@@ -1,0 +1,1514 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Gestión de Herramientas y Maquinaria</title>
+<style>
+  :root{--bg:#0b1220;--card:#111b2e;--card2:#0f172a;--txt:#e5e7eb;--mut:#94a3b8;--pri:#22c55e;--warn:#f59e0b;--dang:#ef4444;--line:#26324a;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:radial-gradient(1200px 800px at 20% 0%,#142040 0%,var(--bg) 55%);color:var(--txt)}
+  header{position:sticky;top:0;z-index:20;background:rgba(11,18,32,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .wrap{max-width:1180px;margin:0 auto;padding:14px 16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  /* === CSS GENERAL === */
+  .icon-img {width: 48px; height: 48px; object-fit: contain; vertical-align: middle;}
+  .emojiBtn .icon-img {width: 32px; height: 32px;}
+  
+  /* Upload & Slider Styles */
+  .drop-zone {border: 2px dashed var(--line); background: rgba(15,23,42,0.5); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; color: var(--mut); margin-bottom: 10px;}
+  .drop-zone:hover, .drop-zone.dragover {border-color: var(--pri); background: rgba(34,197,94,0.1); color: var(--txt);}
+  .slider-container {background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--line);}
+  input[type=range] {width: 100%; cursor: pointer; accent-color: var(--pri);}
+
+  /* === DRAG AND DROP STYLES === */
+  /* Tools */
+  .tool[draggable="true"] {cursor: grab;}
+  .tool[draggable="true"]:active {cursor: grabbing;}
+  .tool.dragging {opacity: 0.4; border: 2px dashed var(--mut); background: rgba(0,0,0,0.2);}
+  .tool.drag-over {border: 2px solid var(--pri); transform: scale(1.02); box-shadow: 0 0 15px rgba(34,197,94,0.2); z-index: 10;}
+
+  /* Families */
+  .fam-wrap[draggable="true"] .fam-head { cursor: grab; }
+  .fam-wrap[draggable="true"] .fam-head:active { cursor: grabbing; }
+  .fam-wrap.dragging { opacity: 0.3; }
+  .fam-wrap.drag-over { border: 2px dashed var(--pri) !important; background: rgba(34,197,94,0.05) !important; }
+
+  /* === CATALOG MANAGER STYLES === */
+  .cat-header {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 8px;
+    margin: 15px 0 8px 0; font-size: 13px; font-weight: 700; color: #f8fafc;
+    border: 1px solid transparent; transition: 0.2s;
+  }
+  .cat-header.drag-target { border-color: var(--pri); background: rgba(34,197,94,0.15); }
+  
+  .cat-actions { display:flex; gap:5px; opacity:0.6; transition:0.2s; }
+  .cat-header:hover .cat-actions { opacity:1; }
+  .icon-btn { padding:4px; background:transparent; border:none; color:var(--mut); cursor:pointer; border-radius:4px; }
+  .icon-btn:hover { background:rgba(255,255,255,0.1); color:var(--txt); }
+  .icon-btn.del:hover { background:rgba(239,68,68,0.2); color:#fca5a5; }
+
+  /* Drag styles for Icons inside Catalog */
+  .emojiBtn[draggable="true"] { cursor: grab; }
+  .emojiBtn.dragging-icon { opacity: 0.3; transform: scale(0.8); }
+  .emojiBtn.drag-over-icon { transform: scale(1.1); border-color: var(--pri); background: rgba(34,197,94,0.2); }
+
+  /* =============================== */
+
+  h1{font-size:16px;margin:0;color:#f1f5f9;letter-spacing:.2px; display: flex; align-items: center; gap: 8px;}
+  .btn{border:1px solid var(--line);background:linear-gradient(180deg,#16233f,#0f172a);color:var(--txt);padding:9px 11px;border-radius:10px;cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.primary{border-color:rgba(34,197,94,.35);box-shadow:0 0 0 1px rgba(34,197,94,.15) inset}
+  .btn.danger{border-color:rgba(239,68,68,.35);box-shadow:0 0 0 1px rgba(239,68,68,.15) inset}
+  .btn.ghost{background:transparent}
+  .spacer{flex:1}
+  .pill{font-size:12px;color:var(--mut);border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:rgba(15,23,42,.7)}
+  main{max-width:1180px;margin:0 auto;padding:16px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:980px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,rgba(17,27,46,.95),rgba(15,23,42,.95));border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+  .card h2{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);color:#f8fafc;letter-spacing:.2px}
+  .card .content{padding:12px 14px}
+  .tools{display:block;} /* Override grid for vertical blocks */
+  
+  .tool{position:relative;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#101a32,#0b1220);padding:10px;cursor:pointer; transition: transform 0.2s, border-color 0.2s; margin-bottom: 8px;}
+  .tool.selected{outline:2px solid rgba(34,197,94,.55);box-shadow:0 0 0 2px rgba(34,197,94,.15)}
+  .tool .name{font-weight:650;margin:0 0 6px 0;font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .tool .name svg{display:block;}
+  .tool .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--mut);font-size:12px}
+  
+  .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;background:rgba(2,6,23,.35)}
+  .badge.ok{border-color:rgba(34,197,94,.35)}
+  .badge.maint{border-color:rgba(245,158,11,.45); color:#fbbf24; background:rgba(245,158,11,.1)}
+  .bar{height:7px;border-radius:999px;background:#0b1326;border:1px solid var(--line);overflow:hidden;margin-top:8px}
+  .bar > div{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
+  .bar.low > div{background:linear-gradient(90deg,#f59e0b,#d97706)}
+  .bar.crit > div{background:linear-gradient(90deg,#ef4444,#b91c1c)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .small{font-size:12px;color:var(--mut)}
+  
+  /* En uso */
+  .loan{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#101a32,#0b1220);padding:10px;margin-bottom:10px}
+  .loan .top{display:flex;gap:10px;align-items:flex-start}
+  .loan .top .sp{flex:1}
+  .loan .title{margin:0;font-weight:700;font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .loan .sub{margin:2px 0 0 0;color:var(--mut);font-size:12px}
+  .loan.warn{border-color:rgba(245,158,11,.55)}
+  .loan.dang{border-color:rgba(239,68,68,.6)}
+  
+  /* Floating bar */
+  #floating{position:fixed;left:16px;right:16px;bottom:16px;z-index:30;display:none}
+  #floating .inner{max-width:1180px;margin:0 auto;border:1px solid var(--line);border-radius:16px;background:rgba(15,23,42,.92);backdrop-filter:blur(10px);box-shadow:0 18px 40px rgba(0,0,0,.4);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  #floating input{background:#0b1326;border:1px solid var(--line);border-radius:10px;padding:9px 10px;color:var(--txt);min-width:220px}
+  
+  /* Modal System */
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
+  .modal.aux{z-index:60;} 
+  .modal.show{display:flex}
+  .modal .panel{width:min(860px,92vw);max-height:86vh;overflow:auto;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#101a32,#0b1220);box-shadow:0 22px 60px rgba(0,0,0,.55)}
+  .modal .head{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .modal .head h3{margin:0;font-size:14px}
+  .modal .body{padding:12px 14px}
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media (max-width:820px){.form{grid-template-columns:1fr}}
+  label{display:block;font-size:12px;color:var(--mut);margin:0 0 6px}
+  input,select,textarea{width:100%;background:#0b1326;border:1px solid var(--line);border-radius:10px;padding:9px 10px;color:var(--txt);outline:none}
+  textarea{min-height:80px;resize:vertical}
+  .modal .foot{display:flex;gap:10px;justify-content:flex-end;padding:12px 14px;border-top:1px solid var(--line)}
+  
+  table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:14px}
+  th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:12px}
+  th{color:#e2e8f0;text-align:left;background:rgba(2,6,23,.35)}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace}
+
+  .emojiGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;max-height:50vh;overflow:auto;padding:6px}
+  .emojiBtn{font-size:26px;padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);cursor:pointer; transition: transform 0.1s; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .emojiBtn:active{transform:scale(0.9)}
+  .emojiBtn:hover{background:rgba(255,255,255,.12)}
+  
+  .check{display:flex; align-items:center; gap:8px; padding:6px; border-radius:6px; cursor:pointer;}
+  .check:hover{background:rgba(255,255,255,0.05)}
+  .check input{width:auto;}
+  .maint-stat{display:flex; gap:12px; margin-bottom:12px; padding:10px; background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:10px; color:#fbbf24; font-size:13px;}
+</style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:50;padding:10px;background:#111;color:#fff;"><button class="btn" onclick="window.location.href='index.html'">Volver al menú</button></div>
+
+<header>
+  <div class="wrap">
+    <div class="row">
+      <h1>🛠️ Gestión de Préstamos</h1>
+      <span id="statusPill" class="pill">Cargando…</span>
+      <div class="spacer"></div>
+      <button class="btn primary" id="btnNuevo">+ Herramienta</button>
+      <button class="btn" id="btnOps">👥 Operarios</button>
+      <button class="btn" id="btnCatalogo">📦 Catálogo</button>
+      <button class="btn" id="btnHistorial">📜 Historial</button>
+      <button class="btn" id="btnConfig">⚙️ Config</button>
+      <button class="btn" id="btnExport">⬇ Exportar</button>
+      <button class="btn" id="btnImport">⬆ Importar</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card">
+      <h2>Inventario</h2>
+      <div class="content">
+        <div class="row" style="margin-bottom:10px; gap:10px">
+          <input id="invSearch" placeholder="🔍 Buscar herramienta..." style="flex:1; min-width:150px; background:rgba(0,0,0,0.2);">
+          
+          <select id="sortInv" style="max-width:200px">
+            <option value="manual">Orden: Personalizado</option>
+            <option value="crit">Prioridad: Críticos</option>
+            <option value="name">Orden: Nombre</option>
+            <option value="free">Orden: Cantidad Libre</option>
+          </select>
+        </div>
+        <div id="invEmpty" class="small" style="display:none">No hay herramientas. Usa “📦 Catálogo” o “+ Herramienta”.</div>
+        <div id="invTools" class="tools"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>En uso</h2>
+      <div class="content">
+        <div id="useEmpty" class="small" style="display:none">No hay préstamos activos.</div>
+        <div id="useList"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="floating">
+  <div class="inner">
+    <span class="badge">Selección: <b id="selCount">0</b></span>
+    <input id="fbOperario" list="dlOps" placeholder="Operario (obligatorio)" autocomplete="off"/>
+    <datalist id="dlOps"></datalist>
+    <button class="btn primary" id="btnPrestarSel">Prestar</button>
+    <button class="btn danger" id="btnCancelSel">Cancelar</button>
+    <span class="small" id="selHint"></span>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="panel">
+    <div class="head">
+      <h3 id="mTitle">Modal</h3>
+      <button class="btn ghost" id="mClose">Cerrar</button>
+    </div>
+    <div class="body" id="mBody"></div>
+    <div class="foot" id="mFoot"></div>
+  </div>
+</div>
+
+<div class="modal aux" id="auxModal">
+  <div class="panel">
+    <div class="head">
+      <h3 id="aTitle">Seleccionar</h3>
+      <button class="btn ghost" id="aClose">Cerrar</button>
+    </div>
+    <div class="body" id="aBody"></div>
+    <div class="foot" id="aFoot"></div>
+  </div>
+</div>
+
+<script>
+/* ========= Persistencia ========= */
+// RESTAURAMOS LA CLAVE ORIGINAL PARA RECUPERAR DATOS
+const DB_KEY = "tool_loans_db_v14_lib"; 
+const CFG_KEY = "tool_loans_cfg_v14_lib";
+
+const nowIso = () => new Date().toISOString();
+const uid = () => Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,8);
+const clampInt = (v, min, max) => {
+  const n = Number.parseInt(String(v||"").replace(",", "."), 10);
+  if (Number.isNaN(n)) return null;
+  return Math.max(min, Math.min(max, n));
+};
+const normName = (s) => String(s||"").trim().replace(/\s+/g," ");
+const normOp = (s) => {
+  const t = normName(s);
+  if(!t) return "";
+  return t.split(" ").map(w=>w ? (w[0].toUpperCase()+w.slice(1).toLowerCase()) : "").join(" ");
+};
+const esc = (s) => String(s||"").replace(/[&<>"']/g, (c)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+/* ========= Render Icon Update ========= */
+const renderIcon = (s) => {
+  if(!s) return "🧰";
+  if(String(s).startsWith("data:image")) return `<img src="${s}" class="icon-img" alt="icon"/>`;
+  if(String(s).includes("</svg>")) return s; 
+  return esc(s);
+};
+
+/* ========= Resize Utility ========= */
+function processImage(file, callback) {
+  if(!file.type.startsWith("image/")) return alert("No es una imagen");
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX_SIZE = 64; 
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; } }
+      else { if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/png'));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+let db = { tools: [], history: [], library: null, familyOrder: [], operators: [] }; 
+let cfg = { warnDays: 7, dangerDays: 30  , familyOpen: {} };
+let selected = new Set();
+// Variables globales Drag & Drop
+let dragSrcIndex = null; 
+let draggedIcon = null;  
+let dragType = null; // 'tool' or 'family'
+let dragSrcId = null; // ID for tools, Family Name for families
+
+/* ========= DOM ========= */
+const $ = (id)=>document.getElementById(id);
+const invTools = $("invTools");
+const useList = $("useList");
+const floating = $("floating");
+const fbOperario = $("fbOperario");
+const dlOps = $("dlOps");
+const statusPill = $("statusPill");
+
+/* ========= Modal System ========= */
+function showModal(title, bodyHtml, footButtons){
+  $("mTitle").textContent = title;
+  $("mBody").innerHTML = bodyHtml;
+  const foot = $("mFoot");
+  foot.innerHTML = "";
+  for(const b of (footButtons||[])){
+    const btn = document.createElement("button");
+    btn.className = b.className || "btn";
+    btn.textContent = b.text;
+    btn.addEventListener("click", b.onClick);
+    foot.appendChild(btn);
+  }
+  $("modal").classList.add("show");
+}
+function closeModal(){ $("modal").classList.remove("show"); }
+$("mClose").addEventListener("click", closeModal);
+$("modal").addEventListener("click", (e)=>{ if(e.target.id==="modal") closeModal(); });
+
+function showAuxModal(title, bodyHtml, footButtons){
+  $("aTitle").textContent = title;
+  $("aBody").innerHTML = bodyHtml;
+  const foot = $("aFoot");
+  foot.innerHTML = "";
+  for(const b of (footButtons||[])){
+    const btn = document.createElement("button");
+    btn.className = b.className || "btn";
+    btn.textContent = b.text;
+    btn.addEventListener("click", b.onClick);
+    foot.appendChild(btn);
+  }
+  $("auxModal").classList.add("show");
+}
+function closeAuxModal(){ $("auxModal").classList.remove("show"); }
+$("aClose").addEventListener("click", closeAuxModal);
+$("auxModal").addEventListener("click", (e)=>{ if(e.target.id==="auxModal") closeAuxModal(); });
+
+
+/* ========= Logic Core ========= */
+const DEFAULT_LIB = {
+  "Maquinaria PRO": [],
+  "Básicos": ["🧰","🛠️","⚙️","🔩","🔧","🔨","🪛","🪚","⚒️","🪓","⛏️","🗜️","⛓️","🧲","📏","📐","✂️"],
+  "Maquinaria": ["🏗️","🚜","🚚","🚛","🧱","🚧","🛑","🏗","🧗","👷","🚧","🚂","🚄","🚗"],
+  "Gasoil/Fluidos": ["⛽","🛢️","🔴🛢️","⚪🛢️","🟡🛢️","🟢🛢️","💧🛢️","🔥🛢️","🍶","🥛","🥤","🧴","🧪"],
+  "Eléctrico/Gen": ["⚡","🔌","🔋","💡","🔦","📻","📟","📠","📡","🔋⚡","📺"],
+  "Soldadura/Calor": ["👨‍🏭","👩‍🏭","🔥","💥","🌋","🧨","🕯️","🚬","♨️"],
+  "Materiales": ["🪵","🪨","🧱","⬛","⬜","🟥","🟦","🟫","🟧","🟨","🟩","🟣"],
+  "Limpieza": ["🪜","🧯","🪣","🧹","🧽","🧼","🛁","🚽","🗑️","🧴","🚿"],
+  "Oficina/Varios": ["📦","🏷️","🛒","🧾","📝","📉","📈","📁","📂","📌","📎"],
+  "EPIS": ["🦺","⛑️","🧤","👓","🥽","😷","🎧","👂","👟","🥾"],
+  "Mis Iconos": []
+};
+
+function loadAll(){
+  // Cargamos la base de datos ANTIGUA para recuperar lo que tenías
+  try{ const raw = localStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
+
+  if(!db || !Array.isArray(db.tools)) db = {tools:[],history:[], library:null};
+  if(!db.library) db.library = JSON.parse(JSON.stringify(DEFAULT_LIB));
+  
+  // Clean empty defaults if messy
+  if(!db.library["Mis Iconos"]) db.library["Mis Iconos"] = [];
+
+  for(const t of db.tools){
+    if(!Array.isArray(t.loans)) t.loans = [];
+    if(!Array.isArray(t.serials)) t.serials = [];
+    if(!Array.isArray(t.maintSerials)) t.maintSerials = [];
+    if(typeof t.maintQty !== 'number') t.maintQty = 0;
+    if(typeof t.stock !== 'number') t.stock = 0;
+  }
+  
+  // Ensure familyOrder exists and is synced
+  if(!Array.isArray(db.familyOrder)) db.familyOrder = [];
+  syncFamilyOrder();
+  
+  // === AUTO-ACTUALIZAR CON OPERARIOS ===
+  // Si tu base de datos vieja no tenía tabla de operarios, la creamos ahora y metemos los nombres del historial
+  if(!Array.isArray(db.operators)){
+      db.operators = [];
+      const tempSet = new Set();
+      // Recopilar nombres de historial y préstamos activos
+      [...db.history, ...db.tools.flatMap(t=>t.loans)].forEach(item => {
+          if(item.operator) tempSet.add(item.operator.trim());
+      });
+      // Crear fichas básicas
+      tempSet.forEach(name => {
+         if(name) db.operators.push({ id: uid(), name: name, phone: "", dept: "" });
+      });
+  }
+
+  try{ const rawC = localStorage.getItem(CFG_KEY); if(rawC) cfg = {...cfg, ...JSON.parse(rawC)}; }catch(_){}
+  if(cfg.warnHours) { cfg.warnDays = 7; delete cfg.warnHours; }
+  if(cfg.dangerHours) { cfg.dangerDays = 30; delete cfg.dangerHours; }
+}
+
+function syncFamilyOrder(){
+    const currentKeys = Object.keys(db.library);
+    // Add new ones
+    currentKeys.forEach(k => {
+        if(!db.familyOrder.includes(k)) db.familyOrder.push(k);
+    });
+    // Remove deleted ones (and keep "Sin familia" out of this explicit list if preferred, but we handle it in render)
+    db.familyOrder = db.familyOrder.filter(k => currentKeys.includes(k) || k === "Sin familia");
+}
+
+function saveAll(){
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+}
+
+function toolsInUseCount(t){ return (t.loans||[]).reduce((a,l)=>a + (l.qty||0), 0); }
+function toolsInMaintCount(t){ 
+  if(t.mode==="serial") return (t.maintSerials||[]).length;
+  return (t.maintQty||0);
+}
+function toolsFreeQty(t){ 
+  const total = t.stock || 0;
+  const used = toolsInUseCount(t);
+  const maint = toolsInMaintCount(t);
+  return Math.max(0, total - used - maint); 
+}
+function isCritical(t){
+  const free = toolsFreeQty(t);
+  return free <= 0 || free <= Math.max(1, Math.floor((t.stock||0)*0.20));
+}
+
+function daysSince(iso){ 
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const days = diffMs / (1000 * 60 * 60 * 24);
+  return Math.max(0, days);
+}
+
+function hydrateOperators(){
+  dlOps.innerHTML = "";
+  // Ordenar alfabéticamente
+  const sorted = [...db.operators].sort((a,b) => a.name.localeCompare(b.name));
+  
+  sorted.forEach(op => {
+      const opt = document.createElement("option");
+      opt.value = op.name;
+      // Mostrar info extra si existe en la etiqueta (algunos navegadores lo muestran)
+      if(op.dept || op.phone) {
+          opt.label = `${op.dept ? op.dept : ''} ${op.phone ? '📞'+op.phone : ''}`;
+      }
+      dlOps.appendChild(opt);
+  });
+}
+
+/* ========= Render ========= */
+function updateStatus(){
+  const total = db.tools.length;
+  const activeLoans = db.tools.reduce((a,t)=>a + ((t.loans||[]).length), 0);
+  const inMaint = db.tools.reduce((a,t)=>a + toolsInMaintCount(t), 0);
+  statusPill.textContent = `Items: ${total} · Activos: ${activeLoans} · Reparación: ${inMaint}`;
+}
+
+
+/* === Familias desde Catálogo (db.library) === */
+function familyOfTool(t){
+  const icon=(t.icon||"").trim();
+  if(!icon) return "Sin familia";
+  for(const [fam, arr] of Object.entries(db.library||{})){
+    if(Array.isArray(arr) && arr.includes(icon)) return fam;
+  }
+  return "Sin familia";
+}
+
+function render(){
+  try{ var b=document.getElementById('debugBanner'); if(b){b.textContent='DEBUG: render()';}}catch(e){}
+
+  updateStatus();
+  hydrateOperators();
+  syncFamilyOrder(); // Ensure order array is healthy
+
+  /* ================== INVENTARIO (CON BUSQUEDA) ================== */
+  $("invEmpty").style.display = db.tools.length ? "none" : "block";
+  const sort = $("sortInv").value;
+  // MEJORA: Obtener valor de busqueda
+  const search = normName($("invSearch").value).toLowerCase();
+  
+  let list = [];
+  if (sort === "manual") {
+      list = db.tools.map((t, idx) => ({ ...t, originalIndex: idx }));
+  } else {
+      list = [...db.tools];
+      if(sort==="name") list.sort((a,b)=>a.name.localeCompare(b.name));
+      if(sort==="free") list.sort((a,b)=>toolsFreeQty(b)-toolsFreeQty(a));
+      if(sort==="crit") list.sort((a,b)=>{
+        const ac = isCritical(a)?1:0, bc = isCritical(b)?1:0;
+        if(ac!==bc) return bc-ac;
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  // MEJORA: Filtrado por busqueda
+  if(search) {
+      list = list.filter(t => t.name.toLowerCase().includes(search));
+  }
+  
+  // === Agrupar Inventario por familia ===
+  invTools.innerHTML = "";
+  const famBuckets = {};
+  for(const t of list){
+    const fam = familyOfTool(t);
+    (famBuckets[fam] = famBuckets[fam] || []).push(t);
+  }
+
+  // Ordenar familias
+  let fams = [...db.familyOrder];
+  if(famBuckets["Sin familia"] && !fams.includes("Sin familia")) fams.push("Sin familia");
+  
+  // Filtrar solo las que tienen herramientas visibles
+  fams = fams.filter(f => famBuckets[f] && famBuckets[f].length > 0);
+
+  for(const fam of fams){
+    const wrap=document.createElement("div");
+    wrap.className = "fam-wrap";
+    wrap.setAttribute("data-fam", fam);
+    wrap.style.border="1px solid var(--line)";
+    wrap.style.borderRadius="14px";
+    wrap.style.marginBottom="10px";
+    wrap.style.overflow="hidden";
+    wrap.style.background="rgba(255,255,255,0.03)";
+    
+    // Solo permitir drag si no hay busqueda (para no romper orden)
+    if(!search) {
+        wrap.draggable = true;
+        wrap.ondragstart = (e) => handleFamDragStart(e, fam);
+        wrap.ondragover = (e) => handleFamDragOver(e);
+        wrap.ondragleave = (e) => handleFamDragLeave(e);
+        wrap.ondrop = (e) => handleFamDrop(e, fam);
+    }
+
+    const head=document.createElement("div");
+    head.className = "fam-head"; 
+    head.style.display="flex";
+    head.style.justifyContent="space-between";
+    head.style.alignItems="center";
+    head.style.padding="10px 12px";
+    head.style.background="rgba(0,0,0,0.18)";
+    head.style.cursor="pointer"; 
+    head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${famBuckets[fam].length})</span> <span style="font-size:10px;color:var(--mut)">::</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
+
+    const body=document.createElement("div");
+    body.style.padding="10px";
+    
+    // Lógica de colapsado (abierto por defecto si hay búsqueda)
+    const isOpen = search ? true : (cfg.familyOpen && cfg.familyOpen[fam] === true);
+    body.style.display = isOpen ? "block" : "none";
+
+    head.addEventListener("click", ()=>{
+      const isHidden = body.style.display === "none";
+      body.style.display = isHidden ? "block" : "none";
+      if(!cfg.familyOpen) cfg.familyOpen = {};
+      cfg.familyOpen[fam] = isHidden;
+    });
+
+    for(const t of famBuckets[fam]){
+      const free = toolsFreeQty(t);
+      const used = toolsInUseCount(t);
+      const maint = toolsInMaintCount(t);
+      const pct = t.stock ? Math.round((free/t.stock)*100) : 0;
+      const barClass = free<=0 ? "crit" : (free<=1 ? "low" : "");
+      const selClass = selected.has(t.id) ? "selected" : "";
+
+      const tool = document.createElement("div");
+      tool.className = `tool ${selClass}`;
+      
+      // Solo drag herramientas si no hay busqueda
+      if(!search){
+          tool.draggable = true;
+          tool.ondragstart = (e) => handleToolDragStart(e, t.id);
+          tool.ondragover = (e) => handleToolDragOver(e);
+          tool.ondragleave = (e) => handleToolDragLeave(e);
+          tool.ondrop = (e) => handleToolDrop(e, t.id);
+      }
+
+      tool.onclick = (e)=>{
+        if(e.target.closest(".btn") || e.target.closest("input") || e.target.closest("select")) return;
+        toggleSelect(t.id);
+      };
+      
+      tool.innerHTML = `
+        <div class="row">
+          <div class="ico" style="cursor:grab">${renderIcon(t.icon)}</div>
+          <div style="flex:1;min-width:140px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div class="name">${esc(t.name)}</div>
+              <div class="kpis">${used?`<span class="pill warn">En uso ${used}</span>`:""}${maint?`<span class="pill danger">Reparación ${maint}</span>`:""}</div>
+            </div>
+            <div class="meta">Stock: <b>${t.stock}</b> · Libres: <b>${free}</b></div>
+            <div class="bar"><i class="${barClass}" style="width:${pct}%;"></i></div>
+          </div>
+          <div class="row" style="gap:6px">
+            <button class="btn" type="button" onclick="openEdit('${t.id}')">Editar</button>
+            <button class="btn" type="button" onclick="openLoanAction('${t.id}')">Prestar</button>
+            <button class="btn" type="button" onclick="openMaintManager('${t.id}')">Reparación</button>
+            <button class="btn dang" type="button" onclick="deleteTool('${t.id}')">Eliminar</button>
+          </div>
+        </div>
+      `;
+      body.appendChild(tool);
+    }
+
+    wrap.appendChild(head);
+    wrap.appendChild(body);
+    invTools.appendChild(wrap);
+  }
+
+  /* ================== EN USO (AGRUPADO POR FAMILIAS) ================== */
+  
+  // 1. Recopilar prestamos y agrupar
+  const useBuckets = {};
+  let totalLoans = 0;
+  
+  db.tools.forEach(t => {
+      t.loans.forEach(l => {
+         const fam = familyOfTool(t);
+         if(!useBuckets[fam]) useBuckets[fam] = [];
+         useBuckets[fam].push({tool: t, loan: l});
+         totalLoans++;
+      });
+  });
+
+  // Ordenar cada bucket por fecha (como estaba antes)
+  for(const k in useBuckets){
+      useBuckets[k].sort((a,b)=> new Date(a.loan.outAt)-new Date(b.loan.outAt));
+  }
+
+  $("useEmpty").style.display = totalLoans ? "none" : "block";
+  useList.innerHTML = "";
+
+  // 2. Usar orden de familias (mismo que inventario)
+  let useFams = [...db.familyOrder];
+  if(useBuckets["Sin familia"] && !useFams.includes("Sin familia")) useFams.push("Sin familia");
+  useFams = useFams.filter(f => useBuckets[f] && useBuckets[f].length > 0);
+
+  // 3. Renderizar Grupos En Uso
+  for(const fam of useFams){
+      const wrap = document.createElement("div");
+      wrap.className = "fam-wrap";
+      wrap.style.border="1px solid var(--line)";
+      wrap.style.borderRadius="14px";
+      wrap.style.marginBottom="10px";
+      wrap.style.overflow="hidden";
+      wrap.style.background="rgba(255,255,255,0.03)";
+      // NOTA: No añadimos draggable aquí porque no se reordena lo prestado
+
+      const head = document.createElement("div");
+      head.className = "fam-head";
+      head.style.display="flex";
+      head.style.justifyContent="space-between";
+      head.style.alignItems="center";
+      head.style.padding="10px 12px";
+      head.style.background="rgba(255,100,0,0.05)"; // Tinte muy ligero diferente para diferenciar de inventario
+      head.style.cursor="pointer";
+      head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${useBuckets[fam].length})</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
+
+      const body = document.createElement("div");
+      body.style.padding="10px";
+      
+      // Lógica de colapsado para "En Uso" (Prefijo 'use_' para diferenciar del inventario)
+      const openKey = 'use_' + fam;
+      const isOpen = cfg.familyOpen && cfg.familyOpen[openKey] === true;
+      body.style.display = isOpen ? "block" : "none";
+
+      head.addEventListener("click", ()=>{
+          const isHidden = body.style.display === "none";
+          body.style.display = isHidden ? "block" : "none";
+          if(!cfg.familyOpen) cfg.familyOpen = {};
+          cfg.familyOpen[openKey] = isHidden;
+          // No guardamos saveAll() aquí explícitamente para no spammear, pero el estado en memoria persiste
+      });
+
+      // Renderizar tarjetas de prestamo
+      for(const {tool, loan} of useBuckets[fam]){
+          const d = daysSince(loan.outAt);
+          const st = (d >= cfg.dangerDays) ? "dang" : (d >= cfg.warnDays ? "warn" : "ok");
+          const titleEx = loan.variant ? `(${esc(loan.variant)})` : "";
+
+          const card = document.createElement("div");
+          card.className = `loan ${st}`;
+          card.innerHTML = `
+            <div class="top">
+              <div class="sp">
+                <div class="title">${renderIcon(tool.icon)} ${esc(tool.name)} ${titleEx} · <span class="mono">x${loan.qty}</span></div>
+                <p class="sub">Operario: <b>${esc(loan.operator)}</b> · Zona: ${esc(loan.zone||"—")}</p>
+                <p class="sub">Salida: ${new Date(loan.outAt).toLocaleDateString()} · Antigüedad: ${d.toFixed(1)} días</p>
+                ${loan.mode==="serial" ? `<p class="sub mono">Series: ${(loan.serials||[]).join(", ")}</p>` : ""}
+                ${loan.notes ? `<p class="sub">📝 ${esc(loan.notes)}</p>` : ""}
+              </div>
+              <div><button class="btn primary" data-act="return">Devolver</button></div>
+            </div>
+          `;
+          card.querySelector('[data-act="return"]').addEventListener("click", ()=>openReturn(tool.id, loan.id));
+          body.appendChild(card);
+      }
+
+      wrap.appendChild(head);
+      wrap.appendChild(body);
+      useList.appendChild(wrap);
+  }
+
+  $("selCount").textContent = String(selected.size);
+  $("selHint").textContent = selected.size ? "Listo para prestar." : "";
+  floating.style.display = selected.size ? "block" : "none";
+}
+
+function toggleSelect(id){
+  if(selected.has(id)) selected.delete(id); else selected.add(id);
+  render(); var b=document.getElementById('debugBanner'); if(b){b.textContent='DEBUG: OK';}
+}
+
+/* === MAIN PAGE DRAG AND DROP LOGIC === */
+
+// 1. Family Dragging
+function handleFamDragStart(e, famName){
+    if(e.target.closest('.tool')) {
+        // Prevent family drag if actually dragging a tool inside
+        return;
+    }
+    dragType = 'family';
+    dragSrcId = famName;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+}
+function handleFamDragOver(e){
+    if(dragType !== 'family') return;
+    e.preventDefault();
+    e.target.closest('.fam-wrap').classList.add('drag-over');
+}
+function handleFamDragLeave(e){
+    e.target.closest('.fam-wrap')?.classList.remove('drag-over');
+}
+function handleFamDrop(e, targetFam){
+    if(dragType !== 'family') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = e.target.closest('.fam-wrap');
+    if(wrap) wrap.classList.remove('drag-over');
+    
+    const srcFam = dragSrcId;
+    if(srcFam !== targetFam){
+        const srcIdx = db.familyOrder.indexOf(srcFam);
+        const tgtIdx = db.familyOrder.indexOf(targetFam);
+        if(srcIdx > -1 && tgtIdx > -1){
+             // Remove source and insert at target
+             db.familyOrder.splice(srcIdx, 1);
+             db.familyOrder.splice(tgtIdx, 0, srcFam);
+             saveAll();
+             render();
+        }
+    }
+}
+
+// 2. Tool Dragging
+function handleToolDragStart(e, toolId){
+    dragType = 'tool';
+    dragSrcId = toolId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+    e.stopPropagation(); // Stop bubbling to family
+}
+function handleToolDragOver(e){
+    if(dragType !== 'tool') return;
+    e.preventDefault();
+    const t = e.target.closest('.tool');
+    if(t) t.classList.add('drag-over');
+}
+function handleToolDragLeave(e){
+    const t = e.target.closest('.tool');
+    if(t) t.classList.remove('drag-over');
+}
+function handleToolDrop(e, targetId){
+    if(dragType !== 'tool') return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Switch to manual sort automatically if dropped
+    const sortSelect = $("sortInv");
+    if(sortSelect.value !== "manual"){
+        sortSelect.value = "manual";
+        // We need to ensure logic handles this switch gracefully
+    }
+    
+    const srcId = dragSrcId;
+    if(srcId !== targetId){
+        const srcIdx = db.tools.findIndex(t => t.id === srcId);
+        const tgtIdx = db.tools.findIndex(t => t.id === targetId);
+        
+        if(srcIdx > -1 && tgtIdx > -1){
+            // Move item in array
+            const [item] = db.tools.splice(srcIdx, 1);
+            db.tools.splice(tgtIdx, 0, item);
+            saveAll();
+            render();
+        }
+    }
+}
+
+
+/* ========= Tool CRUD ========= */
+function openNew(){
+  showModal("Nueva herramienta", `
+    <div class="form">
+      <div><label>Nombre</label><input id="tName" placeholder="Ej. Llave Fija"/></div>
+      <div><label>Icono</label><div style="display:flex;gap:5px"><input id="tIcon" placeholder="Ej. 🔧" style="flex:1"/><button class="btn" type="button" id="btnPickIcon">📚</button></div></div>
+      <div><label>Stock Total</label><input id="tStock" inputmode="numeric" placeholder="Cantidad comprada"/></div>
+      <div><label>Modo</label><select id="tMode"><option value="qty">Cantidad</option><option value="serial">Por Serie</option></select></div>
+      <div><label>Series (si aplica)</label><textarea id="tSerials" placeholder="Una por línea" disabled></textarea></div>
+    </div>
+  `, [
+    {text:"Cancelar", className:"btn", onClick: closeModal},
+    {text:"Guardar", className:"btn primary", onClick: ()=>{
+      const name = normName($("tName").value);
+      if(!name) return alert("Nombre obligatorio");
+      const icon = $("tIcon").value;
+      const mode = $("tMode").value;
+      let stock = clampInt($("tStock").value,0,9999);
+      let serials = [];
+      if(mode==="serial"){
+        serials = $("tSerials").value.split("\n").map(normName).filter(Boolean);
+        if(!serials.length) return alert("Indica las series");
+        stock = serials.length;
+      } else {
+        if(stock===null) return alert("Stock inválido");
+      }
+      db.tools.push({id:uid(), name, icon, stock, mode, serials, maintQty:0, maintSerials:[], notes:"", loans:[]});
+      saveAll(); closeModal(); render();
+    }}
+  ]);
+  $("tMode").addEventListener("change", e => $("tSerials").disabled = (e.target.value!=="serial"));
+  setTimeout(()=>{
+      const btn = $("btnPickIcon");
+      if(btn) btn.onclick = () => openCatalogManager(true, (val) => { 
+        const inp = $("tIcon"); 
+        inp.value = (inp.value + " " + val).trim();
+      });
+  }, 100);
+}
+
+function openEdit(id){
+  const t = db.tools.find(x=>x.id===id); if(!t) return;
+  showModal("Editar herramienta", `
+    <div class="form">
+      <div><label>Nombre</label><input id="eName" value="${esc(t.name)}"/></div>
+      <div><label>Icono</label><div style="display:flex;gap:5px"><input id="eIcon" value='${t.icon||""}'/><button class="btn" type="button" id="btnPickIconEdit">📚</button></div></div>
+      <div><label>Stock Total</label><input id="eStock" value="${t.stock}" ${t.mode==='serial'?'disabled':''}/></div>
+    </div>
+    <div class="small" style="margin-top:10px">Nota: No se puede cambiar el modo ni series masivamente.</div>
+  `, [
+    {text:"Cancelar", className:"btn", onClick: closeModal},
+    {text:"Guardar", className:"btn primary", onClick: ()=>{
+      const name = normName($("eName").value);
+      if(!name) return;
+      let stock = t.stock;
+      if(t.mode!=="serial") stock = clampInt($("eStock").value, toolsInUseCount(t)+toolsInMaintCount(t), 9999);
+      if(stock===null) return alert("Stock inválido");
+      
+      t.name = name; t.icon = $("eIcon").value; t.stock = stock;
+      saveAll(); closeModal(); render();
+    }}
+  ]);
+  setTimeout(()=>{
+      const btn = $("btnPickIconEdit");
+      if(btn) btn.onclick = () => openCatalogManager(true, (val) => { 
+        const inp = $("eIcon");
+        inp.value = (inp.value + " " + val).trim();
+      });
+  }, 100);
+}
+
+function deleteTool(id){
+  const t = db.tools.find(x=>x.id===id);
+  if(toolsInUseCount(t)>0) return alert("Tiene préstamos activos. Devuélvelos primero.");
+  if(confirm(`¿Eliminar ${t.name}?`)){
+    db.tools = db.tools.filter(x=>x.id!==id);
+    selected.delete(id);
+    saveAll(); render();
+  }
+}
+
+/* ========= Maintenance Manager ========= */
+function openMaintManager(id){
+  const t = db.tools.find(x=>x.id===id); if(!t) return;
+  const inMaint = toolsInMaintCount(t);
+  const free = toolsFreeQty(t);
+  let content = `
+    <div class="maint-stat">
+      <div>Libres: <b>${free}</b></div>
+      <div>En Reparación: <b>${inMaint}</b></div>
+    </div>
+    <div class="grid">
+      <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:8px">
+        <label>Enviar a Reparación</label>
+        <button class="btn danger" id="btnToMaint" ${free<=0?'disabled':''}>⬇ Averiada</button>
+      </div>
+      <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:8px">
+        <label>Volver a Operativa</label>
+        <button class="btn primary" id="btnFromMaint" ${inMaint<=0?'disabled':''}>⬆ Reparada</button>
+      </div>
+    </div>
+  `;
+  showModal(`Reparación: ${esc(t.name)}`, content, [{text:"Cerrar", className:"btn", onClick:closeModal}]);
+  $("btnToMaint").onclick = () => doSendMaint(t);
+  $("btnFromMaint").onclick = () => doReturnMaint(t);
+}
+function doSendMaint(t){
+  const free = toolsFreeQty(t);
+  if(t.mode === 'qty'){
+    showModal("Enviar a Reparación", `<label>Cantidad (Máx ${free})</label><input id="mqty" type="number" value="1" min="1" max="${free}"/>`, [
+      {text:"Cancelar", className:"btn", onClick: ()=>openMaintManager(t.id)}, 
+      {text:"Confirmar", className:"btn danger", onClick: ()=>{
+        const q = clampInt($("mqty").value, 1, free);
+        if(q) { t.maintQty += q; saveAll(); openMaintManager(t.id); render(); }
+      }}
+    ]);
+  } else {
+    const used = new Set(t.loans.flatMap(l=>l.serials));
+    const maint = new Set(t.maintSerials);
+    const available = t.serials.filter(s => !used.has(s) && !maint.has(s));
+    const checks = available.map(s => `<label class="check"><input type="checkbox" value="${esc(s)}"/> ${esc(s)}</label>`).join("");
+    showModal("Enviar a Reparación", `<div class="checks">${checks||"No hay libres"}</div>`, [
+      {text:"Cancelar", className:"btn", onClick: ()=>openMaintManager(t.id)},
+      {text:"Confirmar", className:"btn danger", onClick: ()=>{
+        const sel = [...document.querySelectorAll(".checks input:checked")].map(i=>i.value);
+        if(sel.length){ t.maintSerials.push(...sel); saveAll(); openMaintManager(t.id); render(); }
+      }}
+    ]);
+  }
+}
+function doReturnMaint(t){
+  const inMaint = toolsInMaintCount(t);
+  if(t.mode === 'qty'){
+    showModal("Sacar de Reparación", `<label>Cantidad (Máx ${inMaint})</label><input id="umqty" type="number" value="1" min="1" max="${inMaint}"/>`, [
+      {text:"Cancelar", className:"btn", onClick: ()=>openMaintManager(t.id)},
+      {text:"Recuperar", className:"btn primary", onClick: ()=>{
+        const q = clampInt($("umqty").value, 1, inMaint);
+        if(q) { t.maintQty = Math.max(0, t.maintQty - q); saveAll(); openMaintManager(t.id); render(); }
+      }}
+    ]);
+  } else {
+    const checks = t.maintSerials.map(s => `<label class="check"><input type="checkbox" value="${esc(s)}"/> ${esc(s)}</label>`).join("");
+    showModal("Sacar de Reparación", `<div class="checks">${checks}</div>`, [
+      {text:"Cancelar", className:"btn", onClick: ()=>openMaintManager(t.id)},
+      {text:"Recuperar", className:"btn primary", onClick: ()=>{
+        const sel = [...document.querySelectorAll(".checks input:checked")].map(i=>i.value);
+        if(sel.length){ t.maintSerials = t.maintSerials.filter(s => !sel.includes(s)); saveAll(); openMaintManager(t.id); render(); }
+      }}
+    ]);
+  }
+}
+
+/* ========= Loans ========= */
+function openBatchLoan(){
+  const op = normOp(fbOperario.value);
+  if(!op) {
+      if(selected.size > 0) alert("Escribe un operario abajo en la barra flotante");
+      return;
+  }
+  const list = db.tools.filter(t=>selected.has(t.id));
+  if(!list.length) return alert("Selecciona herramientas");
+  const rows = list.map(t=>{
+    const free = toolsFreeQty(t);
+    const usedS = new Set(t.loans.flatMap(l=>l.serials));
+    const maintS = new Set(t.maintSerials);
+    const availS = (t.serials||[]).filter(s => !usedS.has(s) && !maintS.has(s));
+    let inputHtml = "";
+    if(t.mode==="serial"){
+       const opts = availS.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
+       inputHtml = `<select multiple data-id="${t.id}" data-type="serial" size="${Math.min(5,availS.length||1)}" style="min-width:150px">${opts}</select>`;
+    } else {
+       inputHtml = `<input type="number" data-id="${t.id}" data-type="qty" min="0" max="${free}" placeholder="0"/>`;
+    }
+    return `<tr><td>${renderIcon(t.icon)} ${t.name}</td><td>${free}</td><td><input data-id="${t.id}" data-type="variant" placeholder="Ej: 13, Pared 12..." style="font-size:12px"/></td><td>${inputHtml}</td></tr>`;
+  }).join("");
+  showModal("Confirmar Préstamo", `
+    <div class="form"><div><label>Operario</label><input id="lOp" value="${esc(op)}" readonly/></div><div><label>Zona / Obra</label><input id="lZone"/></div><div style="grid-column:1/-1"><label>Notas generales</label><textarea id="lNotes"></textarea></div></div>
+    <table style="margin-top:10px"><thead><tr><th>Item</th><th>Libre</th><th>Detalle/Medida</th><th>Selección</th></tr></thead><tbody>${rows}</tbody></table>
+  `, [
+    {text:"Cancelar", className:"btn", onClick: closeModal},
+    {text:"Prestar", className:"btn primary", onClick: ()=>{
+      const zone = normName($("lZone").value);
+      const notes = normName($("lNotes").value);
+      const items = [];
+      document.querySelectorAll('tbody tr').forEach(tr => {
+          const qtyInput = tr.querySelector('[data-type="qty"], [data-type="serial"]');
+          const varInput = tr.querySelector('[data-type="variant"]');
+          const tid = qtyInput.getAttribute("data-id");
+          const type = qtyInput.getAttribute("data-type");
+          const t = db.tools.find(x=>x.id===tid);
+          const variant = normName(varInput.value);
+          if(type==="qty"){
+            const q = parseInt(qtyInput.value);
+            if(q>0) items.push({t, qty:q, serials:[], mode:'qty', variant});
+          } else {
+            const s = [...qtyInput.selectedOptions].map(o=>o.value);
+            if(s.length) items.push({t, qty:s.length, serials:s, mode:'serial', variant});
+          }
+      });
+      if(!items.length) return alert("No has seleccionado cantidades");
+      const outAt = nowIso();
+      items.forEach(({t, qty, serials, mode, variant}) => {
+          const l = {id:uid(), operator:op, zone, qty, mode, serials, outAt, notes, variant};
+          t.loans.push(l);
+          db.history.push({id:uid(), type:"OUT", toolId:t.id, toolName:t.name, operator:op, zone, qty, serials, outAt, notes, variant});
+      });
+      fbOperario.value = ""; selected.clear(); saveAll(); closeModal(); render();
+    }}
+  ]);
+}
+
+function openReturn(tid, lid){
+  const t = db.tools.find(x=>x.id===tid);
+  const l = t.loans.find(x=>x.id===lid);
+  if(!l) return;
+  showModal("Devolución", `
+    <div class="form"><div><label>Herramienta</label><input value="${esc(t.name)} ${l.variant?`(${esc(l.variant)})`:''}" disabled/></div><div><label>Operario</label><input value="${esc(l.operator)}" disabled/></div><div><label>Cant. a devolver (máx ${l.qty})</label><input id="rQty" type="number" value="${l.qty}" max="${l.qty}"/></div><div><label>Estado devuelto</label><select id="rSt"><option value="ok">OK (A stock)</option><option value="inc">Roto (A Reparación)</option></select></div><div style="grid-column:1/-1"><label>Notas</label><textarea id="rNote"></textarea></div></div>
+    ${l.mode==='serial' ? `<div class="small mono" style="margin-top:10px">Series: ${l.serials.join(", ")}</div>` : ''}
+  `, [
+    {text:"Cancelar", className:"btn", onClick:closeModal},
+    {text:"Confirmar", className:"btn primary", onClick: ()=>{
+       const q = clampInt($("rQty").value, 1, l.qty);
+       if(!q) return;
+       const status = $("rSt").value;
+       const note = $("rNote").value;
+       let retSerials = [];
+       if(l.mode === 'serial'){ retSerials = l.serials.slice(0, q); l.serials = l.serials.slice(q); }
+       l.qty -= q;
+       if(l.qty <= 0) t.loans = t.loans.filter(x=>x.id!==lid);
+       if(status === 'inc'){ if(t.mode==='serial') t.maintSerials.push(...retSerials); else t.maintQty += q; }
+       db.history.push({ id:uid(), type:"IN", toolId:t.id, toolName:t.name, operator:l.operator, qty:q, serials:retSerials, outAt:l.outAt, inAt:nowIso(), status, notes:note, variant:l.variant });
+       saveAll(); closeModal(); render();
+    }}
+  ]);
+}
+
+function openHistory(){
+  showModal("Historial", `<div style="margin-bottom:10px;display:flex;gap:10px"><input id="hSearch" placeholder="Filtrar..." style="flex:1"/><button class="btn danger" id="hClear">Limpiar</button></div><div style="max-height:60vh;overflow:auto"><table id="hTable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Nota</th></tr></thead><tbody id="hBody"></tbody></table></div>`, [{text:"Cerrar", className:"btn", onClick:closeModal}]);
+  const renderH = (filter) => {
+    const list = db.history.slice().reverse().filter(h => !filter || (h.operator+h.toolName+(h.variant||"")).toLowerCase().includes(filter.toLowerCase()));
+    $("hBody").innerHTML = list.map(h => `<tr><td class="mono small">${new Date(h.type==="OUT"?h.outAt:h.inAt).toLocaleDateString()}</td><td><span class="badge ${h.type==='OUT'?'':'ok'}">${h.type}</span></td><td class="small"><b>${esc(h.toolName)}</b> ${h.variant?`<br>(${esc(h.variant)})`:''}<br>${esc(h.operator)} (x${h.qty})</td><td class="small">${esc(h.notes||"")} ${h.status==='inc'?'🚨':''}</td></tr>`).join("");
+  };
+  renderH(""); $("hSearch").oninput = (e) => renderH(e.target.value); $("hClear").onclick = () => { if(confirm("¿Borrar todo?")) { db.history=[]; saveAll(); closeModal(); } };
+}
+
+
+/* ================================================== */
+/* === GESTOR DE OPERARIOS (NUEVO) ================= */
+/* ================================================== */
+function openOperatorManager() {
+    const renderOps = (searchVal = "") => {
+        let rows = "";
+        const filtered = db.operators.filter(op => 
+            op.name.toLowerCase().includes(searchVal) || 
+            (op.dept||"").toLowerCase().includes(searchVal)
+        );
+        // Orden alfabético
+        filtered.sort((a,b)=>a.name.localeCompare(b.name));
+
+        filtered.forEach(op => {
+            rows += `
+              <tr>
+                <td><b>${esc(op.name)}</b></td>
+                <td>${esc(op.phone||"-")}</td>
+                <td>${esc(op.dept||"-")}</td>
+                <td style="text-align:right">
+                    <button class="icon-btn edit" onclick="editOp('${op.id}')">✏️</button>
+                    <button class="icon-btn del" onclick="deleteOp('${op.id}')">🗑️</button>
+                </td>
+              </tr>
+            `;
+        });
+        
+        return `
+          <div style="margin-bottom:10px; display:flex; gap:10px;">
+            <input id="opSearch" placeholder="Buscar operario..." value="${esc(searchVal)}" style="flex:1">
+            <button class="btn primary" id="btnAddOp">+ Nuevo</button>
+          </div>
+          <div style="max-height:50vh; overflow:auto">
+            <table>
+              <thead><tr><th>Nombre</th><th>Teléfono</th><th>Dpto</th><th></th></tr></thead>
+              <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--mut)">Sin operarios</td></tr>'}</tbody>
+            </table>
+          </div>
+        `;
+    };
+
+    showModal("Gestión de Operarios", renderOps(), [{text:"Cerrar", className:"btn", onClick:closeModal}]);
+
+    // Re-bind events after render
+    const bindEvents = () => {
+        const inp = $("opSearch");
+        if(inp) inp.oninput = (e) => {
+            $("mBody").innerHTML = renderOps(e.target.value.toLowerCase());
+            bindEvents(); // Re-bind dynamic buttons
+            // Focus back to input
+            const newInp = $("opSearch");
+            newInp.value = e.target.value;
+            newInp.focus();
+        };
+        const btnAdd = $("btnAddOp");
+        if(btnAdd) btnAdd.onclick = () => openOpForm();
+    };
+    bindEvents();
+}
+
+// Global functions for inline HTML access
+window.editOp = (id) => openOpForm(id);
+window.deleteOp = (id) => {
+    if(confirm("¿Eliminar operario? (No afecta al historial pasado)")){
+        db.operators = db.operators.filter(o => o.id !== id);
+        saveAll();
+        openOperatorManager(); // Refresh
+        render(); // Refresh autocomplete
+    }
+};
+
+function openOpForm(id = null){
+    const op = id ? db.operators.find(o => o.id === id) : {name:"", phone:"", dept:""};
+    
+    showAuxModal(id ? "Editar Operario" : "Nuevo Operario", `
+        <div class="form">
+            <div style="grid-column:1/-1"><label>Nombre Completo</label><input id="fOpName" value="${esc(op.name)}" placeholder="Ej. Juan Pérez"></div>
+            <div><label>Teléfono</label><input id="fOpPhone" value="${esc(op.phone)}" placeholder="Opcional"></div>
+            <div><label>Departamento</label><input id="fOpDept" value="${esc(op.dept)}" placeholder="Ej. Soldadura"></div>
+        </div>
+    `, [
+        {text:"Cancelar", className:"btn", onClick:closeAuxModal},
+        {text:"Guardar", className:"btn primary", onClick:()=>{
+            const name = normName($("fOpName").value);
+            if(!name) return alert("Nombre obligatorio");
+            
+            if(id){
+                // Edit
+                const target = db.operators.find(o => o.id === id);
+                if(target) {
+                    target.name = name;
+                    target.phone = $("fOpPhone").value.trim();
+                    target.dept = $("fOpDept").value.trim();
+                }
+            } else {
+                // Create
+                db.operators.push({
+                    id: uid(),
+                    name: name,
+                    phone: $("fOpPhone").value.trim(),
+                    dept: $("fOpDept").value.trim()
+                });
+            }
+            saveAll();
+            closeAuxModal();
+            openOperatorManager(); // Back to list
+            render(); // Refresh autocomplete
+        }}
+    ]);
+}
+
+$("btnConfig").onclick = () => {
+    showModal("Configuración", `<div class="form"><div><label>Aviso Amarillo (Días)</label><input id="cWarn" type="number" value="${cfg.warnDays}"/></div><div><label>Aviso Rojo (Días)</label><input id="cDanger" type="number" value="${cfg.dangerDays}"/></div></div>`, [
+        {text:"Cancelar", className:"btn", onClick:closeModal},
+        {text:"Guardar", className:"btn primary", onClick: ()=>{ cfg.warnDays = parseInt($("cWarn").value)||7; cfg.dangerDays = parseInt($("cDanger").value)||30; saveAll(); closeModal(); render(); }}
+    ]);
+};
+$("btnExport").onclick = () => {
+  const blob = new Blob([JSON.stringify({db,cfg})], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_${Date.now()}.json`; a.click();
+};
+$("btnImport").onclick = () => {
+  const inp = document.createElement("input"); inp.type="file";
+  inp.onchange = async e => {
+    try { const data = JSON.parse(await e.target.files[0].text()); if(data.db) { db = data.db; cfg = data.cfg||cfg; saveAll(); render(); alert("Importado"); } } catch(err){ alert("Error archivo"); }
+  };
+  inp.click();
+};
+
+$("btnNuevo").onclick = openNew;
+$("btnOps").onclick = openOperatorManager; // NUEVO BOTON
+$("btnHistorial").onclick = openHistory;
+$("sortInv").onchange = render;
+$("invSearch").oninput = render; // BUSCADOR ACTIVADO
+$("btnPrestarSel").onclick = openBatchLoan;
+$("btnCancelSel").onclick = ()=>{ selected.clear(); render(); };
+
+
+/* ================================================== */
+/* === GESTOR DE CATÁLOGO TOTAL (RENOVADO) ========= */
+/* ================================================== */
+
+// Ahora es una única función que maneja tanto "Ver/Gestionar" como "Seleccionar para herramienta"
+// isPickerMode: true (si vienes de "Nueva Herramienta") / false (si vienes del botón menú principal)
+// onSelect: callback solo usado si isPickerMode=true
+function openCatalogManager(isPickerMode = false, onSelect = null) {
+  
+  const renderManager = () => {
+      let html = `
+        <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--line); padding-bottom:10px;">
+          <button class="btn primary" id="btnAddNewFamily">+ Familia</button>
+          <button class="btn" id="btnUploadIcon">+ Icono/Imagen</button>
+          <div class="spacer"></div>
+          ${!isPickerMode ? `<span class="small" style="color:var(--mut)">Arrastra iconos para ordenar o mover entre familias.</span>` : ''}
+        </div>
+        <div style="max-height:60vh; overflow-y:auto; padding-right:5px;">
+      `;
+
+      // Iterar familias
+      for(const [cat, list] of Object.entries(db.library)){
+        // Header de Familia (Drop Target)
+        html += `
+          <div class="cat-header" data-cat="${cat}">
+             <span>${cat} <span class="badge" style="margin-left:8px">${list.length}</span></span>
+             <div class="cat-actions">
+                <button class="icon-btn edit" title="Renombrar" onclick="renameFamily('${cat}')">✏️</button>
+                <button class="icon-btn del" title="Borrar Familia" onclick="deleteFamily('${cat}')">🗑️</button>
+             </div>
+          </div>
+          <div class="emojiGrid" data-cat="${cat}">
+        `;
+        // Iconos
+        html += list.map((e, idx) => `
+            <button class="emojiBtn" 
+              draggable="true" 
+              data-cat="${cat}" 
+              data-idx="${idx}"
+              onclick="selectIcon('${cat}', ${idx})"
+            >
+              ${renderIcon(e)}
+            </button>`
+        ).join("");
+        html += `</div>`;
+      }
+      html += `</div>`;
+
+      // Renderizar en el modal adecuado
+      if(isPickerMode) {
+          $("aBody").innerHTML = html;
+      } else {
+          $("mBody").innerHTML = html;
+      }
+
+      attachCatalogEvents(isPickerMode, onSelect, renderManager);
+  };
+
+  if(isPickerMode){
+      showAuxModal("Seleccionar Icono", "", [{text:"Cancelar", className:"btn", onClick:closeAuxModal}]);
+  } else {
+      showModal("Gestión de Catálogo", "", [{text:"Cerrar", className:"btn", onClick:closeModal}]);
+  }
+  
+  renderManager();
+}
+
+// Eventos y Lógica del Catálogo
+window.renameFamily = (oldName) => {
+    const newName = prompt("Nuevo nombre para la familia:", oldName);
+    if(newName && newName !== oldName){
+        if(db.library[newName]) return alert("Ese nombre ya existe");
+        const entries = Object.entries(db.library);
+        const newLib = {};
+        // Mantener orden de keys
+        for(const [k,v] of entries){
+            if(k === oldName) newLib[newName] = v;
+            else newLib[k] = v;
+        }
+        db.library = newLib;
+        
+        // Also update familyOrder
+        const idx = db.familyOrder.indexOf(oldName);
+        if(idx > -1) db.familyOrder[idx] = newName;
+        else db.familyOrder.push(newName);
+        
+        saveAll();
+        // Refrescar vista re-llamando al openCatalogManager en el modo correcto
+        // Truco: detectamos cual modal está abierto
+        const isAux = $("auxModal").classList.contains("show");
+        openCatalogManager(isAux, isAux ? window.currentSelectCb : null);
+        render(); // update main view too
+    }
+};
+
+window.deleteFamily = (name) => {
+    if(confirm(`¿Eliminar familia "${name}" y todos sus iconos?`)){
+        delete db.library[name];
+        db.familyOrder = db.familyOrder.filter(n => n !== name);
+        saveAll();
+        const isAux = $("auxModal").classList.contains("show");
+        openCatalogManager(isAux, isAux ? window.currentSelectCb : null);
+        render(); // update main view
+    }
+};
+
+window.selectIcon = (cat, idx) => {
+    // Si estamos en modo picker, ejecutamos el callback
+    if(window.isPickerActive && window.currentSelectCb) {
+        window.currentSelectCb(db.library[cat][idx]);
+        closeAuxModal();
+    } else {
+        // En modo gestión, click podría ser para borrar individualmente?
+        if(confirm("¿Eliminar este icono?")){
+            db.library[cat].splice(idx, 1);
+            saveAll();
+            openCatalogManager(false);
+        }
+    }
+}
+
+function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
+    // Guardar estado global para los oncliks inline
+    window.isPickerActive = isPickerMode;
+    window.currentSelectCb = onSelect;
+
+    // Botones Top
+    const btnAddFam = document.getElementById("btnAddNewFamily");
+    const btnUpload = document.getElementById("btnUploadIcon");
+    
+    if(btnAddFam) btnAddFam.onclick = () => {
+        const name = prompt("Nombre de la nueva familia:");
+        if(name){
+            if(db.library[name]) return alert("Ya existe");
+            db.library[name] = [];
+            db.familyOrder.push(name);
+            saveAll();
+            refreshCb();
+            render();
+        }
+    };
+
+    if(btnUpload) btnUpload.onclick = () => openUploadModal(refreshCb);
+
+    // DRAG AND DROP LOGIC
+    const icons = document.querySelectorAll('.emojiBtn');
+    const headers = document.querySelectorAll('.cat-header');
+
+    icons.forEach(icon => {
+        icon.addEventListener('dragstart', (e) => {
+            draggedIcon = {
+                cat: icon.dataset.cat,
+                idx: parseInt(icon.dataset.idx)
+            };
+            icon.classList.add('dragging-icon');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        icon.addEventListener('dragend', () => {
+            icon.classList.remove('dragging-icon');
+            document.querySelectorAll('.emojiBtn').forEach(i => i.classList.remove('drag-over-icon'));
+            document.querySelectorAll('.cat-header').forEach(h => h.classList.remove('drag-target'));
+        });
+
+        // Drop sobre otro icono (Reordenar)
+        icon.addEventListener('dragover', (e) => { e.preventDefault(); icon.classList.add('drag-over-icon'); });
+        icon.addEventListener('dragleave', () => icon.classList.remove('drag-over-icon'));
+        icon.addEventListener('drop', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const targetCat = icon.dataset.cat;
+            const targetIdx = parseInt(icon.dataset.idx);
+
+            if(draggedIcon && (draggedIcon.cat !== targetCat || draggedIcon.idx !== targetIdx)){
+                // Mover
+                const item = db.library[draggedIcon.cat].splice(draggedIcon.idx, 1)[0];
+                // Si es la misma categoria pero hemos borrado uno antes, ajustar indice
+                let finalIdx = targetIdx;
+                /* La logica simple de splice y insert funciona bien si recargamos todo */
+                
+                // Insertar en nuevo lugar
+                db.library[targetCat].splice(finalIdx, 0, item);
+                saveAll();
+                refreshCb();
+            }
+        });
+    });
+
+    // Drop sobre cabecera (Mover a carpeta)
+    headers.forEach(header => {
+        header.addEventListener('dragover', (e) => { e.preventDefault(); header.classList.add('drag-target'); });
+        header.addEventListener('dragleave', () => header.classList.remove('drag-target'));
+        header.addEventListener('drop', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const targetCat = header.dataset.cat;
+            if(draggedIcon && draggedIcon.cat !== targetCat){
+                const item = db.library[draggedIcon.cat].splice(draggedIcon.idx, 1)[0];
+                db.library[targetCat].push(item);
+                saveAll();
+                refreshCb();
+            }
+        });
+    });
+}
+
+// Sub-Modal para Subir Imagen
+function openUploadModal(parentRefreshCb) {
+  let tempImgData = null; 
+  let baseImg = null; 
+
+  // Guardamos referencia al modal padre para volver a él
+  const isAux = $("auxModal").classList.contains("show");
+  const parentModalId = isAux ? "auxModal" : "modal";
+  
+  // Ocultamos temporalmente el padre (no cerramos para no perder estado si fuera complejo)
+  // Pero aquí, como recargamos todo, podemos cerrarlo visualmente y reabrirlo.
+  // Estrategia: Usamos el OTRO modal disponible para el upload.
+  // Si estamos en modal principal (Gestión), usamos auxModal para upload.
+  // Si estamos en auxModal (Picker), usamos modal para upload (invertido).
+  
+  const uploadModalId = isAux ? "modal" : "auxModal";
+  const uploadModalTitle = isAux ? "mTitle" : "aTitle";
+  const uploadModalBody = isAux ? "mBody" : "aBody";
+  const uploadModalFoot = isAux ? "mFoot" : "aFoot";
+  const uploadModalEl = $(uploadModalId);
+
+  const body = `
+    <div style="text-align:center">
+      <div class="drop-zone" id="dz_upload">
+        <span style="font-size:24px">📂</span><br>Click, Arrastrar o Ctrl+V
+      </div>
+      <input type="file" id="fi_upload" accept="image/*" style="display:none"/>
+      <div class="slider-container"><label>Tono de Color</label><input type="range" id="sl_hue" min="0" max="360" value="0"></div>
+      <div id="pv_upload" style="margin:15px 0; height:60px; display:flex; align-items:center; justify-content:center;"></div>
+      <div style="text-align:left"><label>Familia destino:</label><select id="sel_cat_up">${Object.keys(db.library).map(k=>`<option value="${k}">${k}</option>`).join("")}</select></div>
+    </div>
+  `;
+
+  // Configurar el modal de upload
+  $(uploadModalTitle).textContent = "Subir Nuevo Icono";
+  $(uploadModalBody).innerHTML = body;
+  const foot = $(uploadModalFoot);
+  foot.innerHTML = "";
+  
+  // Botones
+  const btnCancel = document.createElement("button");
+  btnCancel.className = "btn";
+  btnCancel.textContent = "Volver";
+  btnCancel.onclick = () => {
+      uploadModalEl.classList.remove("show");
+      // El padre sigue abierto detras
+  };
+  
+  const btnSave = document.createElement("button");
+  btnSave.className = "btn primary";
+  btnSave.textContent = "Guardar";
+  btnSave.onclick = () => {
+       if(!tempImgData) return alert("Falta imagen");
+       const cat = $("sel_cat_up").value;
+       db.library[cat].push(tempImgData);
+       saveAll();
+       uploadModalEl.classList.remove("show");
+       parentRefreshCb(); // Recargar el manager
+  };
+
+  foot.appendChild(btnCancel);
+  foot.appendChild(btnSave);
+  uploadModalEl.classList.add("show");
+
+  // Lógica Upload
+  const dz = $("dz_upload");
+  const fi = $("fi_upload");
+  const pv = $("pv_upload");
+  const slider = $("sl_hue");
+
+  dz.onclick = () => fi.click();
+
+  const updatePreview = () => {
+      if(!baseImg) return;
+      const hue = slider.value;
+      const canvas = document.createElement('canvas');
+      canvas.width = baseImg.width; canvas.height = baseImg.height;
+      const ctx = canvas.getContext('2d');
+      ctx.filter = `hue-rotate(${hue}deg)`;
+      ctx.drawImage(baseImg, 0, 0);
+      tempImgData = canvas.toDataURL('image/png');
+      pv.innerHTML = `<img src="${tempImgData}" style="border:1px solid #fff; border-radius:4px; padding:4px; background:#333"/>`;
+  };
+
+  const handleFile = (f) => {
+    processImage(f, (base64) => {
+      const img = new Image();
+      img.onload = () => { baseImg = img; slider.value = 0; updatePreview(); };
+      img.src = base64;
+    });
+  };
+
+  slider.oninput = updatePreview;
+  fi.onchange = (e) => { if(e.target.files[0]) handleFile(e.target.files[0]); };
+  dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
+  dz.ondragleave = () => dz.classList.remove("dragover");
+  dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("dragover"); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
+  document.onpaste = (e) => {
+    // Solo capturar paste si este modal está visible (top z-index)
+    if(!uploadModalEl.classList.contains("show")) return; 
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) { if (item.kind === 'file' && item.type.startsWith('image/')) handleFile(item.getAsFile()); }
+  };
+}
+
+// === FUNCIONES AUXILIARES PARA LOS BOTONES ===
+
+// Acción del botón "Prestar" en la tarjeta
+function openLoanAction(id){
+  // Si la herramienta no estaba seleccionada, la seleccionamos
+  if(!selected.has(id)) {
+      selected.add(id);
+      render();
+  }
+  // Abrimos el modal con TODO lo que haya seleccionado (incluyendo la actual)
+  // Usamos timeout para dar tiempo al renderizado visual
+  setTimeout(() => openBatchLoan(), 10);
+}
+
+// Boton del menu principal: Abre el modo Gestión (isPicker=false)
+$("btnCatalogo").onclick = () => openCatalogManager(false);
+
+boot();
+function boot(){
+  loadAll();
+  // Al iniciar, ninguna familia debe quedar desplegada por defecto
+  if(!cfg.familyOpen) cfg.familyOpen = {};
+  cfg.familyOpen = {};
+  saveAll();
+  render();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Terminal Ferretería</title>
+  <style>
+    :root{
+      --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
+      --line:#ffffff1f; --txt:#eaf1ff; --muted:#9bb0d0;
+      --shadow: 0 16px 40px rgba(0,0,0,.45);
+      --r2:22px; --pad:18px; --btnH:74px; --btnH2:64px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue";
+      --accent:#35b6ff; --ok:#2bd671; --warn:#ffcc66; --bad:#ff5a7a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--font); color:var(--txt); min-height:100vh;
+      background:
+        radial-gradient(900px 500px at 20% 0%, #19346a66, transparent 55%),
+        radial-gradient(800px 500px at 85% 18%, #1b5b7a55, transparent 60%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+    }
+    .app{max-width:1100px;margin:0 auto;padding:18px 18px 36px}
+    header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 4px 18px}
+    .title{display:flex;flex-direction:column;gap:6px}
+    .title h1{margin:0;font-size:22px;letter-spacing:.2px}
+    .title .sub{color:var(--muted);font-size:13px}
+    .hdrRight{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+    .badge{font-size:12px;color:#bfe6ff;border:1px solid #3bbcff55;padding:7px 10px;border-radius:999px;background:#061a2b88;white-space:nowrap}
+    .tinyBtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .tinyBtn{
+      height:40px;border-radius:12px;border:1px solid #ffffff22;background:#0b2346;color:var(--txt);
+      font-weight:900;font-size:13px;cursor:pointer;padding:0 12px;display:inline-flex;align-items:center;gap:8px;
+    }
+    .tinyBtn:active{transform:scale(.99)}
+    .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--shadow);padding:var(--pad)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    @media (max-width:900px){.grid2,.grid3{grid-template-columns:1fr}.app{padding:14px}.hdrRight{align-items:flex-start}.tinyBtns{justify-content:flex-start}}
+    .btn{
+      height:var(--btnH); border-radius:18px; border:1px solid #ffffff22; background:#0b2346; color:var(--txt);
+      font-size:20px; font-weight:700; letter-spacing:.3px; display:flex; align-items:center; justify-content:center; gap:10px;
+      cursor:pointer; user-select:none; transition:transform .06s ease, background .18s ease, border-color .18s ease, opacity .18s ease;
+      box-shadow:0 10px 22px rgba(0,0,0,.25); padding:0 14px;
+    }
+    .btn:active{transform:scale(.985)}
+    .btn.primary{background:linear-gradient(180deg,#0d3560,#0a2747);border-color:#49c2ff55}
+    .btn.accent{background:linear-gradient(180deg,#0b4a73,#083252);border-color:#49c2ff88}
+    .btn.good{background:linear-gradient(180deg,#0c4f33,#083220);border-color:#2bd67188}
+    .btn.danger{background:linear-gradient(180deg,#5b1230,#3d0c20);border-color:#ff5a7a88}
+    .btn.small{height:var(--btnH2);font-size:18px;border-radius:16px}
+    .btn.ghost{background:transparent}
+    .btn.disabled{opacity:.35;pointer-events:none}
+    .kpi{display:flex;flex-direction:column;gap:5px;padding:14px;border-radius:16px;border:1px solid var(--line);background:#07162f88}
+    .kpi .lbl{color:var(--muted);font-size:12px;letter-spacing:.4px;text-transform:uppercase}
+    .kpi .val{font-size:22px;font-weight:800}
+    .kpi .val.big{font-size:40px;line-height:1}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .sep{height:1px;background:var(--line);margin:14px 0}
+    input, select{width:100%;height:56px;border-radius:14px;border:1px solid #ffffff22;background:#061a33;color:var(--txt);padding:0 14px;font-size:18px;outline:none}
+    input::placeholder{color:#8ea3c422}
+    .hint{color:var(--muted);font-size:13px;margin-top:8px}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#061a2b88;border:1px solid #49c2ff44;color:#ccecff;font-size:13px}
+    .tag{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.4px}
+    .tag.zero{background:#4a0f23;border:1px solid #ff5a7a66}
+    .tag.low{background:#4a3a0f;border:1px solid #ffcc6666}
+    .list{display:flex;flex-direction:column;gap:12px;max-height:52vh;overflow:auto;padding-right:6px}
+    
+    /* NEW: Collapsible Groups */
+    .groupHdr{
+      background:linear-gradient(90deg, #102a52, #0d1b38);
+      border:1px solid #ffffff33; border-radius:16px; padding:16px;
+      cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+      font-weight:800; font-size:18px; user-select:none;
+      transition:background .2s;
+    }
+    .groupHdr:active{background:#163563}
+    .groupHdr .arrow{transition:transform .2s ease; opacity:.6}
+    .groupHdr.open .arrow{transform:rotate(180deg)}
+    .groupBody{display:none; flex-direction:column; gap:12px; padding:6px 0 16px 12px; border-left:2px solid #ffffff11; margin-left:12px}
+    .groupBody.show{display:flex}
+
+    .item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#07162f88;border-radius:16px;padding:14px}
+    .item .left{display:flex;flex-direction:column;gap:6px;min-width:0}
+    .item .name{font-weight:900;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .item .meta{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+    .item .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .miniBtn{height:52px;min-width:120px;border-radius:14px;border:1px solid #ffffff22;background:#0b2346;color:var(--txt);font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px}
+    .miniBtn.sel{background:linear-gradient(180deg,#0b4a73,#083252);border-color:#49c2ff88}
+    .miniBtn.disabled{opacity:.35;pointer-events:none}
+    .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#081a33ee;border:1px solid #49c2ff44;border-radius:16px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:var(--shadow);max-width:min(720px, calc(100vw - 20px));z-index:99}
+    .toast.show{display:flex}
+    .toast .msg{font-weight:800}
+    .toast .undo{margin-left:auto;height:44px;border-radius:12px;border:1px solid #2bd67155;background:#062a1a;color:#d9ffe8;font-weight:900;cursor:pointer;padding:0 14px}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid #ffffff22;background:#061a2b88;font-weight:900}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title">
+      <h1>Terminal Ferretería</h1>
+      <div class="sub">Versión Agrupada: Familias colapsadas por defecto.</div>
+    </div>
+    <div class="hdrRight">
+      <div class="tinyBtns">
+        <button class="tinyBtn" id="btnOps">⚙ Operarios</button>
+        <button class="tinyBtn" id="btnHist">📋 Historial</button>
+      </div>
+      <div class="badge" id="hdrBadge">Sin sesión</div>
+    </div>
+  </header>
+  <div id="stepWrap" class="card"></div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite">
+  <div class="msg" id="toastMsg">Acción realizada</div>
+  <button class="undo" id="undoBtn">Deshacer</button>
+</div>
+
+<script>
+(() => {
+  const OPS_KEY  = "tablet_ops_ferreteria_v3_clean";
+  const HIST_KEY = "tablet_hist_ferreteria_v3_clean";
+  const HIST_LIMIT = 500;
+
+  const DEFAULT_OPERATORS = [];
+
+  // -------------------------
+  // Integración con Stock real (localStorage) - SIN Firestore
+  // Lee y descuenta directamente sobre la misma DB que usa stock.html (DB_KEY="taller_stock_v3_data")
+  // -------------------------
+  const STOCK_DB_KEY = "taller_stock_v3_data";
+
+  function loadStockDB(){
+    try{
+      const raw = localStorage.getItem(STOCK_DB_KEY);
+      if(!raw) return null;
+      const db = JSON.parse(raw);
+      if(!db || !Array.isArray(db.materials) || !Array.isArray(db.movements)) return null;
+      return db;
+    }catch(e){ return null; }
+  }
+
+  function saveStockDB(db){ localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db)); }
+
+  function getStockFromDB(db, matId){
+    return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
+  }
+
+  function isFerreteria(m){
+    const cat = String(m.cat||"").toLowerCase();
+    const grp = String(m.grp||"").toLowerCase();
+    // Criterio flexible: categoría o grupo contienen "ferreter" o familias típicas
+    return cat.includes("ferreter") || grp.includes("torn") || grp.includes("arand") || grp.includes("tuerc") || grp.includes("disco") || grp.includes("broca") || grp.includes("consum");
+  }
+
+  // ITEMS vivo desde stock real
+  let ITEMS = [];
+
+  function refreshItemsFromStock(){
+    const db = loadStockDB();
+    if(!db){
+      ITEMS = [];
+      return {ok:false, reason:"No existe la base de datos de stock. Abre stock.html una vez para inicializarla."};
+    }
+    const mats = (db.materials||[]).filter(isFerreteria);
+    ITEMS = mats.map(m=>{
+      const stock = getStockFromDB(db, m.id);
+      return {
+        id: m.id,
+        name: m.name,
+        unit: m.unit || "ud",
+        stock,
+        usageCount: 0,
+        family: m.grp || m.cat || "Ferretería"
+      };
+    });
+    return {ok:true};
+  }
+
+  function applyConsumeToStock(matId, qty){
+    const db = loadStockDB();
+    if(!db) return {ok:false, msg:"No se pudo cargar el stock real."};
+    const current = getStockFromDB(db, matId);
+    if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
+    db.movements.push({
+      id: Math.random().toString(36).substr(2,9),
+      matId,
+      type: "out",
+      qty,
+      date: new Date().toISOString(),
+      source: "TABLET_FERRETERIA_LOCAL"
+    });
+    saveStockDB(db);
+    return {ok:true, stockAfter: current-qty};
+  }
+
+
+  const state = { operator:null, sessionId:null, activeItemId:null, lastAction:null, view:"main" };
+
+  const $wrap = document.getElementById('stepWrap');
+  const $badge = document.getElementById('hdrBadge');
+  const byId = id => document.getElementById(id);
+
+  const nowISO = () => new Date().toISOString();
+  const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
+  function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  // --- operators
+  function loadOps(){
+    try{
+      const raw = localStorage.getItem(OPS_KEY);
+      if(!raw){
+        const seed = [];
+        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+        return seed;
+      }
+      const arr = JSON.parse(raw);
+      if(!Array.isArray(arr) || !arr.length){
+        const seed = [];
+        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+        return seed;
+      }
+      return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
+    }catch(e){
+      const seed = [];
+      localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+      return seed;
+    }
+  }
+  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); }
+  function getActiveOps(){ return loadOps().filter(o=>o.active); }
+
+  // --- history
+  function loadHist(){
+    try{
+      const raw = localStorage.getItem(HIST_KEY);
+      if(!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function saveHist(arr){ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }
+  function addHist(entry){
+    const arr = loadHist();
+    arr.unshift(entry);
+    if(arr.length>HIST_LIMIT) arr.length=HIST_LIMIT;
+    saveHist(arr);
+  }
+
+  // --- ui helpers
+  function setBadge(){
+    const parts=[];
+    if(state.operator) parts.push(state.operator);
+    if(state.activeItemId){
+      const it=ITEMS.find(x=>x.id===state.activeItemId);
+      if(it) parts.push("Activo: "+it.name);
+    }
+    $badge.textContent = parts.length ? parts.join(" · ") : "Sin sesión";
+  }
+  function toast(msg, canUndo){
+    const t=byId('toast');
+    byId('toastMsg').textContent=msg;
+    byId('undoBtn').style.display = canUndo ? 'inline-flex':'none';
+    t.classList.add('show');
+    clearTimeout(toast._tmr);
+    toast._tmr=setTimeout(()=>t.classList.remove('show'),8000);
+  }
+  function detectLowTag(stock){
+    if(stock<=0) return ['zero','SIN STOCK'];
+    if(stock<=2) return ['low','BAJO'];
+    return [null,null];
+  }
+  function sortItems(arr){
+    return [...arr].sort((a,b)=>{
+      if(b.usageCount!==a.usageCount) return b.usageCount-a.usageCount;
+      return a.name.localeCompare(b.name,'es');
+    });
+  }
+  function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+
+  function goBackMain(){
+    if(!state.operator) screenOperator();
+    else if(!state.activeItemId) screenItems();
+    else screenConsume();
+  }
+
+  // --- screens
+  function screenOperator(){
+    refreshItemsFromStock();
+    state.view="main"; setBadge();
+    const ops = getActiveOps().map(o=>`<button class="btn small accent" data-op="${o.name}">${o.name}</button>`).join('');
+    $wrap.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="pill">Paso 1 · Operario</div>
+          <div style="margin-top:10px;font-size:26px;font-weight:900">¿Quién va a coger material?</div>
+          <div class="hint">Pulsa tu nombre. Si es una ayuda puntual, usa "Ocasional".</div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <div class="grid3">${ops || `<div class="muted">No hay operarios. Ve a ⚙ Operarios para añadirlos.</div>`}
+        <button class="btn small danger" id="btnOcc">OCASIONAL</button>
+      </div>
+      <div class="sep"></div>
+      <div id="occBox" style="display:none">
+        <div style="font-weight:900;margin-bottom:10px">Nombre del operario ocasional (obligatorio)</div>
+        <div class="grid2">
+          <input id="occName" placeholder="Escribe el nombre..."/>
+          <button class="btn small primary" id="occOk">Confirmar</button>
+        </div>
+      </div>
+    `;
+    [...$wrap.querySelectorAll('[data-op]')].forEach(b=> b.onclick = ()=>{
+      state.operator=b.getAttribute('data-op'); state.sessionId=newSessionId(); screenItems();
+    });
+    byId('btnOcc').onclick = ()=>{ byId('occBox').style.display='block'; byId('occName').focus(); };
+    byId('occOk').onclick = ()=>{
+      const v=(byId('occName').value||'').trim();
+      if(!v){ toast("Debes escribir un nombre para 'Ocasional'.",false); return; }
+      state.operator=v; state.sessionId=newSessionId(); screenItems();
+    };
+  }
+
+  function screenItems(){
+    const r = refreshItemsFromStock();
+    if(!r.ok){
+      state.view='main'; setBadge();
+      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${'${'}escapeHtml(r.reason){'}'}<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializarla.</div></div></div><div class="sep"></div><button class="btn small ghost" id="back">⬅ Volver</button>`;
+      byId('back').onclick=()=>screenOperator();
+      return;
+    }
+
+    state.view="main"; setBadge();
+    // We keep families for the dropdown, but main view is now grouped sections
+    const families = Array.from(new Set(ITEMS.map(i=>i.family))).sort((a,b)=>a.localeCompare(b,'es'));
+    const famOptions = ['<option value="">(Todas)</option>'].concat(families.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`)).join('');
+
+    $wrap.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="pill">Paso 2 · Artículo</div>
+          <div style="margin-top:10px;font-size:26px;font-weight:900">Selecciona el consumible</div>
+          <div class="hint">Pulsa en una familia para ver sus artículos.</div>
+        </div>
+        <button class="btn small danger" id="logout">Cerrar sesión</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid3">
+        <div>
+          <div class="hint" style="margin:0 0 8px">Familia (Filtro)</div>
+          <select id="fFam">${famOptions}</select>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 8px">Buscar</div>
+          <input id="fTxt" placeholder="Ej: tornillo, disco..."/>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 8px">Modo rápido</div>
+          <select id="fStep">
+            <option value="1">Consumir 1</option>
+            <option value="5">Consumir 5</option>
+            <option value="10">Consumir 10</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="itemsList" class="list"></div>
+    `;
+
+    byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
+
+    const render = () => {
+      const famFilter = byId('fFam').value;
+      const txt = (byId('fTxt').value||"").trim().toLowerCase();
+      const step = parseInt(byId('fStep').value,10) || 1;
+
+      // Filter Logic
+      const filtered = sortItems(ITEMS).filter(it=>{
+        if(famFilter && it.family!==famFilter) return false;
+        if(txt && !it.name.toLowerCase().includes(txt)) return false;
+        return true;
+      });
+
+      // Group Logic
+      const groups = {};
+      filtered.forEach(it => {
+        if(!groups[it.family]) groups[it.family] = [];
+        groups[it.family].push(it);
+      });
+      const sortedFamKeys = Object.keys(groups).sort();
+
+      // If user is searching text, expand groups automatically
+      const autoExpand = txt.length > 0;
+
+      if(filtered.length === 0) {
+        byId('itemsList').innerHTML = `<div class="muted">No hay resultados.</div>`;
+        return;
+      }
+
+      byId('itemsList').innerHTML = sortedFamKeys.map(famName => {
+        const list = groups[famName];
+        const isOpenClass = autoExpand ? 'open' : '';
+        const isShowClass = autoExpand ? 'show' : '';
+
+        // Generate items HTML
+        const itemsHtml = list.map(it => {
+            const [cls,lbl]=detectLowTag(it.stock);
+            const warnTag = cls ? `<span class="tag ${cls}">${lbl}</span>`:'';
+            const disabled = it.stock<=0 ? 'disabled':'';
+            const canStep = it.stock>=step;
+            const stepDisabled = (!canStep) ? 'disabled' : '';
+
+            return `
+              <div class="item">
+                <div class="left">
+                  <div class="name">${escapeHtml(it.name)}</div>
+                  <div class="meta">
+                    <span class="muted">Usos: <b>${it.usageCount}</b></span>
+                    ${warnTag}
+                  </div>
+                </div>
+                <div class="right">
+                  <div class="kpi" style="min-width:140px; padding:10px">
+                    <div class="lbl">Stock</div>
+                    <div class="val" style="font-size:18px">${it.stock} ${escapeHtml(it.unit)}</div>
+                  </div>
+                  <button class="miniBtn sel ${disabled}" data-sel="${it.id}">Ver</button>
+                  <button class="miniBtn ${stepDisabled}" data-quick="${it.id}">- ${step}</button>
+                </div>
+              </div>
+            `;
+        }).join("");
+
+        // Generate Group Header + Body
+        return `
+          <div class="groupWrap">
+            <div class="groupHdr ${isOpenClass}" data-tog="${escapeHtml(famName)}">
+               <span>${escapeHtml(famName)} <span style="opacity:0.5;font-size:0.8em">(${list.length})</span></span>
+               <span class="arrow">▼</span>
+            </div>
+            <div class="groupBody ${isShowClass}" id="gb-${escapeHtml(famName)}">
+              ${itemsHtml}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Events for Headers
+      $wrap.querySelectorAll(".groupHdr").forEach(h => {
+        h.onclick = () => {
+          const fam = h.getAttribute('data-tog');
+          const body = document.getElementById(`gb-${fam}`);
+          h.classList.toggle('open');
+          body.classList.toggle('show');
+        };
+      });
+
+      // Events for Items
+      $wrap.querySelectorAll("[data-sel]").forEach(b=>{
+        b.onclick = ()=>{
+          const id=b.getAttribute("data-sel");
+          const it=ITEMS.find(x=>x.id===id);
+          if(!it || it.stock<=0){ toast("Sin stock.", false); return; }
+          state.activeItemId=id; screenConsume();
+        };
+      });
+      $wrap.querySelectorAll("[data-quick]").forEach(b=>{
+        b.onclick = ()=>{
+          const id=b.getAttribute("data-quick");
+          const it=ITEMS.find(x=>x.id===id);
+          if(!it){ return; }
+          if(it.stock<step){ toast("No hay suficiente stock.", false); return; }
+          consume(it, step);
+          render(); // Re-render to update stock numbers
+        };
+      });
+    };
+
+    ["fFam","fTxt","fStep"].forEach(id=>{
+      byId(id).addEventListener("input", render);
+      byId(id).addEventListener("change", render);
+    });
+    render();
+  }
+
+  function consume(it, qty){
+    const beforeStock = it.stock;
+    const beforeUse = it.usageCount;
+    state.lastAction = {itemId: it.id, stockBefore: beforeStock, usageBefore: beforeUse, qty};
+
+    const res = applyConsumeToStock(it.id, qty);
+    if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
+    refreshItemsFromStock();
+    const it2 = ITEMS.find(x=>x.id===it.id);
+    if(it2) it.stock = it2.stock;
+    it.usageCount += qty;
+
+    addHist({
+      ts: nowISO(),
+      operator: state.operator,
+      sessionId: state.sessionId || "SIN_SESION",
+      itemId: it.id,
+      itemName: it.name,
+      family: it.family,
+      delta: -qty,
+      unit: it.unit,
+      stockBefore: beforeStock,
+      stockAfter: (res.stockAfter!==undefined?res.stockAfter:it.stock),
+      device: "DEMO_TABLET"
+    });
+
+    toast(`Descontado ${qty} ${it.unit} (${it.stock} restantes).`, true);
+  }
+
+  function screenConsume(){
+    state.view="main"; setBadge();
+    const it=ITEMS.find(x=>x.id===state.activeItemId);
+    if(!it){ screenItems(); return; }
+    const canUse = it.stock>0;
+
+    $wrap.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="pill">Activo · Ferretería</div>
+          <div style="margin-top:10px;font-size:28px;font-weight:1000">${escapeHtml(it.name)}</div>
+          <div class="hint">Operario: <b>${escapeHtml(state.operator)}</b> · ${fmt(nowISO())}</div>
+        </div>
+        <div class="row" style="gap:10px">
+          <button class="btn small ghost" id="chgItem">Cambiar artículo</button>
+          <button class="btn small danger" id="logout">Cerrar sesión</button>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid3">
+        <div class="kpi"><div class="lbl">Familia</div><div class="val">${escapeHtml(it.family)}</div></div>
+        <div class="kpi"><div class="lbl">Usos</div><div class="val">${it.usageCount}</div></div>
+        <div class="kpi"><div class="lbl">Stock</div><div class="val big">${it.stock}</div><div class="muted">${escapeHtml(it.unit)}</div></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid2">
+        <div>
+          <div class="hint" style="margin:0 0 8px">Cantidad a consumir (${escapeHtml(it.unit)})</div>
+          <input id="qtyIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
+          <div class="hint">Puedes escribir cualquier cifra. Si no hay suficiente stock, no te dejará.</div>
+        </div>
+        <button class="btn ${canUse ? 'accent':'disabled'}" id="useCustom">CONSUMIR</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid3">
+        <button class="btn ${canUse ? 'accent':'disabled'}" id="use1">CONSUMIR 1</button>
+        <button class="btn ${it.stock>=5 ? 'accent':'disabled'}" id="use5">CONSUMIR 5</button>
+        <button class="btn ${it.stock>=10 ? 'accent':'disabled'}" id="use10">CONSUMIR 10</button>
+      </div>
+
+      <div class="hint">Cada consumo queda registrado en 📋 Historial (máx. ${HIST_LIMIT}).</div>
+    `;
+
+    byId('chgItem').onclick = ()=>{ state.activeItemId=null; screenItems(); };
+    byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
+
+    byId('use1').onclick = ()=>{ if(it.stock<1) return; consume(it,1); screenConsume(); };
+    byId('use5').onclick = ()=>{ if(it.stock<5) return; consume(it,5); screenConsume(); };
+    byId('use10').onclick = ()=>{ if(it.stock<10) return; consume(it,10); screenConsume(); };
+
+    byId('useCustom').onclick = ()=>{
+      const raw = (byId('qtyIn').value||'').trim();
+      const qty = parseInt(raw,10);
+      if(!raw || isNaN(qty) || qty<=0){ toast('Introduce una cantidad válida.', false); return; }
+      if(it.stock<qty){ toast('No hay suficiente stock para esa cantidad.', false); return; }
+      consume(it, qty);
+      byId('qtyIn').value='';
+      screenConsume();
+    };
+  }
+
+  // --- operarios screen
+  function screenOps(){
+    state.view="ops"; setBadge();
+    const ops = loadOps();
+    const rows = ops.map((o,i)=>`
+      <div class="item">
+        <div class="left">
+          <div class="name">${escapeHtml(o.name)}</div>
+          <div class="meta"><span class="muted">${o.active ? "Activo" : "Inactivo"}</span></div>
+        </div>
+        <div class="right">
+          <button class="miniBtn" data-tgl="${i}">${o.active ? "Desactivar" : "Activar"}</button>
+          <button class="miniBtn" style="background:#3d0c20;border-color:#ff5a7a88" data-del="${i}">Eliminar</button>
+        </div>
+      </div>
+    `).join("");
+
+    $wrap.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="pill">⚙ Gestión de operarios</div>
+          <div style="margin-top:10px;font-size:24px;font-weight:900">Añadir, activar/desactivar o eliminar</div>
+        </div>
+        <button class="btn small ghost" id="backMain">⬅ Volver</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grid2">
+        <input id="newOp" placeholder="Nuevo operario (nombre)"/>
+        <button class="btn small primary" id="addOp">Añadir</button>
+      </div>
+      <div class="sep"></div>
+      <div class="list" style="max-height:48vh">${rows || `<div class="muted">No hay operarios.</div>`}</div>
+      <div class="sep"></div>
+      <button class="btn small danger" id="resetOps">Vaciar lista</button>
+    `;
+    byId('backMain').onclick = ()=>goBackMain();
+    byId('addOp').onclick = ()=>{
+      const v=(byId('newOp').value||"").trim();
+      if(!v){ toast("Escribe un nombre.",false); return; }
+      const cur=loadOps();
+      if(cur.some(x=>x.name.toLowerCase()===v.toLowerCase())){ toast("Ya existe.",false); return; }
+      cur.push({name:v, active:true}); saveOps(cur); toast("Operario añadido.",false); screenOps();
+    };
+    $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
+      btn.onclick=()=>{
+        const idx=parseInt(btn.getAttribute("data-tgl"),10);
+        const cur=loadOps(); if(!cur[idx]) return;
+        cur[idx].active=!cur[idx].active; saveOps(cur);
+        toast(cur[idx].active ? "Operario activado." : "Operario desactivado.",false);
+        screenOps();
+      };
+    });
+    $wrap.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.onclick=()=>{
+        const idx=parseInt(btn.getAttribute("data-del"),10);
+        const cur=loadOps(); if(!cur[idx]) return;
+        if(!confirm(`Eliminar operario "${cur[idx].name}"?`)) return;
+        cur.splice(idx,1); saveOps(cur); toast("Operario eliminado.",false); screenOps();
+      };
+    });
+    byId('resetOps').onclick=()=>{
+      if(!confirm("Restaurar lista por defecto?")) return;
+      saveOps([]);
+      toast("Operarios limpiados.",false); screenOps();
+    };
+  }
+
+  // --- history aggregated
+  function screenHist(){
+    state.view="hist"; setBadge();
+    const hist=loadHist();
+
+    const ops = Array.from(new Set(hist.map(h=>h.operator))).sort((a,b)=>a.localeCompare(b,'es'));
+    const fams = Array.from(new Set(hist.map(h=>h.family))).sort((a,b)=>a.localeCompare(b,'es'));
+    const opOptions = ['<option value="">(Todos)</option>'].concat(ops.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)).join('');
+    const famOptions = ['<option value="">(Todas)</option>'].concat(fams.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`)).join('');
+
+    $wrap.innerHTML = `
+      <div class="row">
+        <div>
+          <div class="pill">📋 Historial (últimos ${HIST_LIMIT})</div>
+          <div style="margin-top:10px;font-size:24px;font-weight:900">Consumos agrupados</div>
+          <div class="hint">1 línea por (Operario + Sesión + Artículo). Ordenado por lo más reciente.</div>
+        </div>
+        <button class="btn small ghost" id="backMain">⬅ Volver</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid3">
+        <div class="kpi"><div class="lbl">Registros</div><div class="val">${hist.length}</div></div>
+        <div class="kpi"><div class="lbl">Último</div><div class="val">${hist[0] ? fmt(hist[0].ts) : "-"}</div></div>
+        <div class="kpi"><div class="lbl">Límite</div><div class="val">${HIST_LIMIT}</div></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid3">
+        <div><div class="hint" style="margin:0 0 8px">Operario</div><select id="fOp">${opOptions}</select></div>
+        <div><div class="hint" style="margin:0 0 8px">Familia</div><select id="fFam">${famOptions}</select></div>
+        <div><div class="hint" style="margin:0 0 8px">Buscar artículo</div><input id="fTxt" placeholder="Ej: tornillo, disco..."/></div>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="grid2">
+        <button class="btn small primary" id="btnExport">Exportar JSON</button>
+        <button class="btn small danger" id="btnClear">Borrar historial</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="histList" class="list" style="max-height:46vh"></div>
+    `;
+
+    byId('backMain').onclick=()=>goBackMain();
+    byId('btnExport').onclick=()=>exportHist();
+    byId('btnClear').onclick=()=>{
+      if(!confirm("Borrar todo el historial local?")) return;
+      saveHist([]); toast("Historial borrado.",false); screenHist();
+    };
+
+    const render=()=>{
+      const op = byId('fOp').value;
+      const fam = byId('fFam').value;
+      const txt = (byId('fTxt').value||"").trim().toLowerCase();
+
+      const filtered = hist.filter(h=>{
+        if(op && h.operator!==op) return false;
+        if(fam && h.family!==fam) return false;
+        if(txt && !(String(h.itemName||"").toLowerCase().includes(txt))) return false;
+        return true;
+      });
+
+      const map=new Map();
+      filtered.forEach(h=>{
+        const key=[h.operator,h.sessionId||"SIN_SESION",h.itemId].join("||");
+        if(!map.has(key)){
+          map.set(key,{
+            operator:h.operator, sessionId:h.sessionId||"SIN_SESION",
+            itemId:h.itemId, itemName:h.itemName, family:h.family, unit:h.unit,
+            total:0, firstTs:h.ts, lastTs:h.ts, stockStart:h.stockBefore, stockEnd:h.stockAfter
+          });
+        }
+        const g=map.get(key);
+        g.total += (h.delta||0);
+        if(h.ts < g.firstTs){ g.firstTs=h.ts; g.stockStart=h.stockBefore; }
+        if(h.ts > g.lastTs){ g.lastTs=h.ts; g.stockEnd=h.stockAfter; }
+      });
+
+      const groups=Array.from(map.values()).sort((a,b)=> (b.lastTs||"").localeCompare(a.lastTs||""));
+
+      byId('histList').innerHTML = groups.map(g=>{
+        const totalAbs=Math.abs(g.total);
+        return `
+          <div class="item">
+            <div class="left">
+              <div class="name">${escapeHtml(g.itemName)}</div>
+              <div class="meta">
+                <span class="chip">${escapeHtml(g.family)}</span>
+                <span class="chip">${escapeHtml(g.operator)}</span>
+                <span class="muted">Sesión: ${escapeHtml(g.sessionId)}</span>
+                <span class="muted">${fmt(g.firstTs)} → ${fmt(g.lastTs)}</span>
+              </div>
+            </div>
+            <div class="right">
+              <div class="kpi" style="min-width:170px">
+                <div class="lbl">Consumido</div>
+                <div class="val">-${totalAbs} ${escapeHtml(g.unit)}</div>
+              </div>
+              <div class="kpi" style="min-width:200px">
+                <div class="lbl">Stock</div>
+                <div class="val">${g.stockStart} → <b>${g.stockEnd}</b></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("") || `<div class="muted">No hay resultados con estos filtros.</div>`;
+    };
+
+    ["fOp","fFam","fTxt"].forEach(id=>{
+      byId(id).addEventListener("input",render);
+      byId(id).addEventListener("change",render);
+    });
+    render();
+  }
+
+  function exportHist(){
+    const hist=loadHist();
+    const blob=new Blob([JSON.stringify(hist,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download="historial_ferreteria_demo.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast("Exportación iniciada.",false);
+  }
+
+  // --- undo
+  byId('undoBtn').onclick=()=>{
+    const la=state.lastAction; if(!la) return;
+    const it=ITEMS.find(x=>x.id===la.itemId); if(!it) return;
+    it.stock=la.stockBefore; it.usageCount=la.usageBefore;
+    state.lastAction=null;
+
+    const hist=loadHist();
+    if(hist[0] && hist[0].itemId===it.id && hist[0].operator===state.operator && (hist[0].sessionId||"")===(state.sessionId||"")){
+      hist.shift(); saveHist(hist);
+    }
+    toast("Acción deshecha.",false);
+    goBackMain();
+  };
+
+  // header buttons
+  document.getElementById("btnOps").onclick=()=>screenOps();
+  document.getElementById("btnHist").onclick=()=>screenHist();
+
+  // start
+  screenOperator();
+})();
+</script>
+</body>
+</html>
