@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>Terminal Corte Hierro</title>
+  <title>Terminal Corte Hierro</title>
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -144,8 +144,7 @@
   };
   const TABLET_EMAIL = "tablet.hierro@gestiontaller.local";
   const TABLET_PASS  = "222222";
-  const FS_PATH_STOCK_DOC = ["taller","stock"];
-  const FS_PATH_OPS_DOC   = ["taller","ops"];        // /taller/stock
+  const FS_PATH_STOCK_DOC = ["taller","stock"];        // /taller/stock
   const FS_PATH_MOV_COL   = ["taller","movements"];    // /taller/movements
 
   let __fb = null;
@@ -183,22 +182,21 @@
       if(!data || !data.materials || !Array.isArray(data.materials)) return false;
       localStorage.setItem(STOCK_DB_KEY, JSON.stringify(data));
       return true;
+    }catch(e){
+      console.warn("⚠️ fsLoadStockToLocal error:", e);
+      return false;
     }
-catch(e){
-  console.warn("⚠ Firestore stock load error", e);
-  return false;
-}
+  }
 
   async function fsLoadOpsToLocal(){
     const fb = await fbEnsure(); if(!fb) return false;
     try{
       const {doc, getDoc} = fb.fsMod;
-      const ref = doc(fb.db, ...FS_PATH_OPS_DOC);
+      const ref = doc(fb.db, ...FS_PATH_OPS_DOC.split("/"));
       const snap = await getDoc(ref);
       if(!snap.exists()) return false;
       const data = snap.data() || {};
       const ops = Array.isArray(data.hierro) ? data.hierro : [];
-      // Normalizar
       const norm = ops.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
       localStorage.setItem(OPS_KEY, JSON.stringify(norm));
       return true;
@@ -208,25 +206,20 @@ catch(e){
     }
   }
 
-  async function fsSaveOpsFromLocal(){
+  async function fsSaveOpsFromLocal(list){
     const fb = await fbEnsure(); if(!fb) return false;
     try{
       const {doc, setDoc} = fb.fsMod;
-      const ref = doc(fb.db, ...FS_PATH_OPS_DOC);
-      const raw = localStorage.getItem(OPS_KEY);
-      const ops = raw ? (JSON.parse(raw)||[]) : [];
-      await setDoc(ref, { hierro: ops, updatedAt: new Date().toISOString() }, {merge:true});
+      const ref = doc(fb.db, ...FS_PATH_OPS_DOC.split("/"));
+      // merge: guarda hierro, mantiene otros campos
+      await setDoc(ref, {hierro: list}, {merge:true});
       return true;
     }catch(e){
       console.warn("⚠️ Firestore ops save error", e);
       return false;
     }
   }
-catch(e){
-      console.warn("⚠️ fsLoadStockToLocal error:", e);
-      return false;
-    }
-  }
+
 
   async function fsSaveStockFromLocal(extraMovement=null){
     const fb = await fbEnsure(); if(!fb) return false;
@@ -364,7 +357,7 @@ return {ok:true, stockAfter: current-qty};
       return seed;
     }
   }
-  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); }
+  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); if(USE_FIRESTORE){ fsSaveOpsFromLocal(list).then(ok=>{ if(ok) console.log("✅ Ops guardados en Firestore"); }); } }
   function getActiveOps(){ return loadOps().filter(o=>o.active); }
 
   // -------------------------
@@ -688,7 +681,6 @@ return {ok:true, stockAfter: current-qty};
       }
       cur.push({name:v, active:true});
       saveOps(cur);
-      fsSaveOpsFromLocal();
       toast("Operario añadido.", false);
       screenOps();
     };
@@ -699,7 +691,6 @@ return {ok:true, stockAfter: current-qty};
         if(!cur[idx]) return;
         cur[idx].active = !cur[idx].active;
         saveOps(cur);
-        fsSaveOpsFromLocal();
         toast(cur[idx].active ? "Operario activado." : "Operario desactivado.", false);
         screenOps();
       };
@@ -713,17 +704,14 @@ return {ok:true, stockAfter: current-qty};
         if(!confirm(`Eliminar operario "${name}"?`)) return;
         cur.splice(idx,1);
         saveOps(cur);
-        fsSaveOpsFromLocal();
         toast("Operario eliminado.", false);
         screenOps();
       };
     });
     byId('resetOps').onclick = () => {
-      if(!confirm("Restaurar la lista de operarios por defecto?")) return;
-      const seed = [];
-      saveOps(seed);
-      fsSaveOpsFromLocal();
-      toast("Operarios limpiados.", false);
+      if(!confirm("Vaciar la lista de operarios?")) return;
+      saveOps([]);
+      toast("Operarios borrados.", false);
       screenOps();
     };
   }
@@ -934,7 +922,7 @@ return {ok:true, stockAfter: current-qty};
   document.getElementById("btnHist").onclick = () => screenHist();
 
   // Start
-  if(USE_FIRESTORE){ await fsLoadStockToLocal(); }
+  if(USE_FIRESTORE){ await fsLoadStockToLocal(); await fsLoadOpsToLocal(); }
   screenFinish();
 })();
 </script>
