@@ -184,6 +184,10 @@
       localStorage.setItem(STOCK_DB_KEY, JSON.stringify(data));
       return true;
     }
+catch(e){
+  console.warn("⚠ Firestore stock load error", e);
+  return false;
+}
 
   async function fsLoadOpsToLocal(){
     const fb = await fbEnsure(); if(!fb) return false;
