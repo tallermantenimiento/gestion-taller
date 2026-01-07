@@ -116,7 +116,7 @@
 </div>
 
 <script>
-(() => {
+(async () => {
   const OPS_KEY  = "tablet_ops_hierro_v3_clean";
   const HIST_KEY = "tablet_hist_hierro_v3_clean";
   const HIST_LIMIT = 500;
@@ -129,7 +129,124 @@
   // -------------------------
   const STOCK_DB_KEY = "taller_stock_v3_data";
 
-  function loadStockDB(){
+  
+  // -------------------------
+  // Firestore (ONLINE) - login automático oculto
+  // -------------------------
+  const USE_FIRESTORE = true;
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+  const TABLET_EMAIL = "tablet.hierro@gestiontaller.local";
+  const TABLET_PASS  = "222222";
+  const FS_PATH_STOCK_DOC = ["taller","stock"];
+  const FS_PATH_OPS_DOC   = ["taller","ops"];        // /taller/stock
+  const FS_PATH_MOV_COL   = ["taller","movements"];    // /taller/movements
+
+  let __fb = null;
+
+  async function fbEnsure(){
+    if(!USE_FIRESTORE) return null;
+    if(__fb) return __fb;
+    const appMod = await import("https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js");
+    const authMod = await import("https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js");
+    const fsMod   = await import("https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js");
+
+    const app = appMod.initializeApp(FIREBASE_CONFIG);
+    const auth = authMod.getAuth(app);
+    const db   = fsMod.getFirestore(app);
+
+    if(!auth.currentUser){
+      try{
+        await authMod.signInWithEmailAndPassword(auth, TABLET_EMAIL, TABLET_PASS);
+      }catch(e){
+        console.warn("⚠️ Tablet auto-login fallo:", e);
+      }
+    }
+    __fb = {app, auth, db, authMod, fsMod};
+    return __fb;
+  }
+
+  async function fsLoadStockToLocal(){
+    const fb = await fbEnsure(); if(!fb) return false;
+    try{
+      const {doc, getDoc} = fb.fsMod;
+      const ref = doc(fb.db, ...FS_PATH_STOCK_DOC);
+      const snap = await getDoc(ref);
+      if(!snap.exists()) return false;
+      const data = snap.data();
+      if(!data || !data.materials || !Array.isArray(data.materials)) return false;
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify(data));
+      return true;
+    }
+
+  async function fsLoadOpsToLocal(){
+    const fb = await fbEnsure(); if(!fb) return false;
+    try{
+      const {doc, getDoc} = fb.fsMod;
+      const ref = doc(fb.db, ...FS_PATH_OPS_DOC);
+      const snap = await getDoc(ref);
+      if(!snap.exists()) return false;
+      const data = snap.data() || {};
+      const ops = Array.isArray(data.hierro) ? data.hierro : [];
+      // Normalizar
+      const norm = ops.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
+      localStorage.setItem(OPS_KEY, JSON.stringify(norm));
+      return true;
+    }catch(e){
+      console.warn("⚠️ Firestore ops load error", e);
+      return false;
+    }
+  }
+
+  async function fsSaveOpsFromLocal(){
+    const fb = await fbEnsure(); if(!fb) return false;
+    try{
+      const {doc, setDoc} = fb.fsMod;
+      const ref = doc(fb.db, ...FS_PATH_OPS_DOC);
+      const raw = localStorage.getItem(OPS_KEY);
+      const ops = raw ? (JSON.parse(raw)||[]) : [];
+      await setDoc(ref, { hierro: ops, updatedAt: new Date().toISOString() }, {merge:true});
+      return true;
+    }catch(e){
+      console.warn("⚠️ Firestore ops save error", e);
+      return false;
+    }
+  }
+catch(e){
+      console.warn("⚠️ fsLoadStockToLocal error:", e);
+      return false;
+    }
+  }
+
+  async function fsSaveStockFromLocal(extraMovement=null){
+    const fb = await fbEnsure(); if(!fb) return false;
+    try{
+      const raw = localStorage.getItem(STOCK_DB_KEY);
+      if(!raw) return false;
+      const dbObj = JSON.parse(raw);
+
+      const {doc, setDoc, serverTimestamp, collection, addDoc} = fb.fsMod;
+      const refStock = doc(fb.db, ...FS_PATH_STOCK_DOC);
+
+      await setDoc(refStock, {...dbObj, updatedAt: serverTimestamp(), lastTerminal:"corte_hierro"}, {merge:true});
+
+      if(extraMovement){
+        const refMov = collection(fb.db, ...FS_PATH_MOV_COL);
+        await addDoc(refMov, {...extraMovement, terminal:"corte_hierro", ts: serverTimestamp()});
+      }
+      return true;
+    }catch(e){
+      console.warn("⚠️ fsSaveStockFromLocal error:", e);
+      return false;
+    }
+  }
+function loadStockDB(){
     try{
       const raw = localStorage.getItem(STOCK_DB_KEY);
       if(!raw) return null;
@@ -198,7 +315,8 @@
       source: "TABLET_HIERRO_LOCAL"
     });
     saveStockDB(db);
-    return {ok:true, stockAfter: current-qty};
+        if(USE_FIRESTORE){ try{ await fsSaveStockFromLocal(lastAction); }catch(e){} }
+return {ok:true, stockAfter: current-qty};
   }
 
 
@@ -566,6 +684,7 @@
       }
       cur.push({name:v, active:true});
       saveOps(cur);
+      fsSaveOpsFromLocal();
       toast("Operario añadido.", false);
       screenOps();
     };
@@ -576,6 +695,7 @@
         if(!cur[idx]) return;
         cur[idx].active = !cur[idx].active;
         saveOps(cur);
+        fsSaveOpsFromLocal();
         toast(cur[idx].active ? "Operario activado." : "Operario desactivado.", false);
         screenOps();
       };
@@ -589,6 +709,7 @@
         if(!confirm(`Eliminar operario "${name}"?`)) return;
         cur.splice(idx,1);
         saveOps(cur);
+        fsSaveOpsFromLocal();
         toast("Operario eliminado.", false);
         screenOps();
       };
@@ -597,6 +718,7 @@
       if(!confirm("Restaurar la lista de operarios por defecto?")) return;
       const seed = [];
       saveOps(seed);
+      fsSaveOpsFromLocal();
       toast("Operarios limpiados.", false);
       screenOps();
     };
@@ -808,6 +930,7 @@
   document.getElementById("btnHist").onclick = () => screenHist();
 
   // Start
+  if(USE_FIRESTORE){ await fsLoadStockToLocal(); }
   screenFinish();
 })();
 </script>
