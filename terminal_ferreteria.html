@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Ferretería</title>
-  <!-- PATCH_VERSION: 2026-01-08 OPS_FIRESTORE_SYNC -->
+  <!-- PATCH_VERSION: 2026-01-08 OPS+STOCK FIRESTORE_SYNC -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -68,7 +68,6 @@
     .tag.low{background:#4a3a0f;border:1px solid #ffcc6666}
     .list{display:flex;flex-direction:column;gap:12px;max-height:52vh;overflow:auto;padding-right:6px}
 
-    /* Collapsible Groups */
     .groupHdr{
       background:linear-gradient(90deg, #102a52, #0d1b38);
       border:1px solid #ffffff33; border-radius:16px; padding:16px;
@@ -103,7 +102,7 @@
   <header>
     <div class="title">
       <h1>Terminal Ferretería</h1>
-      <div class="sub">Versión Agrupada: Familias colapsadas por defecto. Operarios sincronizados por Firestore.</div>
+      <div class="sub">Ferretería conectado a Stock real (Firestore) + Operarios Firestore.</div>
     </div>
     <div class="hdrRight">
       <div class="tinyBtns">
@@ -121,7 +120,6 @@
   <button class="undo" id="undoBtn">Deshacer</button>
 </div>
 
-<!-- Firebase (Compat, sin bundlers) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -132,11 +130,53 @@
   const HIST_KEY = "tablet_hist_ferreteria_v3_clean";
   const HIST_LIMIT = 500;
 
-  // -------------------------
-  // Integración con Stock real (localStorage) - SIN Firestore (stock)
-  // -------------------------
+  // STOCK cache local (misma key que stock.html)
   const STOCK_DB_KEY = "taller_stock_v3_data";
 
+  // FIRESTORE stock: MISMO DOC que Hierro
+  const USE_FIRESTORE_STOCK = true;
+  const FIRESTORE_STOCK_DOC = { col: "taller_stock", doc: "main" };
+
+  // FIRESTORE operarios: doc dedicado
+  const USE_FIRESTORE_OPS = true;
+  const OPS_DOC_PATH = { col: "taller_ops", doc: "ferreteria" };
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+
+  let fbApp=null, fbAuth=null, fbDb=null;
+  let fsReady=false;
+  let fsUnsub=null;
+
+  let opsReady=false;
+  let opsUnsub=null;
+  let ignoreLocalOpsSave=false;
+  let opsSaveTimer=null;
+
+  function fbEnsure(){
+    if(fbApp) return;
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb   = firebase.firestore();
+  }
+
+  async function fsLoginHidden(){
+    try{
+      if(!fbAuth.currentUser){
+        await fbAuth.signInAnonymously();
+      }
+    }catch(e){
+      console.warn("Auth anónimo no disponible:", e);
+    }
+  }
+
+  // -------- Stock DB local helpers
   function loadStockDB(){
     try{
       const raw = localStorage.getItem(STOCK_DB_KEY);
@@ -159,9 +199,8 @@
            grp.includes("disco") || grp.includes("broca") || grp.includes("consum");
   }
 
-  // ITEMS vivo desde stock real
+  // ITEMS vivo desde stock real cache
   let ITEMS = [];
-
   function refreshItemsFromStock(){
     const db = loadStockDB();
     if(!db){
@@ -183,67 +222,158 @@
     return {ok:true};
   }
 
-  function applyConsumeToStock(matId, qty){
-    const db = loadStockDB();
-    if(!db) return {ok:false, msg:"No se pudo cargar el stock real."};
-    const current = getStockFromDB(db, matId);
-    if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
-    db.movements.push({
-      id: Math.random().toString(36).substr(2,9),
-      matId,
-      type: "out",
-      qty,
-      date: new Date().toISOString(),
-      source: "TABLET_FERRETERIA_LOCAL"
-    });
-    saveStockDB(db);
-    return {ok:true, stockAfter: current-qty};
+  // -------- Firestore stock sync
+  function stockDocRef(){
+    return fbDb.collection(FIRESTORE_STOCK_DOC.col).doc(FIRESTORE_STOCK_DOC.doc);
   }
 
-  // =========================
-  // FIRESTORE SYNC OPERARIOS (FERRETERIA)
-  // =========================
-  const USE_FIRESTORE_OPS = true;
-
-  // Doc dedicado SOLO para operarios de ferretería
-  const OPS_DOC_PATH = { col: "taller_ops", doc: "ferreteria" };
-
-  // MISMO firebaseConfig que tu proyecto
-  const firebaseConfig = {
-    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
-    authDomain: "gestion-taller-2a439.firebaseapp.com",
-    projectId: "gestion-taller-2a439",
-    storageBucket: "gestion-taller-2a439.firebasestorage.app",
-    messagingSenderId: "498579673950",
-    appId: "1:498579673950:web:eb626781a5b509957db5cf"
-  };
-
-  let fbApp=null, fbAuth=null, fbDb=null;
-  let opsUnsub=null;
-  let opsReady=false;
-  let ignoreLocalOpsSave=false;
-  let opsSaveTimer=null;
-
-  function fbEnsure(){
-    if(fbApp) return;
-    fbApp = firebase.initializeApp(firebaseConfig);
-    fbAuth = firebase.auth();
-    fbDb   = firebase.firestore();
+  async function fsLoadStockOnceToLocal(){
+    const snap = await stockDocRef().get();
+    if(!snap.exists) return {ok:false, msg:"No existe el doc de stock en Firestore."};
+    const data = snap.data() || {};
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)){
+      return {ok:false, msg:"El doc Firestore no tiene materials/movements válidos."};
+    }
+    localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+      materials: data.materials || [],
+      movements: data.movements || [],
+      categoryOrder: data.categoryOrder || []
+    }));
+    return {ok:true};
   }
 
-  async function fsLoginHidden(){
-    try{
-      if(!fbAuth.currentUser){
-        await fbAuth.signInAnonymously();
+  function fsStartStockRealtime(){
+    if(fsUnsub) fsUnsub();
+    fsUnsub = stockDocRef().onSnapshot((snap)=>{
+      if(!snap.exists) return;
+      const data = snap.data() || {};
+      if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
+
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+        materials: data.materials || [],
+        movements: data.movements || [],
+        categoryOrder: data.categoryOrder || []
+      }));
+
+      refreshItemsFromStock();
+      setBadge();
+
+      if(state.view==="main"){
+        if(state.operator && !state.activeItemId) screenItems();
+        if(state.operator && state.activeItemId) screenConsume();
       }
+    }, (err)=>{
+      console.warn("Firestore stock onSnapshot error:", err);
+    });
+  }
+
+  function genId(){ return Math.random().toString(36).slice(2,11); }
+
+  async function applyConsumeToStockFirestore(matId, qty){
+    if(!USE_FIRESTORE_STOCK || !fsReady){
+      return {ok:false, msg:"Firestore no listo (stock)."};
+    }
+    const ref = stockDocRef();
+    const movementId = genId();
+
+    try{
+      const res = await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error("Firestore stock doc no existe.");
+        const data = snap.data() || {};
+        const materials = Array.isArray(data.materials) ? data.materials : [];
+        const movements = Array.isArray(data.movements) ? data.movements : [];
+        const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
+        const current = movements.filter(m=>m.matId===matId).reduce((a,m)=> (m.type==="in"? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
+        if(current < qty){
+          return {ok:false, msg:"SIN STOCK: no se puede consumir.", current};
+        }
+
+        const mv = {
+          id: movementId,
+          matId,
+          type: "out",
+          qty,
+          date: new Date().toISOString(),
+          source: "TABLET_FERRETERIA",
+          device: (navigator.userAgent||""),
+          sessionId: state.sessionId || "SIN_SESION",
+          operator: state.operator || ""
+        };
+
+        movements.push(mv);
+
+        tx.set(ref, {
+          materials,
+          movements,
+          categoryOrder,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        return {ok:true, stockAfter: current-qty, materials, movements, categoryOrder};
+      });
+
+      if(!res.ok) return res;
+
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+        materials: res.materials || [],
+        movements: res.movements || [],
+        categoryOrder: res.categoryOrder || []
+      }));
+
+      return {ok:true, stockAfter: res.stockAfter, movementId};
+
     }catch(e){
-      console.warn("Auth anónimo no disponible:", e);
+      console.warn("No se pudo guardar movimiento en Firestore (stock):", e);
+      return {ok:false, msg:"No se pudo guardar en Firestore. Revisa conexión/reglas."};
     }
   }
 
-  function opsDocRef(){
-    return fbDb.collection(OPS_DOC_PATH.col).doc(OPS_DOC_PATH.doc);
+  async function undoConsumeByMovementId(movementId){
+    if(!USE_FIRESTORE_STOCK || !fsReady) return {ok:false, msg:"Firestore no listo."};
+    const ref = stockDocRef();
+    try{
+      const out = await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error("Firestore doc no existe.");
+        const data = snap.data() || {};
+        const materials = Array.isArray(data.materials) ? data.materials : [];
+        const movements = Array.isArray(data.movements) ? data.movements : [];
+        const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
+        const idx = movements.findIndex(m=>m && m.id===movementId);
+        if(idx === -1){
+          return {ok:false, msg:"No se encontró el movimiento para deshacer."};
+        }
+        movements.splice(idx,1);
+
+        tx.set(ref, {
+          materials,
+          movements,
+          categoryOrder,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        return {ok:true, materials, movements, categoryOrder};
+      });
+
+      if(out.ok){
+        localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+          materials: out.materials || [],
+          movements: out.movements || [],
+          categoryOrder: out.categoryOrder || []
+        }));
+      }
+      return out;
+    }catch(e){
+      console.warn("Undo Firestore falló:", e);
+      return {ok:false, msg:"No se pudo deshacer en Firestore."};
+    }
   }
+
+  // -------- Firestore OPS sync
+  function opsDocRef(){ return fbDb.collection(OPS_DOC_PATH.col).doc(OPS_DOC_PATH.doc); }
 
   async function opsLoadOnceToLocal(){
     const snap = await opsDocRef().get();
@@ -254,7 +384,6 @@
     ignoreLocalOpsSave = true;
     localStorage.setItem(OPS_KEY, JSON.stringify(data.ops || []));
     ignoreLocalOpsSave = false;
-
     return true;
   }
 
@@ -269,10 +398,8 @@
       localStorage.setItem(OPS_KEY, JSON.stringify(data.ops || []));
       ignoreLocalOpsSave = false;
 
-      // repintado suave
-      if(state.view === "ops") screenOps();
-      if(!state.operator && state.view === "main") screenOperator();
-
+      if(state.view==="ops") screenOps();
+      if(!state.operator && state.view==="main") screenOperator();
     }, (err)=>{
       console.warn("Firestore OPS onSnapshot error:", err);
     });
@@ -285,21 +412,15 @@
     clearTimeout(opsSaveTimer);
     opsSaveTimer = setTimeout(async ()=>{
       try{
-        await opsDocRef().set({
-          ops: list,
-          updatedAt: new Date().toISOString()
-        }, { merge:true });
+        await opsDocRef().set({ ops:list, updatedAt:new Date().toISOString() }, {merge:true});
       }catch(e){
         console.warn("No se pudo guardar OPS en Firestore:", e);
       }
     }, 450);
   }
 
-  // =========================
-  // State + UI
-  // =========================
+  // -------- State + UI
   const state = { operator:null, sessionId:null, activeItemId:null, lastAction:null, view:"main" };
-
   const $wrap = document.getElementById('stepWrap');
   const $badge = document.getElementById('hdrBadge');
   const byId = id => document.getElementById(id);
@@ -308,37 +429,21 @@
   const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
   function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-  // --- operators (local cache + firestore sync)
   function loadOps(){
     try{
       const raw = localStorage.getItem(OPS_KEY);
-      if(!raw){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
+      if(!raw){ localStorage.setItem(OPS_KEY, JSON.stringify([])); return []; }
       const arr = JSON.parse(raw);
-      if(!Array.isArray(arr) || !arr.length){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
+      if(!Array.isArray(arr)) return [];
       return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
-    }catch(e){
-      const seed = [];
-      localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-      return seed;
-    }
+    }catch(e){ return []; }
   }
-
   function saveOps(list){
     localStorage.setItem(OPS_KEY, JSON.stringify(list));
-    scheduleOpsSaveToFirestore(list); // <<<<<< CLAVE: sincroniza
+    scheduleOpsSaveToFirestore(list);
   }
-
   function getActiveOps(){ return loadOps().filter(o=>o.active); }
 
-  // --- history
   function loadHist(){
     try{
       const raw = localStorage.getItem(HIST_KEY);
@@ -355,7 +460,6 @@
     saveHist(arr);
   }
 
-  // --- ui helpers
   function setBadge(){
     const parts=[];
     if(state.operator) parts.push(state.operator);
@@ -380,14 +484,12 @@
     if(stock<=2) return ['low','BAJO'];
     return [null,null];
   }
-
   function sortItems(arr){
     return [...arr].sort((a,b)=>{
       if(b.usageCount!==a.usageCount) return b.usageCount-a.usageCount;
       return a.name.localeCompare(b.name,'es');
     });
   }
-
   function escapeHtml(s){
     return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   }
@@ -398,13 +500,11 @@
     else screenConsume();
   }
 
-  // --- screens
+  // -------- Screens
   function screenOperator(){
     refreshItemsFromStock();
     state.view="main"; setBadge();
-
     const ops = getActiveOps().map(o=>`<button class="btn small accent" data-op="${escapeHtml(o.name)}">${escapeHtml(o.name)}</button>`).join('');
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
@@ -426,11 +526,9 @@
         </div>
       </div>
     `;
-
     [...$wrap.querySelectorAll('[data-op]')].forEach(b=> b.onclick = ()=>{
       state.operator=b.getAttribute('data-op'); state.sessionId=newSessionId(); screenItems();
     });
-
     byId('btnOcc').onclick = ()=>{ byId('occBox').style.display='block'; byId('occName').focus(); };
     byId('occOk').onclick = ()=>{
       const v=(byId('occName').value||'').trim();
@@ -448,7 +546,7 @@
           <div>
             <div class="pill">Stock real no disponible</div>
             <div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div>
-            <div class="hint">${escapeHtml(r.reason)}<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializarla.</div>
+            <div class="hint">${escapeHtml(r.reason)}<br>Solución: abre <b>stock.html</b> una vez o revisa sincronización.</div>
           </div>
         </div>
         <div class="sep"></div>
@@ -459,7 +557,6 @@
     }
 
     state.view="main"; setBadge();
-
     const families = Array.from(new Set(ITEMS.map(i=>i.family))).sort((a,b)=>a.localeCompare(b,'es'));
     const famOptions = ['<option value="">(Todas)</option>'].concat(families.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`)).join('');
 
@@ -472,9 +569,7 @@
         </div>
         <button class="btn small danger" id="logout">Cerrar sesión</button>
       </div>
-
       <div class="sep"></div>
-
       <div class="grid3">
         <div>
           <div class="hint" style="margin:0 0 8px">Familia (Filtro)</div>
@@ -493,9 +588,7 @@
           </select>
         </div>
       </div>
-
       <div class="sep"></div>
-
       <div id="itemsList" class="list"></div>
     `;
 
@@ -513,23 +606,17 @@
       });
 
       const groups = {};
-      filtered.forEach(it => {
-        if(!groups[it.family]) groups[it.family] = [];
-        groups[it.family].push(it);
-      });
-
-      const sortedFamKeys = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
-      const autoExpand = txt.length > 0;
+      filtered.forEach(it => { (groups[it.family] ||= []).push(it); });
+      const famKeys = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
+      const autoExpand = txt.length>0;
 
       if(filtered.length === 0) {
         byId('itemsList').innerHTML = `<div class="muted">No hay resultados.</div>`;
         return;
       }
 
-      byId('itemsList').innerHTML = sortedFamKeys.map(famName => {
+      byId('itemsList').innerHTML = famKeys.map(famName => {
         const list = groups[famName];
-        const famKey = famName; // para ids
-
         const isOpenClass = autoExpand ? 'open' : '';
         const isShowClass = autoExpand ? 'show' : '';
 
@@ -563,13 +650,11 @@
 
         return `
           <div class="groupWrap">
-            <div class="groupHdr ${isOpenClass}" data-tog="${escapeHtml(famKey)}">
-              <span>${escapeHtml(famName)} <span style="opacity:0.5;font-size:0.8em">(${list.length})</span></span>
+            <div class="groupHdr ${isOpenClass}" data-tog="${escapeHtml(famName)}">
+              <span>${escapeHtml(famName)} <span style="opacity:.5;font-size:.8em">(${list.length})</span></span>
               <span class="arrow">▼</span>
             </div>
-            <div class="groupBody ${isShowClass}" id="gb-${escapeHtml(famKey)}">
-              ${itemsHtml}
-            </div>
+            <div class="groupBody ${isShowClass}" id="gb-${escapeHtml(famName)}">${itemsHtml}</div>
           </div>
         `;
       }).join("");
@@ -593,12 +678,12 @@
       });
 
       $wrap.querySelectorAll("[data-quick]").forEach(b=>{
-        b.onclick = ()=>{
+        b.onclick = async ()=>{
           const id=b.getAttribute("data-quick");
           const it=ITEMS.find(x=>x.id===id);
           if(!it) return;
           if(it.stock<step){ toast("No hay suficiente stock.", false); return; }
-          consume(it, step);
+          await consume(it, step);
           render();
         };
       });
@@ -608,23 +693,21 @@
       byId(id).addEventListener("input", render);
       byId(id).addEventListener("change", render);
     });
-
     render();
   }
 
-  function consume(it, qty){
+  async function consume(it, qty){
     const beforeStock = it.stock;
-    const beforeUse = it.usageCount;
-    state.lastAction = {itemId: it.id, stockBefore: beforeStock, usageBefore: beforeUse, qty};
+    state.lastAction = { itemId: it.id, stockBefore: beforeStock, qty, movementId:null };
 
-    const res = applyConsumeToStock(it.id, qty);
+    const res = await applyConsumeToStockFirestore(it.id, qty);
     if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
 
     refreshItemsFromStock();
     const it2 = ITEMS.find(x=>x.id===it.id);
     if(it2) it.stock = it2.stock;
 
-    it.usageCount += qty;
+    state.lastAction.movementId = res.movementId;
 
     addHist({
       ts: nowISO(),
@@ -636,11 +719,12 @@
       delta: -qty,
       unit: it.unit,
       stockBefore: beforeStock,
-      stockAfter: (res.stockAfter!==undefined?res.stockAfter:it.stock),
+      stockAfter: res.stockAfter,
       device: "TERMINAL_FERRETERIA",
+      movementId: res.movementId
     });
 
-    toast(`Descontado ${qty} ${it.unit} (${it.stock} restantes).`, true);
+    toast(`Descontado ${qty} ${it.unit} (${res.stockAfter} restantes).`, true);
   }
 
   function screenConsume(){
@@ -661,56 +745,46 @@
           <button class="btn small danger" id="logout">Cerrar sesión</button>
         </div>
       </div>
-
       <div class="sep"></div>
-
       <div class="grid3">
         <div class="kpi"><div class="lbl">Familia</div><div class="val">${escapeHtml(it.family)}</div></div>
-        <div class="kpi"><div class="lbl">Usos</div><div class="val">${it.usageCount}</div></div>
         <div class="kpi"><div class="lbl">Stock</div><div class="val big">${it.stock}</div><div class="muted">${escapeHtml(it.unit)}</div></div>
+        <div class="kpi"><div class="lbl">Sync</div><div class="val">${USE_FIRESTORE_STOCK && fsReady ? "Firestore OK" : "Local"}</div></div>
       </div>
-
       <div class="sep"></div>
-
       <div class="grid2">
         <div>
           <div class="hint" style="margin:0 0 8px">Cantidad a consumir (${escapeHtml(it.unit)})</div>
           <input id="qtyIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
-          <div class="hint">Puedes escribir cualquier cifra. Si no hay suficiente stock, no te dejará.</div>
         </div>
         <button class="btn ${canUse ? 'accent':'disabled'}" id="useCustom">CONSUMIR</button>
       </div>
-
       <div class="sep"></div>
-
       <div class="grid3">
         <button class="btn ${canUse ? 'accent':'disabled'}" id="use1">CONSUMIR 1</button>
         <button class="btn ${it.stock>=5 ? 'accent':'disabled'}" id="use5">CONSUMIR 5</button>
         <button class="btn ${it.stock>=10 ? 'accent':'disabled'}" id="use10">CONSUMIR 10</button>
       </div>
-
-      <div class="hint">Cada consumo queda registrado en 📋 Historial (máx. ${HIST_LIMIT}).</div>
     `;
 
     byId('chgItem').onclick = ()=>{ state.activeItemId=null; screenItems(); };
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
 
-    byId('use1').onclick = ()=>{ if(it.stock<1) return; consume(it,1); screenConsume(); };
-    byId('use5').onclick = ()=>{ if(it.stock<5) return; consume(it,5); screenConsume(); };
-    byId('use10').onclick = ()=>{ if(it.stock<10) return; consume(it,10); screenConsume(); };
+    byId('use1').onclick = async ()=>{ if(it.stock<1) return; await consume(it,1); screenConsume(); };
+    byId('use5').onclick = async ()=>{ if(it.stock<5) return; await consume(it,5); screenConsume(); };
+    byId('use10').onclick = async ()=>{ if(it.stock<10) return; await consume(it,10); screenConsume(); };
 
-    byId('useCustom').onclick = ()=>{
+    byId('useCustom').onclick = async ()=>{
       const raw = (byId('qtyIn').value||'').trim();
       const qty = parseInt(raw,10);
       if(!raw || isNaN(qty) || qty<=0){ toast('Introduce una cantidad válida.', false); return; }
       if(it.stock<qty){ toast('No hay suficiente stock para esa cantidad.', false); return; }
-      consume(it, qty);
+      await consume(it, qty);
       byId('qtyIn').value='';
       screenConsume();
     };
   }
 
-  // --- operarios screen (ahora sincroniza por Firestore)
   function screenOps(){
     state.view="ops"; setBadge();
     const ops = loadOps();
@@ -730,9 +804,8 @@
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">⚙ Gestión de operarios (sincronizado)</div>
-          <div style="margin-top:10px;font-size:24px;font-weight:900">Añadir, activar/desactivar o eliminar</div>
-          <div class="hint">Se guarda en Firestore y aparece en la tablet de Ferretería automáticamente.</div>
+          <div class="pill">⚙ Operarios (Firestore)</div>
+          <div style="margin-top:10px;font-size:24px;font-weight:900">Se sincronizan en la tablet de Ferretería</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
@@ -748,167 +821,86 @@
     `;
 
     byId('backMain').onclick = ()=>goBackMain();
-
     byId('addOp').onclick = ()=>{
       const v=(byId('newOp').value||"").trim();
       if(!v){ toast("Escribe un nombre.",false); return; }
       const cur=loadOps();
       if(cur.some(x=>x.name.toLowerCase()===v.toLowerCase())){ toast("Ya existe.",false); return; }
-      cur.push({name:v, active:true});
-      saveOps(cur);
-      toast("Operario añadido.",false);
-      screenOps();
+      cur.push({name:v, active:true}); saveOps(cur);
+      toast("Operario añadido.",false); screenOps();
     };
-
     $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
       btn.onclick=()=>{
         const idx=parseInt(btn.getAttribute("data-tgl"),10);
         const cur=loadOps(); if(!cur[idx]) return;
-        cur[idx].active=!cur[idx].active;
-        saveOps(cur);
+        cur[idx].active=!cur[idx].active; saveOps(cur);
         toast(cur[idx].active ? "Operario activado." : "Operario desactivado.",false);
         screenOps();
       };
     });
-
     $wrap.querySelectorAll("[data-del]").forEach(btn=>{
       btn.onclick=()=>{
         const idx=parseInt(btn.getAttribute("data-del"),10);
         const cur=loadOps(); if(!cur[idx]) return;
         if(!confirm(`Eliminar operario "${cur[idx].name}"?`)) return;
-        cur.splice(idx,1);
-        saveOps(cur);
-        toast("Operario eliminado.",false);
-        screenOps();
+        cur.splice(idx,1); saveOps(cur);
+        toast("Operario eliminado.",false); screenOps();
       };
     });
-
     byId('resetOps').onclick=()=>{
       if(!confirm("Vaciar lista de operarios?")) return;
-      saveOps([]);
-      toast("Operarios limpiados.",false);
-      screenOps();
+      saveOps([]); toast("Operarios limpiados.",false); screenOps();
     };
   }
 
-  // --- history aggregated
   function screenHist(){
     state.view="hist"; setBadge();
     const hist=loadHist();
 
-    const ops = Array.from(new Set(hist.map(h=>h.operator))).sort((a,b)=>a.localeCompare(b,'es'));
-    const fams = Array.from(new Set(hist.map(h=>h.family))).sort((a,b)=>a.localeCompare(b,'es'));
-    const opOptions = ['<option value="">(Todos)</option>'].concat(ops.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)).join('');
-    const famOptions = ['<option value="">(Todas)</option>'].concat(fams.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`)).join('');
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">📋 Historial (últimos ${HIST_LIMIT})</div>
-          <div style="margin-top:10px;font-size:24px;font-weight:900">Consumos agrupados</div>
-          <div class="hint">1 línea por (Operario + Sesión + Artículo). Ordenado por lo más reciente.</div>
+          <div class="pill">📋 Historial (local)</div>
+          <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de consumos</div>
+          <div class="hint">Stock real se descuenta en Firestore, historial queda en este dispositivo.</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
-
       <div class="sep"></div>
-
-      <div class="grid3">
-        <div class="kpi"><div class="lbl">Registros</div><div class="val">${hist.length}</div></div>
-        <div class="kpi"><div class="lbl">Último</div><div class="val">${hist[0] ? fmt(hist[0].ts) : "-"}</div></div>
-        <div class="kpi"><div class="lbl">Límite</div><div class="val">${HIST_LIMIT}</div></div>
-      </div>
-
+      <div class="kpi"><div class="lbl">Registros</div><div class="val">${hist.length}</div></div>
       <div class="sep"></div>
-
-      <div class="grid3">
-        <div><div class="hint" style="margin:0 0 8px">Operario</div><select id="fOp">${opOptions}</select></div>
-        <div><div class="hint" style="margin:0 0 8px">Familia</div><select id="fFam">${famOptions}</select></div>
-        <div><div class="hint" style="margin:0 0 8px">Buscar artículo</div><input id="fTxt" placeholder="Ej: tornillo, disco..."/></div>
-      </div>
-
-      <div class="sep"></div>
-
       <div class="grid2">
         <button class="btn small primary" id="btnExport">Exportar JSON</button>
         <button class="btn small danger" id="btnClear">Borrar historial</button>
       </div>
-
       <div class="sep"></div>
-
-      <div id="histList" class="list" style="max-height:46vh"></div>
+      <div class="list" style="max-height:46vh">
+        ${hist.map(h=>`
+          <div class="item">
+            <div class="left">
+              <div class="name">${escapeHtml(h.itemName||"")}</div>
+              <div class="meta">
+                <span class="chip">${escapeHtml(h.operator||"")}</span>
+                <span class="muted">${fmt(h.ts)}</span>
+              </div>
+            </div>
+            <div class="right">
+              <div class="kpi" style="min-width:170px">
+                <div class="lbl">Delta</div>
+                <div class="val">${h.delta} ${escapeHtml(h.unit||"")}</div>
+              </div>
+            </div>
+          </div>
+        `).join('') || `<div class="muted">Sin historial.</div>`}
+      </div>
     `;
 
     byId('backMain').onclick=()=>goBackMain();
     byId('btnExport').onclick=()=>exportHist();
     byId('btnClear').onclick=()=>{
-      if(!confirm("Borrar todo el historial local?")) return;
+      if(!confirm("Borrar historial local?")) return;
       saveHist([]); toast("Historial borrado.",false); screenHist();
     };
-
-    const render=()=>{
-      const op = byId('fOp').value;
-      const fam = byId('fFam').value;
-      const txt = (byId('fTxt').value||"").trim().toLowerCase();
-
-      const filtered = hist.filter(h=>{
-        if(op && h.operator!==op) return false;
-        if(fam && h.family!==fam) return false;
-        if(txt && !(String(h.itemName||"").toLowerCase().includes(txt))) return false;
-        return true;
-      });
-
-      const map=new Map();
-      filtered.forEach(h=>{
-        const key=[h.operator,h.sessionId||"SIN_SESION",h.itemId].join("||");
-        if(!map.has(key)){
-          map.set(key,{
-            operator:h.operator, sessionId:h.sessionId||"SIN_SESION",
-            itemId:h.itemId, itemName:h.itemName, family:h.family, unit:h.unit,
-            total:0, firstTs:h.ts, lastTs:h.ts, stockStart:h.stockBefore, stockEnd:h.stockAfter
-          });
-        }
-        const g=map.get(key);
-        g.total += (h.delta||0);
-        if(h.ts < g.firstTs){ g.firstTs=h.ts; g.stockStart=h.stockBefore; }
-        if(h.ts > g.lastTs){ g.lastTs=h.ts; g.stockEnd=h.stockAfter; }
-      });
-
-      const groups=Array.from(map.values()).sort((a,b)=> (b.lastTs||"").localeCompare(a.lastTs||""));
-
-      byId('histList').innerHTML = groups.map(g=>{
-        const totalAbs=Math.abs(g.total);
-        return `
-          <div class="item">
-            <div class="left">
-              <div class="name">${escapeHtml(g.itemName)}</div>
-              <div class="meta">
-                <span class="chip">${escapeHtml(g.family)}</span>
-                <span class="chip">${escapeHtml(g.operator)}</span>
-                <span class="muted">Sesión: ${escapeHtml(g.sessionId)}</span>
-                <span class="muted">${fmt(g.firstTs)} → ${fmt(g.lastTs)}</span>
-              </div>
-            </div>
-            <div class="right">
-              <div class="kpi" style="min-width:170px">
-                <div class="lbl">Consumido</div>
-                <div class="val">-${totalAbs} ${escapeHtml(g.unit)}</div>
-              </div>
-              <div class="kpi" style="min-width:200px">
-                <div class="lbl">Stock</div>
-                <div class="val">${g.stockStart} → <b>${g.stockEnd}</b></div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("") || `<div class="muted">No hay resultados con estos filtros.</div>`;
-    };
-
-    ["fOp","fFam","fTxt"].forEach(id=>{
-      byId(id).addEventListener("input",render);
-      byId(id).addEventListener("change",render);
-    });
-    render();
   }
 
   function exportHist(){
@@ -922,52 +914,54 @@
     toast("Exportación iniciada.",false);
   }
 
-  // --- undo (solo UI + historial local)
-  byId('undoBtn').onclick=()=>{
-    const la=state.lastAction; if(!la) return;
-    const it=ITEMS.find(x=>x.id===la.itemId); if(!it) return;
+  // Undo REAL Firestore
+  byId('undoBtn').onclick = async ()=>{
+    const la=state.lastAction; if(!la || !la.movementId){ toast("No hay movimiento para deshacer.",false); return; }
 
-    it.stock=la.stockBefore;
-    it.usageCount=la.usageBefore;
-    state.lastAction=null;
+    const res = await undoConsumeByMovementId(la.movementId);
+    if(!res.ok){ toast(res.msg||"No se pudo deshacer en Firestore.",false); return; }
 
-    const hist=loadHist();
-    if(hist[0] && hist[0].itemId===it.id && hist[0].operator===state.operator && (hist[0].sessionId||"")===(state.sessionId||"")){
+    const hist = loadHist();
+    if(hist[0] && hist[0].movementId === la.movementId){
       hist.shift(); saveHist(hist);
     }
+    state.lastAction=null;
 
-    toast("Acción deshecha.",false);
+    refreshItemsFromStock();
+    toast("Acción deshecha (stock restaurado).",false);
     goBackMain();
   };
 
-  // header buttons
   document.getElementById("btnOps").onclick=()=>screenOps();
   document.getElementById("btnHist").onclick=()=>screenHist();
 
-  // START: inicializa Firestore OPS y luego arranca UI
   (async ()=>{
     try{
+      fbEnsure();
+      await fsLoginHidden();
+
+      // Stock Firestore -> cache local + realtime
+      if(USE_FIRESTORE_STOCK){
+        const r = await fsLoadStockOnceToLocal();
+        if(!r.ok) console.warn("Carga stock Firestore inicial falló:", r.msg);
+        fsReady=true;
+        fsStartStockRealtime();
+      }
+
+      // Operarios Firestore
       if(USE_FIRESTORE_OPS){
-        fbEnsure();
-        await fsLoginHidden();
-
         const existed = await opsLoadOnceToLocal();
-        opsReady = true;
+        opsReady=true;
         opsStartRealtimeListener();
-
-        // Si el doc no existía, lo creamos con lo local (aunque esté vacío)
         if(!existed){
           const raw = localStorage.getItem(OPS_KEY);
           const localOps = raw ? JSON.parse(raw) : [];
-          await opsDocRef().set({
-            ops: Array.isArray(localOps) ? localOps : [],
-            createdAt: new Date().toISOString()
-          }, { merge:true });
+          await opsDocRef().set({ ops:Array.isArray(localOps)?localOps:[], createdAt:new Date().toISOString() }, {merge:true});
         }
       }
     }catch(e){
-      console.warn("Init OPS Firestore falló:", e);
-      opsReady = false;
+      console.warn("Init Firestore falló:", e);
+      fsReady=false; opsReady=false;
     }
 
     screenOperator();
