@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Corte Hierro</title>
-  <!-- PATCH_VERSION: 2026-01-07 12:04:31 -->
+  <!-- PATCH_VERSION: 2026-01-08 TERMINAL_HIERRO_OPS_FIRESTORE -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -116,20 +116,105 @@
   <button class="undo" id="undoBtn">Deshacer</button>
 </div>
 
+<!-- Firebase (Compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
 <script>
 (() => {
+  // =========================
+  // CONFIG
+  // =========================
+  const USE_FIRESTORE = true; // ✅ ACTIVADO
   const OPS_KEY  = "tablet_ops_hierro_v3_clean";
   const HIST_KEY = "tablet_hist_hierro_v3_clean";
   const HIST_LIMIT = 500;
 
-  const DEFAULT_OPERATORS = [];
+  // Firestore: operarios separados por terminal
+  // Estructura recomendada:
+  // collection "taller" -> doc "ops" -> field "hierro" (array)
+  const FS_OPS_PATH = { col: "taller", doc: "ops", field: "hierro" };
 
-  // -------------------------
-  // Integración con Stock real (localStorage) - SIN Firestore
-  // Lee y descuenta directamente sobre la misma DB que usa stock.html (DB_KEY="taller_stock_v3_data")
-  // -------------------------
+  // Firestore: stock (si lo tienes en otro doc, lo cambias aquí)
+  // Si tu stock YA está en local y te funciona, esto no lo rompe.
+  const FS_STOCK_PATH = { col: "taller_stock", doc: "main" };
+
+  // ✅ Pega aquí tu firebaseConfig REAL
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+
+  // =========================
+  // FIREBASE HELPERS
+  // =========================
+  let fbApp=null, fbAuth=null, fbDb=null;
+
+  function fbEnsure(){
+    if(fbApp) return;
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb   = firebase.firestore();
+  }
+
+  async function fsLoginHidden(){
+    // Login anónimo (si reglas lo permiten)
+    if(fbAuth.currentUser) return;
+    await fbAuth.signInAnonymously();
+  }
+
+  function fsOpsRef(){
+    return fbDb.collection(FS_OPS_PATH.col).doc(FS_OPS_PATH.doc);
+  }
+
+  function fsStockRef(){
+    return fbDb.collection(FS_STOCK_PATH.col).doc(FS_STOCK_PATH.doc);
+  }
+
+  // Carga operarios de Firestore -> localStorage (OPS_KEY)
+  async function fsLoadOpsToLocal(){
+    const snap = await fsOpsRef().get();
+    if(!snap.exists) return false;
+    const data = snap.data() || {};
+    const ops = Array.isArray(data[FS_OPS_PATH.field]) ? data[FS_OPS_PATH.field] : [];
+    localStorage.setItem(OPS_KEY, JSON.stringify(ops));
+    return true;
+  }
+
+  // Guarda operarios local -> Firestore (field hierro)
+  async function fsSaveOpsFromLocal(){
+    const ops = loadOpsRaw();
+    const payload = {};
+    payload[FS_OPS_PATH.field] = ops;
+    payload.updatedAt = new Date().toISOString();
+    await fsOpsRef().set(payload, { merge: true });
+  }
+
+  // Carga stock de Firestore -> localStorage (taller_stock_v3_data)
+  // (solo si existe en Firestore; si no existe, no rompe nada)
+  async function fsLoadStockToLocal(){
+    const STOCK_DB_KEY = "taller_stock_v3_data";
+    const snap = await fsStockRef().get();
+    if(!snap.exists) return false;
+    const data = snap.data() || {};
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
+    localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+      materials: data.materials || [],
+      movements: data.movements || [],
+      categoryOrder: data.categoryOrder || []
+    }));
+    return true;
+  }
+
+  // =========================
+  // STOCK REAL (localStorage)
+  // =========================
   const STOCK_DB_KEY = "taller_stock_v3_data";
-const USE_FIRESTORE = false;
 
   function loadStockDB(){
     try{
@@ -140,28 +225,22 @@ const USE_FIRESTORE = false;
       return db;
     }catch(e){ return null; }
   }
-
   function saveStockDB(db){
     localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db));
   }
-
   function getStockFromDB(db, matId){
     return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
   }
-
   function isIronMaterial(m){
     const cat = String(m.cat||"").toLowerCase();
     return cat.includes("hierro") || cat.includes("perfil");
   }
-
   function detectFinish(m){
-    // No pedimos al operario que lo marque: se reconoce por nombre/grupo/categoría
     const txt = (String(m.name||"") + " " + String(m.grp||"") + " " + String(m.cat||"")).toLowerCase();
     if(txt.includes("galva") || txt.includes("galvan")) return "GALVANIZADO";
     return "NEGRO";
   }
 
-  // MATERIALS será el listado vivo de materiales de hierro leído del stock real
   let MATERIALS = [];
 
   function refreshMaterialsFromStock(){
@@ -179,7 +258,7 @@ const USE_FIRESTORE = false;
         name: m.name,
         finish,
         stock,
-        usageCount: 0, // opcional (no lo necesitamos para integrar)
+        usageCount: 0,
         unit: m.unit || "br"
       };
     });
@@ -203,53 +282,55 @@ const USE_FIRESTORE = false;
     return {ok:true, stockAfter: current-qty};
   }
 
-
+  // =========================
+  // STATE & HELPERS
+  // =========================
   const state = { finish:null, operator:null, activeMaterialId:null, lastAction:null, view:"main", sessionId:null };
   const $wrap = document.getElementById('stepWrap');
   const $badge = document.getElementById('hdrBadge');
   const byId = id => document.getElementById(id);
 
   const nowISO = () => new Date().toISOString();
-  const fmt = (iso) => {
-    const d = new Date(iso);
-    return d.toLocaleString('es-ES', {hour12:false});
-  };
+  const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
+  function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-  function newSessionId(){
-    // Simple unique id for grouping (operator login session)
-    return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  }
-
-  // -------------------------
-  // Operators store
-  // -------------------------
-  function loadOps(){
+  // =========================
+  // OPERARIOS (LOCAL + FIRESTORE)
+  // =========================
+  function loadOpsRaw(){
     try{
       const raw = localStorage.getItem(OPS_KEY);
-      if(!raw){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
+      if(!raw) return [];
       const arr = JSON.parse(raw);
-      if(!Array.isArray(arr) || !arr.length){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
-      return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
+      return Array.isArray(arr) ? arr : [];
     }catch(e){
-      const seed = [];
-      localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-      return seed;
+      return [];
     }
   }
-  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); }
+
+  function loadOps(){
+    try{
+      const arr = loadOpsRaw();
+      if(!Array.isArray(arr) || !arr.length) return [];
+      return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
+    }catch(e){
+      return [];
+    }
+  }
+
+  async function saveOps(list){
+    localStorage.setItem(OPS_KEY, JSON.stringify(list));
+    // ✅ autosync operarios a Firestore
+    if(USE_FIRESTORE){
+      try{ await fsSaveOpsFromLocal(); }catch(e){ console.warn("No se pudo guardar operarios en Firestore:", e); }
+    }
+  }
+
   function getActiveOps(){ return loadOps().filter(o=>o.active); }
 
-  // -------------------------
-  // History store
-  // -------------------------
+  // =========================
+  // HISTORY (LOCAL)
+  // =========================
   function loadHist(){
     try{
       const raw = localStorage.getItem(HIST_KEY);
@@ -260,19 +341,17 @@ const USE_FIRESTORE = false;
       return [];
     }
   }
-  function saveHist(arr){
-    localStorage.setItem(HIST_KEY, JSON.stringify(arr));
-  }
+  function saveHist(arr){ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }
   function addHist(entry){
     const arr = loadHist();
-    arr.unshift(entry); // newest first
+    arr.unshift(entry);
     if(arr.length > HIST_LIMIT) arr.length = HIST_LIMIT;
     saveHist(arr);
   }
 
-  // -------------------------
-  // UI helpers
-  // -------------------------
+  // =========================
+  // UI
+  // =========================
   function setBadge(){
     const parts=[];
     if(state.finish) parts.push(state.finish);
@@ -318,9 +397,9 @@ const USE_FIRESTORE = false;
     else screenConsume();
   }
 
-  // -------------------------
-  // Main screens
-  // -------------------------
+  // =========================
+  // SCREENS
+  // =========================
   function screenFinish(){
     refreshMaterialsFromStock();
     state.view="main";
@@ -339,7 +418,7 @@ const USE_FIRESTORE = false;
         <button class="btn good" id="btnGalva">HIERRO GALVANIZADO</button>
       </div>
       <div class="sep"></div>
-      <div class="muted">: operarios e historial persistentes (últimos ${HIST_LIMIT}). Stock de ejemplo.</div>
+      <div class="muted">Operarios sincronizados por Firestore · Historial local (${HIST_LIMIT}).</div>
     `;
     byId('btnNegro').onclick = () => { state.finish="NEGRO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
     byId('btnGalva').onclick = () => { state.finish="GALVANIZADO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
@@ -386,8 +465,16 @@ const USE_FIRESTORE = false;
     const r = refreshMaterialsFromStock();
     if(!r.ok){
       state.view='main'; setBadge();
-      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${escapeHtml(r.reason)}
-<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.</div></div></div>`;
+      $wrap.innerHTML = `
+        <div class="row">
+          <div>
+            <div class="pill">Stock real no disponible</div>
+            <div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div>
+            <div class="hint">${escapeHtml(r.reason)}<br>
+              Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.
+            </div>
+          </div>
+        </div>`;
       return;
     }
 
@@ -404,7 +491,6 @@ const USE_FIRESTORE = false;
             <div class="name">${m.name}</div>
             <div class="meta">
               ${materialTag(m)}
-              <span class="muted">Usos: <b>${m.usageCount}</b></span>
               ${warnTag}
             </div>
           </div>
@@ -415,15 +501,14 @@ const USE_FIRESTORE = false;
             </div>
             <button class="miniBtn sel ${disabled}" data-mat="${m.id}">Seleccionar</button>
           </div>
-        </div>
-      `;
+        </div>`;
     }).join('');
     $wrap.innerHTML = `
       <div class="row">
         <div>
           <div class="pill">Paso 3 · Material (${state.finish})</div>
           <div style="margin-top:10px;font-size:26px;font-weight:900">Selecciona el material</div>
-          <div class="hint">Ordenado por “más usados”. Los sin stock se muestran pero no se pueden seleccionar.</div>
+          <div class="hint">Los sin stock se muestran pero no se pueden seleccionar.</div>
         </div>
         <div class="row" style="gap:10px">
           <button class="btn small ghost" id="backOp">⬅ Operario</button>
@@ -431,8 +516,7 @@ const USE_FIRESTORE = false;
         </div>
       </div>
       <div class="sep"></div>
-      <div class="list">${rows || `<div class="muted">No hay materiales en este tipo.</div>`}</div>
-    `;
+      <div class="list">${rows || `<div class="muted">No hay materiales en este tipo.</div>`}</div>`;
     byId('backOp').onclick = ()=>screenOperator();
     byId('chgFinish').onclick = ()=>screenFinish();
     [...$wrap.querySelectorAll('[data-mat]')].forEach(b=>{
@@ -467,20 +551,20 @@ const USE_FIRESTORE = false;
       <div class="sep"></div>
       <div class="grid3">
         <div class="kpi"><div class="lbl">Tipo</div><div class="val">${m.finish}</div></div>
-        <div class="kpi"><div class="lbl">Usos históricos</div><div class="val">${m.usageCount}</div></div>
         <div class="kpi"><div class="lbl">Stock actual</div><div class="val big">${m.stock}</div><div class="muted">barras</div></div>
+        <div class="kpi"><div class="lbl">Sesión</div><div class="val">${escapeHtml(state.sessionId||"")}</div></div>
       </div>
       <div class="sep"></div>
       <div class="grid2">
         <button class="btn ${canUse ? 'accent':'disabled'}" id="useOne">USAR 1 BARRA</button>
         <button class="btn small ghost" id="info">Ver resumen</button>
       </div>
-      <div class="hint">Cada pulsación queda registrada en 📋 Historial (máx. ${HIST_LIMIT}).</div>
-    `;
+      <div class="hint">Cada pulsación queda registrada en 📋 Historial (máx. ${HIST_LIMIT}).</div>`;
+
     byId('chgMat').onclick = ()=>screenMaterials();
     byId('chgFinish2').onclick = ()=>screenFinish();
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
-    byId('info').onclick = ()=>toast(`Activo: ${m.name} · Stock: ${m.stock} · Usos: ${m.usageCount}`,false);
+    byId('info').onclick = ()=>toast(`Activo: ${m.name} · Stock: ${m.stock}`,false);
 
     let lock=false;
     byId('useOne').onclick = ()=>{
@@ -489,20 +573,15 @@ const USE_FIRESTORE = false;
       lock=true; setTimeout(()=>lock=false,850);
 
       const beforeStock = m.stock;
-      const beforeUse   = m.usageCount;
+      state.lastAction = {matId:m.id, stockBefore:beforeStock};
 
-      state.lastAction = {matId:m.id, stockBefore:beforeStock, usageBefore:beforeUse};
-
-      // Apply sobre Stock real
       const res = applyConsumeToStock(m.id, 1);
-      if(!res.ok){ toast(res.msg||"SIN STOCK", false); lock=false; return; }
-      // Refrescar listado vivo desde Stock real
+      if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
+
       refreshMaterialsFromStock();
       const mm = MATERIALS.find(x=>x.id===m.id);
       if(mm){ m.stock = mm.stock; }
-      m.usageCount = (m.usageCount||0) + 1;
 
-      // Save history entry
       addHist({
         ts: nowISO(),
         operator: state.operator,
@@ -512,7 +591,7 @@ const USE_FIRESTORE = false;
         delta: -1,
         stockBefore: beforeStock,
         stockAfter: (res.stockAfter!==undefined?res.stockAfter:m.stock),
-        device: "DEMO_PC",
+        device: "TABLET_HIERRO",
         sessionId: state.sessionId || "SIN_SESION"
       });
 
@@ -521,9 +600,9 @@ const USE_FIRESTORE = false;
     };
   }
 
-  // -------------------------
-  // Operarios
-  // -------------------------
+  // =========================
+  // OPERARIOS SCREEN
+  // =========================
   function screenOps(){
     state.view="ops";
     setBadge();
@@ -531,21 +610,21 @@ const USE_FIRESTORE = false;
     const rows = ops.map((o,i)=>`
       <div class="opRow">
         <div>
-          <div class="nm">${o.name}</div>
+          <div class="nm">${escapeHtml(o.name)}</div>
           <div class="st">${o.active ? "Activo" : "Inactivo"}</div>
         </div>
         <div class="opActions">
           <button data-tgl="${i}">${o.active ? "Desactivar" : "Activar"}</button>
           <button class="danger" data-del="${i}">Eliminar</button>
         </div>
-      </div>
-    `).join("");
+      </div>`).join("");
+
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">⚙ Gestión de operarios</div>
+          <div class="pill">⚙ Gestión de operarios (HIERRO)</div>
           <div style="margin-top:10px;font-size:24px;font-weight:900">Añadir, activar/desactivar o eliminar</div>
-          <div class="hint">Recomendación: desactivar en lugar de eliminar si quieres mantener trazabilidad.</div>
+          <div class="hint">Estos operarios se sincronizan en Firestore y aparecen en móvil y PC.</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
@@ -557,10 +636,11 @@ const USE_FIRESTORE = false;
       <div class="sep"></div>
       <div class="list" style="max-height:48vh">${rows || `<div class="muted">No hay operarios.</div>`}</div>
       <div class="sep"></div>
-      <button class="btn small danger" id="resetOps">Vaciar lista</button>
-    `;
+      <button class="btn small danger" id="resetOps">Vaciar lista</button>`;
+
     byId('backMain').onclick = () => goBackMain();
-    byId('addOp').onclick = () => {
+
+    byId('addOp').onclick = async () => {
       const v = (byId('newOp').value||"").trim();
       if(!v){ toast("Escribe un nombre.", false); return; }
       const cur = loadOps();
@@ -568,113 +648,69 @@ const USE_FIRESTORE = false;
         toast("Ya existe un operario con ese nombre.", false); return;
       }
       cur.push({name:v, active:true});
-      saveOps(cur);
+      await saveOps(cur);
       toast("Operario añadido.", false);
       screenOps();
     };
+
     $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const idx = parseInt(btn.getAttribute("data-tgl"),10);
         const cur = loadOps();
         if(!cur[idx]) return;
         cur[idx].active = !cur[idx].active;
-        saveOps(cur);
+        await saveOps(cur);
         toast(cur[idx].active ? "Operario activado." : "Operario desactivado.", false);
         screenOps();
       };
     });
+
     $wrap.querySelectorAll("[data-del]").forEach(btn=>{
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const idx = parseInt(btn.getAttribute("data-del"),10);
         const cur = loadOps();
         if(!cur[idx]) return;
         const name = cur[idx].name;
         if(!confirm(`Eliminar operario "${name}"?`)) return;
         cur.splice(idx,1);
-        saveOps(cur);
+        await saveOps(cur);
         toast("Operario eliminado.", false);
         screenOps();
       };
     });
-    byId('resetOps').onclick = () => {
-      if(!confirm("Restaurar la lista de operarios por defecto?")) return;
-      const seed = [];
-      saveOps(seed);
+
+    byId('resetOps').onclick = async () => {
+      if(!confirm("Vaciar lista de operarios de hierro (en todos los dispositivos)?")) return;
+      await saveOps([]);
       toast("Operarios limpiados.", false);
       screenOps();
     };
   }
 
-  // -------------------------
-  // Historial
-  // -------------------------
+  // =========================
+  // HIST SCREEN (LOCAL)
+  // =========================
   function screenHist(){
     state.view="hist";
     setBadge();
     const hist = loadHist();
 
-    const ops = Array.from(new Set(hist.map(h=>h.operator))).sort((a,b)=>a.localeCompare(b,'es'));
-    const opOptions = ['<option value="">(Todos)</option>'].concat(ops.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)).join('');
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">📋 Historial (últimos ${HIST_LIMIT})</div>
+          <div class="pill">📋 Historial (local, últimos ${HIST_LIMIT})</div>
           <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de consumos</div>
-          <div class="hint">Cada pulsación “USAR 1 BARRA” crea un registro. Aquí se puede filtrar y exportar.</div>
+          <div class="hint">Esto es local de cada tablet/PC (no sincronizado).</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
-
       <div class="sep"></div>
-
-      <div class="grid3">
-        <div class="kpi">
-          <div class="lbl">Registros</div>
-          <div class="val">${hist.length}</div>
-        </div>
-        <div class="kpi">
-          <div class="lbl">Último registro</div>
-          <div class="val">${hist[0] ? fmt(hist[0].ts) : "-"}</div>
-        </div>
-        <div class="kpi">
-          <div class="lbl">Límite</div>
-          <div class="val">${HIST_LIMIT}</div>
-        </div>
-      </div>
-
+      <div class="list" style="max-height:56vh" id="histList"></div>
       <div class="sep"></div>
-
-      <div class="grid3">
-        <div>
-          <div class="hint" style="margin:0 0 8px">Operario</div>
-          <select id="fOp">${opOptions}</select>
-        </div>
-        <div>
-          <div class="hint" style="margin:0 0 8px">Tipo</div>
-          <select id="fFin">
-            <option value="">(Todos)</option>
-            <option value="NEGRO">NEGRO</option>
-            <option value="GALVANIZADO">GALVANIZADO</option>
-          </select>
-        </div>
-        <div>
-          <div class="hint" style="margin:0 0 8px">Buscar material</div>
-          <input id="fTxt" placeholder="Ej: tubo 40x40"/>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
       <div class="grid2">
         <button class="btn small primary" id="btnExport">Exportar JSON</button>
         <button class="btn small danger" id="btnClear">Borrar historial</button>
-      </div>
-
-      <div class="sep"></div>
-
-      <div id="histList" class="list" style="max-height:46vh"></div>
-    `;
+      </div>`;
 
     byId('backMain').onclick = () => goBackMain();
     byId('btnExport').onclick = () => exportHist();
@@ -685,86 +721,24 @@ const USE_FIRESTORE = false;
       screenHist();
     };
 
-    const render = () => {
-      const op = byId('fOp').value;
-      const fin = byId('fFin').value;
-      const txt = (byId('fTxt').value||"").trim().toLowerCase();
-
-      const filtered = hist.filter(h=>{
-        if(op && h.operator !== op) return false;
-        if(fin && h.finish !== fin) return false;
-        if(txt && !(String(h.materialName||"").toLowerCase().includes(txt))) return false;
-        return true;
-      });
-
-      // Aggregate by operator + session + finish + material
-      const map = new Map();
-      filtered.forEach(h=>{
-        const key = [h.operator, h.sessionId||"SIN_SESION", h.finish, h.materialId].join("||");
-        if(!map.has(key)){
-          map.set(key, {
-            operator: h.operator,
-            sessionId: h.sessionId||"SIN_SESION",
-            finish: h.finish,
-            materialId: h.materialId,
-            materialName: h.materialName,
-            total: 0,
-            firstTs: h.ts,
-            lastTs: h.ts,
-            stockStart: h.stockBefore,
-            stockEnd: h.stockAfter
-          });
-        }
-        const g = map.get(key);
-        g.total += (h.delta||0); // negative
-        // Since hist is newest-first but filtered order unknown, compute min/max
-        if(h.ts < g.firstTs){
-          g.firstTs = h.ts;
-          g.stockStart = h.stockBefore;
-        }
-        if(h.ts > g.lastTs){
-          g.lastTs = h.ts;
-          g.stockEnd = h.stockAfter;
-        }
-      });
-
-      const groups = Array.from(map.values()).sort((a,b)=> (b.lastTs||"").localeCompare(a.lastTs||""));
-
-      byId('histList').innerHTML = groups.map(g=>{
-        const finCls = g.finish==="NEGRO" ? "negro" : "galva";
-        const totalAbs = Math.abs(g.total);
-        return `
-          <div class="item">
-            <div class="left">
-              <div class="name">${escapeHtml(g.materialName)}</div>
-              <div class="meta">
-                <span class="tag ${finCls}">${escapeHtml(g.finish)}</span>
-                <span class="chip">${escapeHtml(g.operator)}</span>
-                <span class="muted">Sesión: ${escapeHtml(g.sessionId)}</span>
-                <span class="muted">${fmt(g.firstTs)} → ${fmt(g.lastTs)}</span>
-              </div>
-            </div>
-            <div class="right">
-              <div class="kpi" style="min-width:170px">
-                <div class="lbl">Barras usadas</div>
-                <div class="val">-${totalAbs}</div>
-              </div>
-              <div class="kpi" style="min-width:200px">
-                <div class="lbl">Stock</div>
-                <div class="val">${g.stockStart} → <b>${g.stockEnd}</b></div>
-              </div>
-            </div>
+    const list = byId('histList');
+    list.innerHTML = hist.map(h=>`
+      <div class="item">
+        <div class="left">
+          <div class="name">${escapeHtml(h.materialName||"")}</div>
+          <div class="meta">
+            <span class="chip">${escapeHtml(h.operator||"")}</span>
+            <span class="muted">${fmt(h.ts)}</span>
+            <span class="muted">Stock: ${h.stockBefore} → ${h.stockAfter}</span>
           </div>
-        `;
-      }).join("") || `<div class="muted">No hay resultados con estos filtros.</div>`;
-    };
-
-    ["fOp","fFin","fTxt"].forEach(id=>{
-      byId(id).addEventListener("input", render);
-      byId(id).addEventListener("change", render);
-    });
-
-    render();
+        </div>
+        <div class="right">
+          <div class="kpi" style="min-width:130px">
+            <div class="lbl">Delta</div>
+            <div class="val">${h.delta}</div>
+          </div>
+        </div>
+      </div>`).join("") || `<div class="muted">No hay historial.</div>`;
   }
 
   function exportHist(){
@@ -773,7 +747,7 @@ const USE_FIRESTORE = false;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "historial_cortes_demo.json";
+    a.download = "historial_hierro.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -785,23 +759,18 @@ const USE_FIRESTORE = false;
     return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   }
 
-  // -------------------------
-  // Undo (also reverts last history entry)
-  // -------------------------
+  // Undo
   byId('undoBtn').onclick = ()=>{
     const la=state.lastAction; if(!la) return;
     const m=MATERIALS.find(x=>x.id===la.matId); if(!m) return;
-    m.stock = la.stockBefore; m.usageCount = la.usageBefore;
+    m.stock = la.stockBefore;
     state.lastAction=null;
 
-    // remove last history entry if it matches this material/operator/time window
     const hist = loadHist();
-    // remove first entry (newest) if same materialId and operator and delta -1
-    if(hist[0] && hist[0].materialId===m.id && hist[0].operator===state.operator && hist[0].delta===-1 && (hist[0].sessionId||'')===(state.sessionId||'')){
+    if(hist[0] && hist[0].materialId===m.id && hist[0].operator===state.operator && hist[0].delta===-1){
       hist.shift();
       saveHist(hist);
     }
-
     toast("Acción deshecha.",false);
     goBackMain();
   };
@@ -810,24 +779,29 @@ const USE_FIRESTORE = false;
   document.getElementById("btnOps").onclick  = () => screenOps();
   document.getElementById("btnHist").onclick = () => screenHist();
 
-  // Start (con login automático)
-(async () => {
-  try{
-    if(USE_FIRESTORE){
-      await fbEnsure();
-      await fsLoginHidden();     // <- LOGIN AUTOMÁTICO
-      await fsLoadOpsToLocal();  // <- trae operarios de Firestore a localStorage
-      await fsLoadStockToLocal();// <- trae stock de Firestore a localStorage
+  // =========================
+  // START: AUTO-LOGIN + LOAD OPS + (OPTIONAL) LOAD STOCK
+  // =========================
+  (async () => {
+    try{
+      if(USE_FIRESTORE){
+        fbEnsure();
+        await fsLoginHidden();
+
+        // 1) Operarios: Firestore -> local
+        await fsLoadOpsToLocal();
+
+        // 2) Stock: opcional Firestore -> local (no rompe si no existe)
+        await fsLoadStockToLocal();
+      }
+    }catch(e){
+      console.warn("Auto-login/auto-load Firestore falló:", e);
     }
-  }catch(e){
-    console.warn("Auto-login/auto-load Firestore falló:", e);
-  }
 
     screenFinish();
+  })();
+
 })();
-
-})();   // ✅ ESTE CIERRE ES EL QUE FALTA (CIERRA EL (()=>{ PRINCIPAL))
-
 </script>
 </body>
 </html>
