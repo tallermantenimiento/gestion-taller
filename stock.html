@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Stock Taller v7.2 - AutoSync Firestore</title>
-<!-- PATCH_VERSION: 2026-01-08 STOCK_AUTOSYNC_FIRESTORE -->
-<style>
-/* (MISMO CSS QUE TU ARCHIVO) */
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Taller v7.2 - AutoSync Firestore</title>
+  <!-- PATCH_VERSION: 2026-01-08 STOCK_AUTOSYNC_FIRESTORE -->
+  <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
       --line:#ffffff1f; --txt:#eaf1ff; --muted:#9bb0d0; --accent:#35b6ff;
@@ -84,36 +82,40 @@
     .toast .msg{font-weight:800}
     .toast .undo{margin-left:auto;height:44px;border-radius:12px;border:1px solid #2bd67155;background:#062a1a;color:#d9ffe8;font-weight:900;cursor:pointer;padding:0 14px}
     .muted{color:var(--muted)}
-    .opRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:14px;border:1px solid var(--line);background:#07162f88}
-    .opRow .nm{font-weight:900;font-size:18px}
-    .opRow .st{color:var(--muted);font-size:13px}
-    .opActions{display:flex;gap:10px;flex-wrap:wrap}
-    .opActions button{height:44px;border-radius:12px;border:1px solid #ffffff22;background:#0b2346;color:var(--txt);font-weight:900;cursor:pointer;padding:0 12px}
-    .opActions button.danger{background:#3d0c20;border-color:#ff5a7a88}
-    .histRow{display:grid;grid-template-columns: 140px 1fr 110px 120px;gap:10px;align-items:center}
-    @media (max-width:900px){.histRow{grid-template-columns:1fr}.histRow .c1,.histRow .c2,.histRow .c3,.histRow .c4{width:100%}}
     .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid #ffffff22;background:#061a2b88;font-weight:900}
-  
-</style>
+  </style>
 </head>
 <body>
 
-<body>
 <div class="app">
   <header>
     <div class="title">
-      <h1>Terminal Corte Hierro</h1>
-      <div class="sub">Terminal tablet conectado a Stock real.</div>
+      <h1>Stock Taller v7.2</h1>
+      <div class="sub">AutoSync con Firestore (sin botón).</div>
     </div>
     <div class="hdrRight">
       <div class="tinyBtns">
-        <button class="tinyBtn" id="btnOps">⚙ Operarios</button>
-        <button class="tinyBtn" id="btnHist">📋 Historial</button>
+        <button class="tinyBtn" id="btnExport">⬇ Exportar</button>
+        <button class="tinyBtn" id="btnImport">⬆ Importar</button>
       </div>
-      <div class="badge" id="hdrBadge">Sin sesión</div>
+      <div class="badge" id="hdrBadge">Cargando...</div>
     </div>
   </header>
-  <div id="stepWrap" class="card"></div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <div class="pill">Stock</div>
+        <div class="hint">Este stock se guarda en localStorage y se sincroniza automáticamente con Firestore.</div>
+      </div>
+    </div>
+    <div class="sep"></div>
+
+    <!-- Aquí va tu UI de stock (árbol, grid, etc.) tal como en el archivo base -->
+    <div id="tree"></div>
+    <div id="summary"></div>
+    <div id="grid"></div>
+  </div>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite">
@@ -121,8 +123,7 @@
   <button class="undo" id="undoBtn">Deshacer</button>
 </div>
 
-
-<!-- Firebase (Compat para poder usarlo sin bundlers) -->
+<!-- Firebase (Compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -131,29 +132,27 @@
 /** STOCK TALLER v7.2 + AUTOSYNC FIRESTORE
  *  - Mantiene DB local (localStorage) como cache
  *  - Se sincroniza SOLO (sin botón) con Firestore
- *  - En móvil verás el mismo stock completo que en web
  *
- *  IMPORTANTE: pega tu firebaseConfig real abajo.
+ *  NOTA: ya está pegado tu firebaseConfig real aquí abajo.
  */
 
 // ====== CONFIG ======
 const USE_FIRESTORE = true;
-const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" }; // puedes cambiarlo
+const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
 const firebaseConfig = {
-  // TODO: PEGA AQUÍ TU CONFIG REAL (el mismo que usas en terminal)
-  apiKey: "REEMPLAZAR",
-  authDomain: "REEMPLAZAR",
-  projectId: "REEMPLAZAR",
-  storageBucket: "REEMPLAZAR",
-  messagingSenderId: "REEMPLAZAR",
-  appId: "REEMPLAZAR"
+  apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+  authDomain: "gestion-taller-2a439.firebaseapp.com",
+  projectId: "gestion-taller-2a439",
+  storageBucket: "gestion-taller-2a439.firebasestorage.app",
+  messagingSenderId: "498579673950",
+  appId: "1:498579673950:web:eb626781a5b509957db5cf"
 };
 
 // ====== DB LOCAL ======
-const DB_KEY="taller_stock_v3_data", SNOOZE_KEY="taller_stock_snooze_until";
-let materials=[], movements=[], currentFilter={cat:null,grp:null,status:null};
-let categoryOrder = [];
+const DB_KEY="taller_stock_v3_data";
+let materials=[], movements=[], categoryOrder=[];
+let currentFilter={cat:null,grp:null,status:null};
 
 // ====== FIRESTORE HELPERS ======
 let fbApp=null, fbAuth=null, fbDb=null;
@@ -161,7 +160,20 @@ let fsUnsub=null;
 let fsReady=false;
 let ignoreNextLocalSave=false;
 let pendingSaveTimer=null;
-let lastRemoteUpdateAt=0;
+
+const $=id=>document.getElementById(id);
+const uuid=()=>Math.random().toString(36).substr(2,9);
+
+function toast(msg){
+  const t=$('toast');
+  $('toastMsg').textContent=msg;
+  $('undoBtn').style.display='none';
+  t.classList.add('show');
+  clearTimeout(toast._tmr);
+  toast._tmr=setTimeout(()=>t.classList.remove('show'),4000);
+}
+
+function setBadge(txt){ $('hdrBadge').textContent = txt; }
 
 function fbEnsure(){
   if(fbApp) return;
@@ -171,7 +183,6 @@ function fbEnsure(){
 }
 
 async function fsLoginHidden(){
-  // login anónimo (si tus reglas lo permiten) o usa tu método actual
   await fbAuth.signInAnonymously();
 }
 
@@ -185,7 +196,6 @@ async function fsLoadOnceToLocal(){
   const data = snap.data() || {};
   if(!data.materials || !data.movements) return false;
 
-  // Guardar en local
   ignoreNextLocalSave = true;
   localStorage.setItem(DB_KEY, JSON.stringify({
     materials: data.materials || [],
@@ -194,11 +204,9 @@ async function fsLoadOnceToLocal(){
   }));
   ignoreNextLocalSave = false;
 
-  // Aplicar a memoria y refrescar UI
   materials = data.materials || [];
   movements = data.movements || [];
   categoryOrder = data.categoryOrder || [];
-  lastRemoteUpdateAt = Date.now();
   return true;
 }
 
@@ -209,9 +217,6 @@ function fsStartRealtimeListener(){
     const data = snap.data() || {};
     if(!data.materials || !data.movements) return;
 
-    // Evitar bucle si este cambio lo acabamos de subir nosotros
-    // (simple: si el cambio remoto llega justo después de un save local, lo aceptamos igualmente,
-    //  pero marcamos timestamp para evitar re-guardar inmediatamente)
     ignoreNextLocalSave = true;
     localStorage.setItem(DB_KEY, JSON.stringify({
       materials: data.materials || [],
@@ -223,14 +228,12 @@ function fsStartRealtimeListener(){
     materials = data.materials || [];
     movements = data.movements || [];
     categoryOrder = data.categoryOrder || [];
-    lastRemoteUpdateAt = Date.now();
 
-    // Re-render UI SIN perder filtro actual
-    renderTree();
-    updateSummary();
-    renderGrid();
+    renderAll();
+    setBadge("Sincronizado");
   }, (err)=>{
     console.warn("Firestore onSnapshot error:", err);
+    setBadge("Error Firestore");
   });
 }
 
@@ -243,27 +246,44 @@ function scheduleFsSave(){
     try{
       const payload = { materials, movements, categoryOrder, updatedAt: new Date().toISOString() };
       await fsDocRef().set(payload, { merge: true });
+      setBadge("Sincronizado");
     }catch(e){
       console.warn("No se pudo guardar en Firestore:", e);
+      setBadge("Sin conexión");
     }
-  }, 450); // debounce corto
+  }, 450);
 }
+
+function saveData(){
+  localStorage.setItem(DB_KEY, JSON.stringify({materials,movements,categoryOrder}));
+  scheduleFsSave();
+}
+
+function loadLocal(){
+  const d=localStorage.getItem(DB_KEY);
+  if(!d) return;
+  try{
+    const p=JSON.parse(d);
+    materials=p.materials||[];
+    movements=p.movements||[];
+    categoryOrder=p.categoryOrder||[];
+  }catch(e){
+    materials=[]; movements=[]; categoryOrder=[];
+  }
+}
+
+// ====== UI mínima (placeholder) ======
+function renderTree(){ $('tree').innerHTML = `<div class="muted">Árbol categorías (tu UI original va aquí)</div>`; }
+function renderSummary(){ $('summary').innerHTML = `<div class="muted">Resumen (tu UI original va aquí)</div>`; }
+function renderGrid(){ $('grid').innerHTML = `<div class="muted">Grid (tu UI original va aquí)</div>`; }
+function renderAll(){ renderTree(); renderSummary(); renderGrid(); }
 
 // ====== INIT ======
 async function initWithSync(){
-  // 1) cargar local
-  const d=localStorage.getItem(DB_KEY);
-  if(d){
-    try{
-      const p=JSON.parse(d);
-      materials=p.materials||[]; movements=p.movements||[]; categoryOrder=p.categoryOrder||[];
-      cleanDuplicates();
-    }catch(e){
-      materials=[]; movements=[]; categoryOrder=[];
-    }
-  }
+  setBadge("Cargando...");
+  loadLocal();
+  renderAll();
 
-  // 2) arrancar firestore y traer remoto (si existe) para que móvil vea lo mismo
   if(USE_FIRESTORE){
     try{
       fbEnsure();
@@ -271,752 +291,31 @@ async function initWithSync(){
       const ok = await fsLoadOnceToLocal();
       fsReady = true;
       fsStartRealtimeListener();
+
       if(!ok){
-        // si no existe aún en Firestore, subimos lo local (o semilla mínima)
+        // Si no existe aún en Firestore, subimos lo local (o semilla mínima)
         if(!materials.length){
           materials=[
             {id:uuid(),cat:"Soldadura, Corte y Desbaste",grp:"Discos",name:"Disco 115mm",unit:"ud",min:10},
             {id:uuid(),cat:"Soldadura, Corte y Desbaste",grp:"Electrodos",name:"Electrodo 2.5mm",unit:"caja",min:2},
             {id:uuid(),cat:"Hierro",grp:"Tubos",name:"Tubo 40x40",unit:"br",min:5}
           ];
+          movements=[];
         }
         await fsDocRef().set({ materials, movements, categoryOrder, createdAt: new Date().toISOString() }, { merge: true });
       }
+
+      setBadge("Sincronizado");
     }catch(e){
       console.warn("Firestore no disponible, seguimos en local:", e);
       fsReady = false;
+      setBadge("Modo local");
     }
+  }else{
+    setBadge("Modo local");
   }
-
-  // 3) render normal
-  renderTree(); updateSummary(); renderGrid(); checkAlerts();
-
-  document.addEventListener('click', (e)=>{
-    if(!e.target.closest('#symGrid') && !e.target.closest('.btn.icon')){ $("symGrid").classList.remove('show'); }
-  });
 }
 
-// ====== FUNCIONES ORIGINALES (idénticas salvo saveData -> scheduleFsSave) ======
-function cleanDuplicates(){
-  const unique = new Map();
-  materials.forEach(m => {
-    const key = `${m.name.trim().toLowerCase()}|${m.cat.trim().toLowerCase()}|${m.grp.trim().toLowerCase()}`;
-    if(!unique.has(key)){ unique.set(key, m); } 
-    else { const original = unique.get(key); movements.forEach(mov => { if(mov.matId === m.id) mov.matId = original.id; }); }
-  });
-  if(materials.length > unique.size){ materials = Array.from(unique.values()); saveData(); }
-}
-
-function saveData(){
-  localStorage.setItem(DB_KEY, JSON.stringify({materials,movements,categoryOrder}));
-  updateSummary();
-  scheduleFsSave(); // <<< AUTO-SYNC
-}
-
-const $=id=>document.getElementById(id), uuid=()=>Math.random().toString(36).substr(2,9);
-const getStock=id=>movements.filter(m=>m.matId===id).reduce((a,m)=>m.type==='in'?a+m.qty:a-m.qty,0);
-const getStatus=m=>{ const s=getStock(m.id); return s<=0?'danger':(s<=m.min?'warn':'ok'); };
-
-// --- (PEGAMOS EL RESTO DEL SCRIPT ORIGINAL) ---
-</script>
-<script>
-
-(() => {
-  const OPS_KEY  = "tablet_ops_hierro_v3_clean";
-  const HIST_KEY = "tablet_hist_hierro_v3_clean";
-  const HIST_LIMIT = 500;
-
-  const DEFAULT_OPERATORS = [];
-
-  // -------------------------
-  // Integración con Stock real (localStorage) - SIN Firestore
-  // Lee y descuenta directamente sobre la misma DB que usa stock.html (DB_KEY="taller_stock_v3_data")
-  // -------------------------
-  const STOCK_DB_KEY = "taller_stock_v3_data";
-
-  function loadStockDB(){
-    try{
-      const raw = localStorage.getItem(STOCK_DB_KEY);
-      if(!raw) return null;
-      const db = JSON.parse(raw);
-      if(!db || !Array.isArray(db.materials) || !Array.isArray(db.movements)) return null;
-      return db;
-    }catch(e){ return null; }
-  }
-
-  function saveStockDB(db){
-    localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db));
-  }
-
-  function getStockFromDB(db, matId){
-    return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
-  }
-
-  function isIronMaterial(m){
-    const cat = String(m.cat||"").toLowerCase();
-    return cat.includes("hierro") || cat.includes("perfil");
-  }
-
-  function detectFinish(m){
-    // No pedimos al operario que lo marque: se reconoce por nombre/grupo/categoría
-    const txt = (String(m.name||"") + " " + String(m.grp||"") + " " + String(m.cat||"")).toLowerCase();
-    if(txt.includes("galva") || txt.includes("galvan")) return "GALVANIZADO";
-    return "NEGRO";
-  }
-
-  // MATERIALS será el listado vivo de materiales de hierro leído del stock real
-  let MATERIALS = [];
-
-  function refreshMaterialsFromStock(){
-    const db = loadStockDB();
-    if(!db){
-      MATERIALS = [];
-      return {ok:false, reason:"No existe la base de datos de stock. Abre stock.html una vez para inicializarla."};
-    }
-    const mats = (db.materials||[]).filter(isIronMaterial);
-    MATERIALS = mats.map(m=>{
-      const finish = detectFinish(m);
-      const stock = getStockFromDB(db, m.id);
-      return {
-        id: m.id,
-        name: m.name,
-        finish,
-        stock,
-        usageCount: 0, // opcional (no lo necesitamos para integrar)
-        unit: m.unit || "br"
-      };
-    });
-    return {ok:true};
-  }
-
-  function applyConsumeToStock(matId, qty){
-    const db = loadStockDB();
-    if(!db) return {ok:false, msg:"No se pudo cargar el stock real."};
-    const current = getStockFromDB(db, matId);
-    if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
-    db.movements.push({
-      id: Math.random().toString(36).substr(2,9),
-      matId: matId,
-      type: "out",
-      qty: qty,
-      date: new Date().toISOString(),
-      source: "TABLET_HIERRO_LOCAL"
-    });
-    saveStockDB(db);
-    return {ok:true, stockAfter: current-qty};
-  }
-
-
-  const state = { finish:null, operator:null, activeMaterialId:null, lastAction:null, view:"main", sessionId:null };
-  const $wrap = document.getElementById('stepWrap');
-  const $badge = document.getElementById('hdrBadge');
-  const byId = id => document.getElementById(id);
-
-  const nowISO = () => new Date().toISOString();
-  const fmt = (iso) => {
-    const d = new Date(iso);
-    return d.toLocaleString('es-ES', {hour12:false});
-  };
-
-  function newSessionId(){
-    // Simple unique id for grouping (operator login session)
-    return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  }
-
-  // -------------------------
-  // Operators store
-  // -------------------------
-  function loadOps(){
-    try{
-      const raw = localStorage.getItem(OPS_KEY);
-      if(!raw){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
-      const arr = JSON.parse(raw);
-      if(!Array.isArray(arr) || !arr.length){
-        const seed = [];
-        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-        return seed;
-      }
-      return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
-    }catch(e){
-      const seed = [];
-      localStorage.setItem(OPS_KEY, JSON.stringify(seed));
-      return seed;
-    }
-  }
-  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); }
-  function getActiveOps(){ return loadOps().filter(o=>o.active); }
-
-  // -------------------------
-  // History store
-  // -------------------------
-  function loadHist(){
-    try{
-      const raw = localStorage.getItem(HIST_KEY);
-      if(!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    }catch(e){
-      return [];
-    }
-  }
-  function saveHist(arr){
-    localStorage.setItem(HIST_KEY, JSON.stringify(arr));
-  }
-  function addHist(entry){
-    const arr = loadHist();
-    arr.unshift(entry); // newest first
-    if(arr.length > HIST_LIMIT) arr.length = HIST_LIMIT;
-    saveHist(arr);
-  }
-
-  // -------------------------
-  // UI helpers
-  // -------------------------
-  function setBadge(){
-    const parts=[];
-    if(state.finish) parts.push(state.finish);
-    if(state.operator) parts.push(state.operator);
-    if(state.activeMaterialId){
-      const m=MATERIALS.find(x=>x.id===state.activeMaterialId);
-      if(m) parts.push("Activo: "+m.name);
-    }
-    $badge.textContent = parts.length ? parts.join(" · ") : "Sin sesión";
-  }
-
-  function toast(msg, canUndo){
-    const t=byId('toast');
-    byId('toastMsg').textContent=msg;
-    byId('undoBtn').style.display = canUndo ? 'inline-flex':'none';
-    t.classList.add('show');
-    clearTimeout(toast._tmr);
-    toast._tmr=setTimeout(()=>t.classList.remove('show'),8000);
-  }
-
-  function detectLowTag(stock){
-    if(stock<=0) return ['zero','SIN STOCK'];
-    if(stock<=2) return ['low','BAJO'];
-    return [null,null];
-  }
-
-  function sortMaterials(arr){
-    return [...arr].sort((a,b)=>{
-      if(b.usageCount!==a.usageCount) return b.usageCount-a.usageCount;
-      return a.name.localeCompare(b.name,'es');
-    });
-  }
-
-  function materialTag(m){
-    const cls = m.finish==="NEGRO" ? "negro" : "galva";
-    return `<span class="tag ${cls}">${m.finish}</span>`;
-  }
-
-  function goBackMain(){
-    if(!state.finish) screenFinish();
-    else if(!state.operator) screenOperator();
-    else if(!state.activeMaterialId) screenMaterials();
-    else screenConsume();
-  }
-
-  // -------------------------
-  // Main screens
-  // -------------------------
-  function screenFinish(){
-    refreshMaterialsFromStock();
-    state.view="main";
-    setBadge();
-    $wrap.innerHTML = `
-      <div class="row" style="gap:14px">
-        <div>
-          <div class="pill">Paso 1 · Seleccionar tipo de corte</div>
-          <div style="margin-top:10px;font-size:28px;font-weight:900">¿Qué vas a cortar?</div>
-          <div class="hint">Selecciona primero NEGRO o GALVANIZADO. Luego elegirás operario y material.</div>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div class="grid2">
-        <button class="btn primary" id="btnNegro">HIERRO NEGRO</button>
-        <button class="btn good" id="btnGalva">HIERRO GALVANIZADO</button>
-      </div>
-      <div class="sep"></div>
-      <div class="muted">: operarios e historial persistentes (últimos ${HIST_LIMIT}). Stock de ejemplo.</div>
-    `;
-    byId('btnNegro').onclick = () => { state.finish="NEGRO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
-    byId('btnGalva').onclick = () => { state.finish="GALVANIZADO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
-  }
-
-  function screenOperator(){
-    state.view="main";
-    setBadge();
-    const ops = getActiveOps().map(o=>`<button class="btn small accent" data-op="${o.name}">${o.name}</button>`).join('');
-    $wrap.innerHTML = `
-      <div class="row">
-        <div>
-          <div class="pill">Paso 2 · Operario</div>
-          <div style="margin-top:10px;font-size:26px;font-weight:900">¿Quién está cortando?</div>
-          <div class="hint">Pulsa tu nombre. Si es una ayuda puntual, usa "Ocasional".</div>
-        </div>
-        <button class="btn small ghost" id="backFinish">⬅ Volver</button>
-      </div>
-      <div class="sep"></div>
-      <div class="grid3">${ops || `<div class="muted">No hay operarios. Ve a ⚙ Operarios para añadirlos.</div>`}
-        <button class="btn small danger" id="btnOcc">OCASIONAL</button>
-      </div>
-      <div class="sep"></div>
-      <div id="occBox" style="display:none">
-        <div style="font-weight:900;margin-bottom:10px">Nombre del operario ocasional (obligatorio)</div>
-        <div class="grid2">
-          <input id="occName" placeholder="Escribe el nombre..."/>
-          <button class="btn small primary" id="occOk">Confirmar</button>
-        </div>
-        <div class="hint">Se registrará este nombre en el historial.</div>
-      </div>
-    `;
-    byId('backFinish').onclick = () => screenFinish();
-    [...$wrap.querySelectorAll('[data-op]')].forEach(b=> b.onclick = ()=>{ state.operator=b.getAttribute('data-op'); state.sessionId=newSessionId(); screenMaterials(); });
-    byId('btnOcc').onclick = ()=>{ byId('occBox').style.display='block'; byId('occName').focus(); };
-    byId('occOk').onclick = ()=>{
-      const v=(byId('occName').value||'').trim();
-      if(!v){ toast("Debes escribir un nombre para 'Ocasional'.",false); return; }
-      state.operator=v; state.sessionId=newSessionId(); screenMaterials();
-    };
-  }
-
-  function screenMaterials(){
-    const r = refreshMaterialsFromStock();
-    if(!r.ok){
-      state.view='main'; setBadge();
-      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${'${'}escapeHtml(r.reason){'}'}<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.</div></div></div>`;
-      return;
-    }
-
-    state.view="main";
-    setBadge();
-    const mats = sortMaterials(MATERIALS.filter(m=>m.finish===state.finish));
-    const rows = mats.map(m=>{
-      const [cls,lbl]=detectLowTag(m.stock);
-      const warnTag = cls ? `<span class="tag ${cls}">${lbl}</span>`:'';
-      const disabled = m.stock<=0 ? 'disabled':'';
-      return `
-        <div class="item">
-          <div class="left">
-            <div class="name">${m.name}</div>
-            <div class="meta">
-              ${materialTag(m)}
-              <span class="muted">Usos: <b>${m.usageCount}</b></span>
-              ${warnTag}
-            </div>
-          </div>
-          <div class="right">
-            <div class="kpi" style="min-width:160px">
-              <div class="lbl">Stock</div>
-              <div class="val">${m.stock} ${escapeHtml(m.unit||"br")}</div>
-            </div>
-            <button class="miniBtn sel ${disabled}" data-mat="${m.id}">Seleccionar</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-    $wrap.innerHTML = `
-      <div class="row">
-        <div>
-          <div class="pill">Paso 3 · Material (${state.finish})</div>
-          <div style="margin-top:10px;font-size:26px;font-weight:900">Selecciona el material</div>
-          <div class="hint">Ordenado por “más usados”. Los sin stock se muestran pero no se pueden seleccionar.</div>
-        </div>
-        <div class="row" style="gap:10px">
-          <button class="btn small ghost" id="backOp">⬅ Operario</button>
-          <button class="btn small ghost" id="chgFinish">↺ Cambiar tipo</button>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div class="list">${rows || `<div class="muted">No hay materiales en este tipo.</div>`}</div>
-    `;
-    byId('backOp').onclick = ()=>screenOperator();
-    byId('chgFinish').onclick = ()=>screenFinish();
-    [...$wrap.querySelectorAll('[data-mat]')].forEach(b=>{
-      b.onclick = ()=>{
-        const id=b.getAttribute('data-mat');
-        const m=MATERIALS.find(x=>x.id===id);
-        if(!m || m.stock<=0){ toast("Sin stock: no se puede seleccionar.",false); return; }
-        state.activeMaterialId=id; screenConsume();
-      };
-    });
-  }
-
-  function screenConsume(){
-    state.view="main";
-    setBadge();
-    const m=MATERIALS.find(x=>x.id===state.activeMaterialId);
-    if(!m){ screenMaterials(); return; }
-    const canUse = m.stock>0;
-    $wrap.innerHTML = `
-      <div class="row">
-        <div>
-          <div class="pill">Activo · ${state.finish}</div>
-          <div style="margin-top:10px;font-size:28px;font-weight:1000">${m.name}</div>
-          <div class="hint">Operario: <b>${state.operator}</b> · Fecha: ${new Date().toLocaleString('es-ES', {hour12:false})}</div>
-        </div>
-        <div class="row" style="gap:10px">
-          <button class="btn small ghost" id="chgMat">Cambiar material</button>
-          <button class="btn small ghost" id="chgFinish2">Cambiar tipo</button>
-          <button class="btn small danger" id="logout">Cerrar sesión</button>
-        </div>
-      </div>
-      <div class="sep"></div>
-      <div class="grid3">
-        <div class="kpi"><div class="lbl">Tipo</div><div class="val">${m.finish}</div></div>
-        <div class="kpi"><div class="lbl">Usos históricos</div><div class="val">${m.usageCount}</div></div>
-        <div class="kpi"><div class="lbl">Stock actual</div><div class="val big">${m.stock}</div><div class="muted">barras</div></div>
-      </div>
-      <div class="sep"></div>
-      <div class="grid2">
-        <button class="btn ${canUse ? 'accent':'disabled'}" id="useOne">USAR 1 BARRA</button>
-        <button class="btn small ghost" id="info">Ver resumen</button>
-      </div>
-      <div class="hint">Cada pulsación queda registrada en 📋 Historial (máx. ${HIST_LIMIT}).</div>
-    `;
-    byId('chgMat').onclick = ()=>screenMaterials();
-    byId('chgFinish2').onclick = ()=>screenFinish();
-    byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
-    byId('info').onclick = ()=>toast(`Activo: ${m.name} · Stock: ${m.stock} · Usos: ${m.usageCount}`,false);
-
-    let lock=false;
-    byId('useOne').onclick = ()=>{
-      if(lock) return;
-      if(m.stock<=0){ toast("SIN STOCK: no se puede consumir.",false); return; }
-      lock=true; setTimeout(()=>lock=false,850);
-
-      const beforeStock = m.stock;
-      const beforeUse   = m.usageCount;
-
-      state.lastAction = {matId:m.id, stockBefore:beforeStock, usageBefore:beforeUse};
-
-      // Apply sobre Stock real
-      const res = applyConsumeToStock(m.id, 1);
-      if(!res.ok){ toast(res.msg||"SIN STOCK", false); lock=false; return; }
-      // Refrescar listado vivo desde Stock real
-      refreshMaterialsFromStock();
-      const mm = MATERIALS.find(x=>x.id===m.id);
-      if(mm){ m.stock = mm.stock; }
-      m.usageCount = (m.usageCount||0) + 1;
-
-      // Save history entry
-      addHist({
-        ts: nowISO(),
-        operator: state.operator,
-        finish: m.finish,
-        materialId: m.id,
-        materialName: m.name,
-        delta: -1,
-        stockBefore: beforeStock,
-        stockAfter: (res.stockAfter!==undefined?res.stockAfter:m.stock),
-        device: "DEMO_PC",
-        sessionId: state.sessionId || "SIN_SESION"
-      });
-
-      toast(`Descontada 1 barra (${m.stock} restantes).`, true);
-      screenConsume();
-    };
-  }
-
-  // -------------------------
-  // Operarios
-  // -------------------------
-  function screenOps(){
-    state.view="ops";
-    setBadge();
-    const ops = loadOps();
-    const rows = ops.map((o,i)=>`
-      <div class="opRow">
-        <div>
-          <div class="nm">${o.name}</div>
-          <div class="st">${o.active ? "Activo" : "Inactivo"}</div>
-        </div>
-        <div class="opActions">
-          <button data-tgl="${i}">${o.active ? "Desactivar" : "Activar"}</button>
-          <button class="danger" data-del="${i}">Eliminar</button>
-        </div>
-      </div>
-    `).join("");
-    $wrap.innerHTML = `
-      <div class="row">
-        <div>
-          <div class="pill">⚙ Gestión de operarios</div>
-          <div style="margin-top:10px;font-size:24px;font-weight:900">Añadir, activar/desactivar o eliminar</div>
-          <div class="hint">Recomendación: desactivar en lugar de eliminar si quieres mantener trazabilidad.</div>
-        </div>
-        <button class="btn small ghost" id="backMain">⬅ Volver</button>
-      </div>
-      <div class="sep"></div>
-      <div class="grid2">
-        <input id="newOp" placeholder="Nuevo operario (nombre)"/>
-        <button class="btn small primary" id="addOp">Añadir</button>
-      </div>
-      <div class="sep"></div>
-      <div class="list" style="max-height:48vh">${rows || `<div class="muted">No hay operarios.</div>`}</div>
-      <div class="sep"></div>
-      <button class="btn small danger" id="resetOps">Vaciar lista</button>
-    `;
-    byId('backMain').onclick = () => goBackMain();
-    byId('addOp').onclick = () => {
-      const v = (byId('newOp').value||"").trim();
-      if(!v){ toast("Escribe un nombre.", false); return; }
-      const cur = loadOps();
-      if(cur.some(x=>x.name.toLowerCase()===v.toLowerCase())){
-        toast("Ya existe un operario con ese nombre.", false); return;
-      }
-      cur.push({name:v, active:true});
-      saveOps(cur);
-      toast("Operario añadido.", false);
-      screenOps();
-    };
-    $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
-      btn.onclick = () => {
-        const idx = parseInt(btn.getAttribute("data-tgl"),10);
-        const cur = loadOps();
-        if(!cur[idx]) return;
-        cur[idx].active = !cur[idx].active;
-        saveOps(cur);
-        toast(cur[idx].active ? "Operario activado." : "Operario desactivado.", false);
-        screenOps();
-      };
-    });
-    $wrap.querySelectorAll("[data-del]").forEach(btn=>{
-      btn.onclick = () => {
-        const idx = parseInt(btn.getAttribute("data-del"),10);
-        const cur = loadOps();
-        if(!cur[idx]) return;
-        const name = cur[idx].name;
-        if(!confirm(`Eliminar operario "${name}"?`)) return;
-        cur.splice(idx,1);
-        saveOps(cur);
-        toast("Operario eliminado.", false);
-        screenOps();
-      };
-    });
-    byId('resetOps').onclick = () => {
-      if(!confirm("Restaurar la lista de operarios por defecto?")) return;
-      const seed = [];
-      saveOps(seed);
-      toast("Operarios limpiados.", false);
-      screenOps();
-    };
-  }
-
-  // -------------------------
-  // Historial
-  // -------------------------
-  function screenHist(){
-    state.view="hist";
-    setBadge();
-    const hist = loadHist();
-
-    const ops = Array.from(new Set(hist.map(h=>h.operator))).sort((a,b)=>a.localeCompare(b,'es'));
-    const opOptions = ['<option value="">(Todos)</option>'].concat(ops.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)).join('');
-
-    $wrap.innerHTML = `
-      <div class="row">
-        <div>
-          <div class="pill">📋 Historial (últimos ${HIST_LIMIT})</div>
-          <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de consumos</div>
-          <div class="hint">Cada pulsación “USAR 1 BARRA” crea un registro. Aquí se puede filtrar y exportar.</div>
-        </div>
-        <button class="btn small ghost" id="backMain">⬅ Volver</button>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="grid3">
-        <div class="kpi">
-          <div class="lbl">Registros</div>
-          <div class="val">${hist.length}</div>
-        </div>
-        <div class="kpi">
-          <div class="lbl">Último registro</div>
-          <div class="val">${hist[0] ? fmt(hist[0].ts) : "-"}</div>
-        </div>
-        <div class="kpi">
-          <div class="lbl">Límite</div>
-          <div class="val">${HIST_LIMIT}</div>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="grid3">
-        <div>
-          <div class="hint" style="margin:0 0 8px">Operario</div>
-          <select id="fOp">${opOptions}</select>
-        </div>
-        <div>
-          <div class="hint" style="margin:0 0 8px">Tipo</div>
-          <select id="fFin">
-            <option value="">(Todos)</option>
-            <option value="NEGRO">NEGRO</option>
-            <option value="GALVANIZADO">GALVANIZADO</option>
-          </select>
-        </div>
-        <div>
-          <div class="hint" style="margin:0 0 8px">Buscar material</div>
-          <input id="fTxt" placeholder="Ej: tubo 40x40"/>
-        </div>
-      </div>
-
-      <div class="sep"></div>
-
-      <div class="grid2">
-        <button class="btn small primary" id="btnExport">Exportar JSON</button>
-        <button class="btn small danger" id="btnClear">Borrar historial</button>
-      </div>
-
-      <div class="sep"></div>
-
-      <div id="histList" class="list" style="max-height:46vh"></div>
-    `;
-
-    byId('backMain').onclick = () => goBackMain();
-    byId('btnExport').onclick = () => exportHist();
-    byId('btnClear').onclick = () => {
-      if(!confirm("Borrar todo el historial local?")) return;
-      saveHist([]);
-      toast("Historial borrado.", false);
-      screenHist();
-    };
-
-    const render = () => {
-      const op = byId('fOp').value;
-      const fin = byId('fFin').value;
-      const txt = (byId('fTxt').value||"").trim().toLowerCase();
-
-      const filtered = hist.filter(h=>{
-        if(op && h.operator !== op) return false;
-        if(fin && h.finish !== fin) return false;
-        if(txt && !(String(h.materialName||"").toLowerCase().includes(txt))) return false;
-        return true;
-      });
-
-      // Aggregate by operator + session + finish + material
-      const map = new Map();
-      filtered.forEach(h=>{
-        const key = [h.operator, h.sessionId||"SIN_SESION", h.finish, h.materialId].join("||");
-        if(!map.has(key)){
-          map.set(key, {
-            operator: h.operator,
-            sessionId: h.sessionId||"SIN_SESION",
-            finish: h.finish,
-            materialId: h.materialId,
-            materialName: h.materialName,
-            total: 0,
-            firstTs: h.ts,
-            lastTs: h.ts,
-            stockStart: h.stockBefore,
-            stockEnd: h.stockAfter
-          });
-        }
-        const g = map.get(key);
-        g.total += (h.delta||0); // negative
-        // Since hist is newest-first but filtered order unknown, compute min/max
-        if(h.ts < g.firstTs){
-          g.firstTs = h.ts;
-          g.stockStart = h.stockBefore;
-        }
-        if(h.ts > g.lastTs){
-          g.lastTs = h.ts;
-          g.stockEnd = h.stockAfter;
-        }
-      });
-
-      const groups = Array.from(map.values()).sort((a,b)=> (b.lastTs||"").localeCompare(a.lastTs||""));
-
-      byId('histList').innerHTML = groups.map(g=>{
-        const finCls = g.finish==="NEGRO" ? "negro" : "galva";
-        const totalAbs = Math.abs(g.total);
-        return `
-          <div class="item">
-            <div class="left">
-              <div class="name">${escapeHtml(g.materialName)}</div>
-              <div class="meta">
-                <span class="tag ${finCls}">${escapeHtml(g.finish)}</span>
-                <span class="chip">${escapeHtml(g.operator)}</span>
-                <span class="muted">Sesión: ${escapeHtml(g.sessionId)}</span>
-                <span class="muted">${fmt(g.firstTs)} → ${fmt(g.lastTs)}</span>
-              </div>
-            </div>
-            <div class="right">
-              <div class="kpi" style="min-width:170px">
-                <div class="lbl">Barras usadas</div>
-                <div class="val">-${totalAbs}</div>
-              </div>
-              <div class="kpi" style="min-width:200px">
-                <div class="lbl">Stock</div>
-                <div class="val">${g.stockStart} → <b>${g.stockEnd}</b></div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("") || `<div class="muted">No hay resultados con estos filtros.</div>`;
-    };
-
-    ["fOp","fFin","fTxt"].forEach(id=>{
-      byId(id).addEventListener("input", render);
-      byId(id).addEventListener("change", render);
-    });
-
-    render();
-  }
-
-  function exportHist(){
-    const hist = loadHist();
-    const blob = new Blob([JSON.stringify(hist, null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "historial_cortes_demo.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 2000);
-    toast("Exportación iniciada.", false);
-  }
-
-  function escapeHtml(s){
-    return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  }
-
-  // -------------------------
-  // Undo (also reverts last history entry)
-  // -------------------------
-  byId('undoBtn').onclick = ()=>{
-    const la=state.lastAction; if(!la) return;
-    const m=MATERIALS.find(x=>x.id===la.matId); if(!m) return;
-    m.stock = la.stockBefore; m.usageCount = la.usageBefore;
-    state.lastAction=null;
-
-    // remove last history entry if it matches this material/operator/time window
-    const hist = loadHist();
-    // remove first entry (newest) if same materialId and operator and delta -1
-    if(hist[0] && hist[0].materialId===m.id && hist[0].operator===state.operator && hist[0].delta===-1 && (hist[0].sessionId||'')===(state.sessionId||'')){
-      hist.shift();
-      saveHist(hist);
-    }
-
-    toast("Acción deshecha.",false);
-    goBackMain();
-  };
-
-  // Header buttons
-  document.getElementById("btnOps").onclick  = () => screenOps();
-  document.getElementById("btnHist").onclick = () => screenHist();
-
-  // Start
-  screenFinish();
-})();
-
-// REEMPLAZO: arrancar con autosync
 initWithSync();
 </script>
 </body>
