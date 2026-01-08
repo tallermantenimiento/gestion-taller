@@ -821,8 +821,10 @@
     console.warn("Auto-login/auto-load Firestore falló:", e);
   }
 
-  screenFinish();
+    screenFinish();
 })();
+
+})();   // ✅ ESTE CIERRE ES EL QUE FALTA (CIERRA EL (()=>{ PRINCIPAL))
 
 </script>
 </body>
