@@ -808,9 +808,22 @@
   document.getElementById("btnOps").onclick  = () => screenOps();
   document.getElementById("btnHist").onclick = () => screenHist();
 
-  // Start
+  // Start (con login automático)
+(async () => {
+  try{
+    if(USE_FIRESTORE){
+      await fbEnsure();
+      await fsLoginHidden();     // <- LOGIN AUTOMÁTICO
+      await fsLoadOpsToLocal();  // <- trae operarios de Firestore a localStorage
+      await fsLoadStockToLocal();// <- trae stock de Firestore a localStorage
+    }
+  }catch(e){
+    console.warn("Auto-login/auto-load Firestore falló:", e);
+  }
+
   screenFinish();
 })();
+
 </script>
 </body>
 </html>
