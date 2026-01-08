@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Corte Hierro</title>
-  <!-- PATCH_VERSION: 2026-01-08 TERMINAL_HIERRO_OPS_FIRESTORE -->
+  <!-- PATCH_VERSION: 2026-01-08 FIRESTORE_SYNC -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -98,7 +98,7 @@
   <header>
     <div class="title">
       <h1>Terminal Corte Hierro</h1>
-      <div class="sub">Terminal tablet conectado a Stock real.</div>
+      <div class="sub">Terminal tablet conectado a Stock real (Firestore).</div>
     </div>
     <div class="hdrRight">
       <div class="tinyBtns">
@@ -116,31 +116,28 @@
   <button class="undo" id="undoBtn">Deshacer</button>
 </div>
 
-<!-- Firebase (Compat) -->
+<!-- Firebase (Compat, sin bundlers) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
 (() => {
-  // =========================
-  // CONFIG
-  // =========================
-  const USE_FIRESTORE = true; // ✅ ACTIVADO
   const OPS_KEY  = "tablet_ops_hierro_v3_clean";
   const HIST_KEY = "tablet_hist_hierro_v3_clean";
   const HIST_LIMIT = 500;
 
-  // Firestore: operarios separados por terminal
-  // Estructura recomendada:
-  // collection "taller" -> doc "ops" -> field "hierro" (array)
-  const FS_OPS_PATH = { col: "taller", doc: "ops", field: "hierro" };
+  // -------------------------
+  // Stock real compartido (MISMA KEY LOCAL que stock.html)
+  // -------------------------
+  const STOCK_DB_KEY = "taller_stock_v3_data";
 
-  // Firestore: stock (si lo tienes en otro doc, lo cambias aquí)
-  // Si tu stock YA está en local y te funciona, esto no lo rompe.
-  const FS_STOCK_PATH = { col: "taller_stock", doc: "main" };
+  // -------------------------
+  // FIRESTORE: MISMO PROYECTO + MISMO DOC (taller_stock/main)
+  // -------------------------
+  const USE_FIRESTORE = true;
+  const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
-  // ✅ Pega aquí tu firebaseConfig REAL
   const firebaseConfig = {
     apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
     authDomain: "gestion-taller-2a439.firebaseapp.com",
@@ -150,10 +147,9 @@
     appId: "1:498579673950:web:eb626781a5b509957db5cf"
   };
 
-  // =========================
-  // FIREBASE HELPERS
-  // =========================
   let fbApp=null, fbAuth=null, fbDb=null;
+  let fsUnsub=null;
+  let fsReady=false;
 
   function fbEnsure(){
     if(fbApp) return;
@@ -161,61 +157,64 @@
     fbAuth = firebase.auth();
     fbDb   = firebase.firestore();
   }
-
   async function fsLoginHidden(){
-    // Login anónimo (si reglas lo permiten)
-    if(fbAuth.currentUser) return;
-    await fbAuth.signInAnonymously();
+    try{
+      if(!fbAuth.currentUser){
+        await fbAuth.signInAnonymously();
+      }
+    }catch(e){
+      console.warn("Auth anónimo no disponible:", e);
+    }
+  }
+  function fsDocRef(){
+    return fbDb.collection(FIRESTORE_DOC_PATH.col).doc(FIRESTORE_DOC_PATH.doc);
   }
 
-  function fsOpsRef(){
-    return fbDb.collection(FS_OPS_PATH.col).doc(FS_OPS_PATH.doc);
-  }
-
-  function fsStockRef(){
-    return fbDb.collection(FS_STOCK_PATH.col).doc(FS_STOCK_PATH.doc);
-  }
-
-  // Carga operarios de Firestore -> localStorage (OPS_KEY)
-  async function fsLoadOpsToLocal(){
-    const snap = await fsOpsRef().get();
-    if(!snap.exists) return false;
+  async function fsLoadOnceToLocalStock(){
+    const snap = await fsDocRef().get();
+    if(!snap.exists) return {ok:false, msg:"No existe el doc en Firestore."};
     const data = snap.data() || {};
-    const ops = Array.isArray(data[FS_OPS_PATH.field]) ? data[FS_OPS_PATH.field] : [];
-    localStorage.setItem(OPS_KEY, JSON.stringify(ops));
-    return true;
-  }
-
-  // Guarda operarios local -> Firestore (field hierro)
-  async function fsSaveOpsFromLocal(){
-    const ops = loadOpsRaw();
-    const payload = {};
-    payload[FS_OPS_PATH.field] = ops;
-    payload.updatedAt = new Date().toISOString();
-    await fsOpsRef().set(payload, { merge: true });
-  }
-
-  // Carga stock de Firestore -> localStorage (taller_stock_v3_data)
-  // (solo si existe en Firestore; si no existe, no rompe nada)
-  async function fsLoadStockToLocal(){
-    const STOCK_DB_KEY = "taller_stock_v3_data";
-    const snap = await fsStockRef().get();
-    if(!snap.exists) return false;
-    const data = snap.data() || {};
-    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)){
+      return {ok:false, msg:"El doc Firestore no tiene materials/movements válidos."};
+    }
     localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
       materials: data.materials || [],
       movements: data.movements || [],
       categoryOrder: data.categoryOrder || []
     }));
-    return true;
+    return {ok:true};
   }
 
-  // =========================
-  // STOCK REAL (localStorage)
-  // =========================
-  const STOCK_DB_KEY = "taller_stock_v3_data";
+  function fsStartRealtimeListener(){
+    if(fsUnsub) fsUnsub();
+    fsUnsub = fsDocRef().onSnapshot((snap)=>{
+      if(!snap.exists) return;
+      const data = snap.data() || {};
+      if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
 
+      // Cache local para que el terminal lea igual que stock.html
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+        materials: data.materials || [],
+        movements: data.movements || [],
+        categoryOrder: data.categoryOrder || []
+      }));
+
+      // Refrescar UI si ya estamos navegando
+      refreshMaterialsFromStock();
+      setBadge();
+      if(state.view === "main"){
+        // No forzamos pantalla (para no molestar), pero si estamos en lista/consume, repintamos
+        if(state.operator && state.finish && !state.activeMaterialId) screenMaterials();
+        if(state.operator && state.finish && state.activeMaterialId) screenConsume();
+      }
+    }, (err)=>{
+      console.warn("Firestore onSnapshot error:", err);
+    });
+  }
+
+  // -------------------------
+  // DB helpers (local cache)
+  // -------------------------
   function loadStockDB(){
     try{
       const raw = localStorage.getItem(STOCK_DB_KEY);
@@ -225,22 +224,27 @@
       return db;
     }catch(e){ return null; }
   }
+
   function saveStockDB(db){
     localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db));
   }
+
   function getStockFromDB(db, matId){
     return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
   }
+
   function isIronMaterial(m){
     const cat = String(m.cat||"").toLowerCase();
     return cat.includes("hierro") || cat.includes("perfil");
   }
+
   function detectFinish(m){
     const txt = (String(m.name||"") + " " + String(m.grp||"") + " " + String(m.cat||"")).toLowerCase();
     if(txt.includes("galva") || txt.includes("galvan")) return "GALVANIZADO";
     return "NEGRO";
   }
 
+  // MATERIALS (vivo)
   let MATERIALS = [];
 
   function refreshMaterialsFromStock(){
@@ -265,72 +269,183 @@
     return {ok:true};
   }
 
-  function applyConsumeToStock(matId, qty){
-    const db = loadStockDB();
-    if(!db) return {ok:false, msg:"No se pudo cargar el stock real."};
-    const current = getStockFromDB(db, matId);
-    if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
-    db.movements.push({
-      id: Math.random().toString(36).substr(2,9),
-      matId: matId,
-      type: "out",
-      qty: qty,
-      date: new Date().toISOString(),
-      source: "TABLET_HIERRO_LOCAL"
-    });
-    saveStockDB(db);
-    return {ok:true, stockAfter: current-qty};
+  // -------------------------
+  // ESCRITURA REAL: añadir movement en Firestore (transaction)
+  // -------------------------
+  function genId(){
+    return Math.random().toString(36).slice(2,11);
   }
 
-  // =========================
-  // STATE & HELPERS
-  // =========================
+  async function applyConsumeToStock(matId, qty){
+    if(!USE_FIRESTORE || !fsReady){
+      // fallback local (no recomendado)
+      const db = loadStockDB();
+      if(!db) return {ok:false, msg:"No se pudo cargar el stock local."};
+      const current = getStockFromDB(db, matId);
+      if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
+      const movementId = genId();
+      db.movements.push({
+        id: movementId,
+        matId,
+        type: "out",
+        qty,
+        date: new Date().toISOString(),
+        source: "TABLET_HIERRO_LOCAL_FALLBACK",
+        sessionId: state.sessionId || "SIN_SESION",
+        operator: state.operator || ""
+      });
+      saveStockDB(db);
+      return {ok:true, stockAfter: current-qty, movementId};
+    }
+
+    const ref = fsDocRef();
+    const movementId = genId();
+    try{
+      const res = await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error("Firestore doc no existe.");
+        const data = snap.data() || {};
+        const materials = Array.isArray(data.materials) ? data.materials : [];
+        const movements = Array.isArray(data.movements) ? data.movements : [];
+        const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
+        // stock actual por movimientos
+        const current = movements.filter(m=>m.matId===matId).reduce((a,m)=> (m.type==="in"? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
+        if(current < qty){
+          return {ok:false, msg:"SIN STOCK: no se puede consumir.", current};
+        }
+
+        const mv = {
+          id: movementId,
+          matId,
+          type: "out",
+          qty,
+          date: new Date().toISOString(),
+          source: "TABLET_HIERRO",
+          device: (navigator.userAgent||""),
+          sessionId: state.sessionId || "SIN_SESION",
+          operator: state.operator || ""
+        };
+
+        movements.push(mv);
+
+        tx.set(ref, {
+          materials,
+          movements,
+          categoryOrder,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        return {ok:true, stockAfter: current-qty, materials, movements, categoryOrder};
+      });
+
+      if(!res.ok) return res;
+
+      // Actualiza cache local inmediatamente para que el terminal lo vea al instante
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+        materials: res.materials || [],
+        movements: res.movements || [],
+        categoryOrder: res.categoryOrder || []
+      }));
+
+      return {ok:true, stockAfter: res.stockAfter, movementId};
+
+    }catch(e){
+      console.warn("No se pudo guardar movimiento en Firestore:", e);
+      return {ok:false, msg:"No se pudo guardar en Firestore. Revisa conexión/reglas."};
+    }
+  }
+
+  async function undoConsumeByMovementId(movementId){
+    if(!USE_FIRESTORE || !fsReady) return {ok:false, msg:"Firestore no listo."};
+    const ref = fsDocRef();
+    try{
+      const out = await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error("Firestore doc no existe.");
+        const data = snap.data() || {};
+        const materials = Array.isArray(data.materials) ? data.materials : [];
+        const movements = Array.isArray(data.movements) ? data.movements : [];
+        const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
+        const idx = movements.findIndex(m=>m && m.id===movementId);
+        if(idx === -1){
+          return {ok:false, msg:"No se encontró el movimiento para deshacer."};
+        }
+        movements.splice(idx,1);
+
+        tx.set(ref, {
+          materials,
+          movements,
+          categoryOrder,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        return {ok:true, materials, movements, categoryOrder};
+      });
+
+      if(out.ok){
+        localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+          materials: out.materials || [],
+          movements: out.movements || [],
+          categoryOrder: out.categoryOrder || []
+        }));
+      }
+      return out;
+    }catch(e){
+      console.warn("Undo Firestore falló:", e);
+      return {ok:false, msg:"No se pudo deshacer en Firestore."};
+    }
+  }
+
+  // -------------------------
+  // State + UI
+  // -------------------------
   const state = { finish:null, operator:null, activeMaterialId:null, lastAction:null, view:"main", sessionId:null };
   const $wrap = document.getElementById('stepWrap');
   const $badge = document.getElementById('hdrBadge');
   const byId = id => document.getElementById(id);
 
   const nowISO = () => new Date().toISOString();
-  const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
-  function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleString('es-ES', {hour12:false});
+  };
 
-  // =========================
-  // OPERARIOS (LOCAL + FIRESTORE)
-  // =========================
-  function loadOpsRaw(){
-    try{
-      const raw = localStorage.getItem(OPS_KEY);
-      if(!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    }catch(e){
-      return [];
-    }
+  function newSessionId(){
+    return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   }
 
+  // -------------------------
+  // Operators store (LOCAL)
+  // -------------------------
   function loadOps(){
     try{
-      const arr = loadOpsRaw();
-      if(!Array.isArray(arr) || !arr.length) return [];
+      const raw = localStorage.getItem(OPS_KEY);
+      if(!raw){
+        const seed = [];
+        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+        return seed;
+      }
+      const arr = JSON.parse(raw);
+      if(!Array.isArray(arr) || !arr.length){
+        const seed = [];
+        localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+        return seed;
+      }
       return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
     }catch(e){
-      return [];
+      const seed = [];
+      localStorage.setItem(OPS_KEY, JSON.stringify(seed));
+      return seed;
     }
   }
-
-  async function saveOps(list){
-    localStorage.setItem(OPS_KEY, JSON.stringify(list));
-    // ✅ autosync operarios a Firestore
-    if(USE_FIRESTORE){
-      try{ await fsSaveOpsFromLocal(); }catch(e){ console.warn("No se pudo guardar operarios en Firestore:", e); }
-    }
-  }
-
+  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); }
   function getActiveOps(){ return loadOps().filter(o=>o.active); }
 
-  // =========================
-  // HISTORY (LOCAL)
-  // =========================
+  // -------------------------
+  // History store (LOCAL)
+  // -------------------------
   function loadHist(){
     try{
       const raw = localStorage.getItem(HIST_KEY);
@@ -341,7 +456,9 @@
       return [];
     }
   }
-  function saveHist(arr){ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }
+  function saveHist(arr){
+    localStorage.setItem(HIST_KEY, JSON.stringify(arr));
+  }
   function addHist(entry){
     const arr = loadHist();
     arr.unshift(entry);
@@ -349,9 +466,9 @@
     saveHist(arr);
   }
 
-  // =========================
-  // UI
-  // =========================
+  // -------------------------
+  // UI helpers
+  // -------------------------
   function setBadge(){
     const parts=[];
     if(state.finish) parts.push(state.finish);
@@ -397,9 +514,9 @@
     else screenConsume();
   }
 
-  // =========================
-  // SCREENS
-  // =========================
+  // -------------------------
+  // Screens
+  // -------------------------
   function screenFinish(){
     refreshMaterialsFromStock();
     state.view="main";
@@ -418,7 +535,7 @@
         <button class="btn good" id="btnGalva">HIERRO GALVANIZADO</button>
       </div>
       <div class="sep"></div>
-      <div class="muted">Operarios sincronizados por Firestore · Historial local (${HIST_LIMIT}).</div>
+      <div class="muted">Stock compartido por Firestore · Historial local (últimos ${HIST_LIMIT}).</div>
     `;
     byId('btnNegro').onclick = () => { state.finish="NEGRO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
     byId('btnGalva').onclick = () => { state.finish="GALVANIZADO"; state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
@@ -438,7 +555,7 @@
         <button class="btn small ghost" id="backFinish">⬅ Volver</button>
       </div>
       <div class="sep"></div>
-      <div class="grid3">${ops || `<div class="muted">No hay operarios. Ve a ⚙ Operarios para añadirlos.</div>`}
+      <div class="grid3">${ops || `<div class="muted">No hay operarios. Ve a ⚙ Operarios para añadirlos (lista local en este dispositivo).</div>`}
         <button class="btn small danger" id="btnOcc">OCASIONAL</button>
       </div>
       <div class="sep"></div>
@@ -465,16 +582,8 @@
     const r = refreshMaterialsFromStock();
     if(!r.ok){
       state.view='main'; setBadge();
-      $wrap.innerHTML = `
-        <div class="row">
-          <div>
-            <div class="pill">Stock real no disponible</div>
-            <div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div>
-            <div class="hint">${escapeHtml(r.reason)}<br>
-              Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.
-            </div>
-          </div>
-        </div>`;
+      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${escapeHtml(r.reason)}
+<br>Solución: abre <b>stock.html</b> (mismo navegador) o revisa sincronización Firestore.</div></div></div>`;
       return;
     }
 
@@ -501,7 +610,8 @@
             </div>
             <button class="miniBtn sel ${disabled}" data-mat="${m.id}">Seleccionar</button>
           </div>
-        </div>`;
+        </div>
+      `;
     }).join('');
     $wrap.innerHTML = `
       <div class="row">
@@ -516,7 +626,8 @@
         </div>
       </div>
       <div class="sep"></div>
-      <div class="list">${rows || `<div class="muted">No hay materiales en este tipo.</div>`}</div>`;
+      <div class="list">${rows || `<div class="muted">No hay materiales en este tipo.</div>`}</div>
+    `;
     byId('backOp').onclick = ()=>screenOperator();
     byId('chgFinish').onclick = ()=>screenFinish();
     [...$wrap.querySelectorAll('[data-mat]')].forEach(b=>{
@@ -552,36 +663,44 @@
       <div class="grid3">
         <div class="kpi"><div class="lbl">Tipo</div><div class="val">${m.finish}</div></div>
         <div class="kpi"><div class="lbl">Stock actual</div><div class="val big">${m.stock}</div><div class="muted">barras</div></div>
-        <div class="kpi"><div class="lbl">Sesión</div><div class="val">${escapeHtml(state.sessionId||"")}</div></div>
+        <div class="kpi"><div class="lbl">Sync</div><div class="val">${USE_FIRESTORE && fsReady ? "Firestore OK" : "Local"}</div></div>
       </div>
       <div class="sep"></div>
       <div class="grid2">
         <button class="btn ${canUse ? 'accent':'disabled'}" id="useOne">USAR 1 BARRA</button>
         <button class="btn small ghost" id="info">Ver resumen</button>
       </div>
-      <div class="hint">Cada pulsación queda registrada en 📋 Historial (máx. ${HIST_LIMIT}).</div>`;
-
+      <div class="hint">Cada pulsación queda registrada en 📋 Historial (máx. ${HIST_LIMIT}) y descuenta en Stock (Firestore).</div>
+    `;
     byId('chgMat').onclick = ()=>screenMaterials();
     byId('chgFinish2').onclick = ()=>screenFinish();
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeMaterialId=null; screenOperator(); };
     byId('info').onclick = ()=>toast(`Activo: ${m.name} · Stock: ${m.stock}`,false);
 
     let lock=false;
-    byId('useOne').onclick = ()=>{
+    byId('useOne').onclick = async ()=>{
       if(lock) return;
       if(m.stock<=0){ toast("SIN STOCK: no se puede consumir.",false); return; }
       lock=true; setTimeout(()=>lock=false,850);
 
       const beforeStock = m.stock;
-      state.lastAction = {matId:m.id, stockBefore:beforeStock};
 
-      const res = applyConsumeToStock(m.id, 1);
-      if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
+      // 1) escribir en Firestore (movement out)
+      const res = await applyConsumeToStock(m.id, 1);
+      if(!res.ok){
+        toast(res.msg||"No se pudo descontar.", false);
+        return;
+      }
 
+      // 2) refrescar desde cache (ya actualizado) / snapshot
       refreshMaterialsFromStock();
       const mm = MATERIALS.find(x=>x.id===m.id);
-      if(mm){ m.stock = mm.stock; }
+      if(mm) m.stock = mm.stock;
 
+      // 3) guardar lastAction para undo real (por movementId)
+      state.lastAction = { matId:m.id, movementId: res.movementId, stockBefore: beforeStock };
+
+      // 4) history local (solo registro UI)
       addHist({
         ts: nowISO(),
         operator: state.operator,
@@ -590,19 +709,20 @@
         materialName: m.name,
         delta: -1,
         stockBefore: beforeStock,
-        stockAfter: (res.stockAfter!==undefined?res.stockAfter:m.stock),
-        device: "TABLET_HIERRO",
-        sessionId: state.sessionId || "SIN_SESION"
+        stockAfter: res.stockAfter,
+        device: "TERMINAL_HIERRO",
+        sessionId: state.sessionId || "SIN_SESION",
+        movementId: res.movementId
       });
 
-      toast(`Descontada 1 barra (${m.stock} restantes).`, true);
+      toast(`Descontada 1 barra (${res.stockAfter} restantes).`, true);
       screenConsume();
     };
   }
 
-  // =========================
-  // OPERARIOS SCREEN
-  // =========================
+  // -------------------------
+  // Operarios
+  // -------------------------
   function screenOps(){
     state.view="ops";
     setBadge();
@@ -610,21 +730,21 @@
     const rows = ops.map((o,i)=>`
       <div class="opRow">
         <div>
-          <div class="nm">${escapeHtml(o.name)}</div>
+          <div class="nm">${o.name}</div>
           <div class="st">${o.active ? "Activo" : "Inactivo"}</div>
         </div>
         <div class="opActions">
           <button data-tgl="${i}">${o.active ? "Desactivar" : "Activar"}</button>
           <button class="danger" data-del="${i}">Eliminar</button>
         </div>
-      </div>`).join("");
-
+      </div>
+    `).join("");
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">⚙ Gestión de operarios (HIERRO)</div>
+          <div class="pill">⚙ Gestión de operarios (local)</div>
           <div style="margin-top:10px;font-size:24px;font-weight:900">Añadir, activar/desactivar o eliminar</div>
-          <div class="hint">Estos operarios se sincronizan en Firestore y aparecen en móvil y PC.</div>
+          <div class="hint">Lista local por dispositivo. (Si quieres, lo sincronizamos a Firestore en un siguiente paso.)</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
@@ -636,11 +756,10 @@
       <div class="sep"></div>
       <div class="list" style="max-height:48vh">${rows || `<div class="muted">No hay operarios.</div>`}</div>
       <div class="sep"></div>
-      <button class="btn small danger" id="resetOps">Vaciar lista</button>`;
-
+      <button class="btn small danger" id="resetOps">Vaciar lista</button>
+    `;
     byId('backMain').onclick = () => goBackMain();
-
-    byId('addOp').onclick = async () => {
+    byId('addOp').onclick = () => {
       const v = (byId('newOp').value||"").trim();
       if(!v){ toast("Escribe un nombre.", false); return; }
       const cur = loadOps();
@@ -648,69 +767,112 @@
         toast("Ya existe un operario con ese nombre.", false); return;
       }
       cur.push({name:v, active:true});
-      await saveOps(cur);
+      saveOps(cur);
       toast("Operario añadido.", false);
       screenOps();
     };
-
     $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
-      btn.onclick = async () => {
+      btn.onclick = () => {
         const idx = parseInt(btn.getAttribute("data-tgl"),10);
         const cur = loadOps();
         if(!cur[idx]) return;
         cur[idx].active = !cur[idx].active;
-        await saveOps(cur);
+        saveOps(cur);
         toast(cur[idx].active ? "Operario activado." : "Operario desactivado.", false);
         screenOps();
       };
     });
-
     $wrap.querySelectorAll("[data-del]").forEach(btn=>{
-      btn.onclick = async () => {
+      btn.onclick = () => {
         const idx = parseInt(btn.getAttribute("data-del"),10);
         const cur = loadOps();
         if(!cur[idx]) return;
         const name = cur[idx].name;
         if(!confirm(`Eliminar operario "${name}"?`)) return;
         cur.splice(idx,1);
-        await saveOps(cur);
+        saveOps(cur);
         toast("Operario eliminado.", false);
         screenOps();
       };
     });
-
-    byId('resetOps').onclick = async () => {
-      if(!confirm("Vaciar lista de operarios de hierro (en todos los dispositivos)?")) return;
-      await saveOps([]);
+    byId('resetOps').onclick = () => {
+      if(!confirm("Restaurar la lista de operarios por defecto?")) return;
+      saveOps([]);
       toast("Operarios limpiados.", false);
       screenOps();
     };
   }
 
-  // =========================
-  // HIST SCREEN (LOCAL)
-  // =========================
+  // -------------------------
+  // Historial
+  // -------------------------
   function screenHist(){
     state.view="hist";
     setBadge();
     const hist = loadHist();
 
+    const ops = Array.from(new Set(hist.map(h=>h.operator))).sort((a,b)=>a.localeCompare(b,'es'));
+    const opOptions = ['<option value="">(Todos)</option>'].concat(ops.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`)).join('');
+
     $wrap.innerHTML = `
       <div class="row">
         <div>
-          <div class="pill">📋 Historial (local, últimos ${HIST_LIMIT})</div>
+          <div class="pill">📋 Historial (últimos ${HIST_LIMIT})</div>
           <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de consumos</div>
-          <div class="hint">Esto es local de cada tablet/PC (no sincronizado).</div>
+          <div class="hint">Este historial es local. El stock real se descuenta en Firestore.</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
+
       <div class="sep"></div>
-      <div class="list" style="max-height:56vh" id="histList"></div>
+
+      <div class="grid3">
+        <div class="kpi">
+          <div class="lbl">Registros</div>
+          <div class="val">${hist.length}</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl">Último registro</div>
+          <div class="val">${hist[0] ? fmt(hist[0].ts) : "-"}</div>
+        </div>
+        <div class="kpi">
+          <div class="lbl">Límite</div>
+          <div class="val">${HIST_LIMIT}</div>
+        </div>
+      </div>
+
       <div class="sep"></div>
+
+      <div class="grid3">
+        <div>
+          <div class="hint" style="margin:0 0 8px">Operario</div>
+          <select id="fOp">${opOptions}</select>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 8px">Tipo</div>
+          <select id="fFin">
+            <option value="">(Todos)</option>
+            <option value="NEGRO">NEGRO</option>
+            <option value="GALVANIZADO">GALVANIZADO</option>
+          </select>
+        </div>
+        <div>
+          <div class="hint" style="margin:0 0 8px">Buscar material</div>
+          <input id="fTxt" placeholder="Ej: tubo 40x40"/>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+
       <div class="grid2">
         <button class="btn small primary" id="btnExport">Exportar JSON</button>
         <button class="btn small danger" id="btnClear">Borrar historial</button>
-      </div>`;
+      </div>
+
+      <div class="sep"></div>
+
+      <div id="histList" class="list" style="max-height:46vh"></div>
+    `;
 
     byId('backMain').onclick = () => goBackMain();
     byId('btnExport').onclick = () => exportHist();
@@ -721,24 +883,84 @@
       screenHist();
     };
 
-    const list = byId('histList');
-    list.innerHTML = hist.map(h=>`
-      <div class="item">
-        <div class="left">
-          <div class="name">${escapeHtml(h.materialName||"")}</div>
-          <div class="meta">
-            <span class="chip">${escapeHtml(h.operator||"")}</span>
-            <span class="muted">${fmt(h.ts)}</span>
-            <span class="muted">Stock: ${h.stockBefore} → ${h.stockAfter}</span>
+    const render = () => {
+      const op = byId('fOp').value;
+      const fin = byId('fFin').value;
+      const txt = (byId('fTxt').value||"").trim().toLowerCase();
+
+      const filtered = hist.filter(h=>{
+        if(op && h.operator !== op) return false;
+        if(fin && h.finish !== fin) return false;
+        if(txt && !(String(h.materialName||"").toLowerCase().includes(txt))) return false;
+        return true;
+      });
+
+      const map = new Map();
+      filtered.forEach(h=>{
+        const key = [h.operator, h.sessionId||"SIN_SESION", h.finish, h.materialId].join("||");
+        if(!map.has(key)){
+          map.set(key, {
+            operator: h.operator,
+            sessionId: h.sessionId||"SIN_SESION",
+            finish: h.finish,
+            materialId: h.materialId,
+            materialName: h.materialName,
+            total: 0,
+            firstTs: h.ts,
+            lastTs: h.ts,
+            stockStart: h.stockBefore,
+            stockEnd: h.stockAfter
+          });
+        }
+        const g = map.get(key);
+        g.total += (h.delta||0);
+        if(h.ts < g.firstTs){
+          g.firstTs = h.ts;
+          g.stockStart = h.stockBefore;
+        }
+        if(h.ts > g.lastTs){
+          g.lastTs = h.ts;
+          g.stockEnd = h.stockAfter;
+        }
+      });
+
+      const groups = Array.from(map.values()).sort((a,b)=> (b.lastTs||"").localeCompare(a.lastTs||""));
+
+      byId('histList').innerHTML = groups.map(g=>{
+        const finCls = g.finish==="NEGRO" ? "negro" : "galva";
+        const totalAbs = Math.abs(g.total);
+        return `
+          <div class="item">
+            <div class="left">
+              <div class="name">${escapeHtml(g.materialName)}</div>
+              <div class="meta">
+                <span class="tag ${finCls}">${escapeHtml(g.finish)}</span>
+                <span class="chip">${escapeHtml(g.operator)}</span>
+                <span class="muted">Sesión: ${escapeHtml(g.sessionId)}</span>
+                <span class="muted">${fmt(g.firstTs)} → ${fmt(g.lastTs)}</span>
+              </div>
+            </div>
+            <div class="right">
+              <div class="kpi" style="min-width:170px">
+                <div class="lbl">Barras usadas</div>
+                <div class="val">-${totalAbs}</div>
+              </div>
+              <div class="kpi" style="min-width:200px">
+                <div class="lbl">Stock (según registro)</div>
+                <div class="val">${g.stockStart} → <b>${g.stockEnd}</b></div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="right">
-          <div class="kpi" style="min-width:130px">
-            <div class="lbl">Delta</div>
-            <div class="val">${h.delta}</div>
-          </div>
-        </div>
-      </div>`).join("") || `<div class="muted">No hay historial.</div>`;
+        `;
+      }).join("") || `<div class="muted">No hay resultados con estos filtros.</div>`;
+    };
+
+    ["fOp","fFin","fTxt"].forEach(id=>{
+      byId(id).addEventListener("input", render);
+      byId(id).addEventListener("change", render);
+    });
+
+    render();
   }
 
   function exportHist(){
@@ -747,7 +969,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "historial_hierro.json";
+    a.download = "historial_cortes_hierro.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -759,19 +981,33 @@
     return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   }
 
-  // Undo
-  byId('undoBtn').onclick = ()=>{
+  // -------------------------
+  // Undo (DESHACE EN FIRESTORE + QUITA HIST LOCAL)
+  // -------------------------
+  byId('undoBtn').onclick = async ()=>{
     const la=state.lastAction; if(!la) return;
-    const m=MATERIALS.find(x=>x.id===la.matId); if(!m) return;
-    m.stock = la.stockBefore;
-    state.lastAction=null;
+    if(!la.movementId){
+      toast("No hay movimiento para deshacer.", false);
+      return;
+    }
 
+    const res = await undoConsumeByMovementId(la.movementId);
+    if(!res.ok){
+      toast(res.msg || "No se pudo deshacer en Firestore.", false);
+      return;
+    }
+
+    // quitar primer historial si coincide con movementId
     const hist = loadHist();
-    if(hist[0] && hist[0].materialId===m.id && hist[0].operator===state.operator && hist[0].delta===-1){
+    if(hist[0] && hist[0].movementId === la.movementId){
       hist.shift();
       saveHist(hist);
     }
-    toast("Acción deshecha.",false);
+
+    state.lastAction=null;
+
+    refreshMaterialsFromStock();
+    toast("Acción deshecha (stock restaurado).",false);
     goBackMain();
   };
 
@@ -779,23 +1015,22 @@
   document.getElementById("btnOps").onclick  = () => screenOps();
   document.getElementById("btnHist").onclick = () => screenHist();
 
-  // =========================
-  // START: AUTO-LOGIN + LOAD OPS + (OPTIONAL) LOAD STOCK
-  // =========================
+  // Start
   (async () => {
     try{
       if(USE_FIRESTORE){
         fbEnsure();
         await fsLoginHidden();
-
-        // 1) Operarios: Firestore -> local
-        await fsLoadOpsToLocal();
-
-        // 2) Stock: opcional Firestore -> local (no rompe si no existe)
-        await fsLoadStockToLocal();
+        const r = await fsLoadOnceToLocalStock();
+        if(!r.ok){
+          console.warn("Carga Firestore inicial falló:", r.msg);
+        }
+        fsReady = true;
+        fsStartRealtimeListener();
       }
     }catch(e){
-      console.warn("Auto-login/auto-load Firestore falló:", e);
+      console.warn("Init Firestore falló:", e);
+      fsReady = false;
     }
 
     screenFinish();
