@@ -129,6 +129,7 @@
   // Lee y descuenta directamente sobre la misma DB que usa stock.html (DB_KEY="taller_stock_v3_data")
   // -------------------------
   const STOCK_DB_KEY = "taller_stock_v3_data";
+const USE_FIRESTORE = false;
 
   function loadStockDB(){
     try{
@@ -385,7 +386,8 @@
     const r = refreshMaterialsFromStock();
     if(!r.ok){
       state.view='main'; setBadge();
-      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${'${'}escapeHtml(r.reason){'}'}<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.</div></div></div>`;
+      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${escapeHtml(r.reason)}
+<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializar la base, y vuelve aquí.</div></div></div>`;
       return;
     }
 
