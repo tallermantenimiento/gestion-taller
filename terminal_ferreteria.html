@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Ferretería</title>
+  <!-- PATCH_VERSION: 2026-01-08 FERRETERIA_FIRESTORE_SYNC -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -66,8 +67,8 @@
     .tag.zero{background:#4a0f23;border:1px solid #ff5a7a66}
     .tag.low{background:#4a3a0f;border:1px solid #ffcc6666}
     .list{display:flex;flex-direction:column;gap:12px;max-height:52vh;overflow:auto;padding-right:6px}
-    
-    /* NEW: Collapsible Groups */
+
+    /* Collapsible Groups */
     .groupHdr{
       background:linear-gradient(90deg, #102a52, #0d1b38);
       border:1px solid #ffffff33; border-radius:16px; padding:16px;
@@ -119,20 +120,109 @@
   <button class="undo" id="undoBtn">Deshacer</button>
 </div>
 
+<!-- Firebase (Compat, sin bundlers) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
 <script>
 (() => {
   const OPS_KEY  = "tablet_ops_ferreteria_v3_clean";
   const HIST_KEY = "tablet_hist_ferreteria_v3_clean";
   const HIST_LIMIT = 500;
 
-  const DEFAULT_OPERATORS = [];
+  // =========================
+  // FIRESTORE CONFIG (MISMA QUE STOCK PRINCIPAL)
+  // =========================
+  const USE_FIRESTORE = true;
+  const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
-  // -------------------------
-  // Integración con Stock real (localStorage) - SIN Firestore
-  // Lee y descuenta directamente sobre la misma DB que usa stock.html (DB_KEY="taller_stock_v3_data")
-  // -------------------------
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+
+  // =========================
+  // DB LOCAL CACHE (MISMA KEY)
+  // =========================
   const STOCK_DB_KEY = "taller_stock_v3_data";
 
+  // =========================
+  // FIRESTORE HELPERS
+  // =========================
+  let fbApp=null, fbAuth=null, fbDb=null;
+  let fsUnsub=null;
+  let fsReady=false;
+  let ignoreNextLocalWrite=false;
+
+  function fbEnsure(){
+    if(fbApp) return;
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb   = firebase.firestore();
+  }
+
+  async function fsLoginHidden(){
+    try{
+      if(!fbAuth.currentUser){
+        await fbAuth.signInAnonymously();
+      }
+    }catch(e){
+      console.warn("Auth anónimo no disponible:", e);
+    }
+  }
+
+  function fsDocRef(){
+    return fbDb.collection(FIRESTORE_DOC_PATH.col).doc(FIRESTORE_DOC_PATH.doc);
+  }
+
+  function writeLocalStockDB(data){
+    ignoreNextLocalWrite = true;
+    localStorage.setItem(STOCK_DB_KEY, JSON.stringify(data));
+    ignoreNextLocalWrite = false;
+  }
+
+  async function fsLoadOnceToLocal(){
+    const snap = await fsDocRef().get();
+    if(!snap.exists) return {ok:false, reason:"No existe documento en Firestore."};
+    const data = snap.data() || {};
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)){
+      return {ok:false, reason:"Documento Firestore inválido (faltan materials/movements)."};
+    }
+    writeLocalStockDB({
+      materials: data.materials || [],
+      movements: data.movements || [],
+      categoryOrder: data.categoryOrder || []
+    });
+    return {ok:true};
+  }
+
+  function fsStartRealtimeListener(onData){
+    if(fsUnsub) fsUnsub();
+    fsUnsub = fsDocRef().onSnapshot((snap)=>{
+      if(!snap.exists) return;
+      const data = snap.data() || {};
+      if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
+
+      writeLocalStockDB({
+        materials: data.materials || [],
+        movements: data.movements || [],
+        categoryOrder: data.categoryOrder || []
+      });
+
+      if(typeof onData==="function") onData(data);
+    }, (err)=>{
+      console.warn("Firestore onSnapshot error:", err);
+    });
+  }
+
+  // =========================
+  // LOCAL DB LOAD/SAVE
+  // =========================
   function loadStockDB(){
     try{
       const raw = localStorage.getItem(STOCK_DB_KEY);
@@ -143,27 +233,32 @@
     }catch(e){ return null; }
   }
 
-  function saveStockDB(db){ localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db)); }
-
   function getStockFromDB(db, matId){
     return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
   }
 
+  // =========================
+  // FILTRO FERRETERIA
+  // =========================
   function isFerreteria(m){
     const cat = String(m.cat||"").toLowerCase();
     const grp = String(m.grp||"").toLowerCase();
     // Criterio flexible: categoría o grupo contienen "ferreter" o familias típicas
-    return cat.includes("ferreter") || grp.includes("torn") || grp.includes("arand") || grp.includes("tuerc") || grp.includes("disco") || grp.includes("broca") || grp.includes("consum");
+    return cat.includes("ferreter") ||
+           grp.includes("torn") || grp.includes("arand") || grp.includes("tuerc") ||
+           grp.includes("disco") || grp.includes("broca") || grp.includes("consum");
   }
 
-  // ITEMS vivo desde stock real
+  // =========================
+  // ITEMS VIVOS DESDE STOCK REAL (CACHE LOCAL)
+  // =========================
   let ITEMS = [];
 
   function refreshItemsFromStock(){
     const db = loadStockDB();
     if(!db){
       ITEMS = [];
-      return {ok:false, reason:"No existe la base de datos de stock. Abre stock.html una vez para inicializarla."};
+      return {ok:false, reason:"No existe la base de datos de stock en local. (Se inicializa al cargar Firestore)."};
     }
     const mats = (db.materials||[]).filter(isFerreteria);
     ITEMS = mats.map(m=>{
@@ -180,24 +275,67 @@
     return {ok:true};
   }
 
-  function applyConsumeToStock(matId, qty){
-    const db = loadStockDB();
-    if(!db) return {ok:false, msg:"No se pudo cargar el stock real."};
-    const current = getStockFromDB(db, matId);
-    if(current < qty) return {ok:false, msg:"SIN STOCK: no se puede consumir."};
-    db.movements.push({
-      id: Math.random().toString(36).substr(2,9),
-      matId,
-      type: "out",
-      qty,
-      date: new Date().toISOString(),
-      source: "TABLET_FERRETERIA_LOCAL"
-    });
-    saveStockDB(db);
-    return {ok:true, stockAfter: current-qty};
+  // =========================
+  // CONSUMO REAL EN FIRESTORE (TRANSACTION)
+  // =========================
+  async function applyConsumeToStockFS(matId, qty){
+    if(!USE_FIRESTORE || !fsReady){
+      return {ok:false, msg:"Firestore no está listo. Reintenta."};
+    }
+    try{
+      const docRef = fsDocRef();
+      let outRes = {ok:false};
+
+      await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(docRef);
+        if(!snap.exists) throw new Error("Documento de stock no existe en Firestore.");
+
+        const data = snap.data() || {};
+        const mats = Array.isArray(data.materials) ? data.materials : [];
+        const movs = Array.isArray(data.movements) ? data.movements : [];
+
+        // comprobar existencia
+        const mat = mats.find(x=>x.id===matId);
+        if(!mat) throw new Error("Material no encontrado en Firestore.");
+
+        // stock actual por movimientos
+        const current = movs.filter(m=>m.matId===matId)
+          .reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
+
+        if(current < qty){
+          outRes = {ok:false, msg:"SIN STOCK: no se puede consumir."};
+          return;
+        }
+
+        const newMov = {
+          id: Math.random().toString(36).substr(2,9),
+          matId,
+          type: "out",
+          qty,
+          date: new Date().toISOString(),
+          source: "TABLET_FERRETERIA_FS"
+        };
+
+        movs.push(newMov);
+
+        tx.set(docRef, {
+          movements: movs,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        outRes = {ok:true, stockAfter: current - qty};
+      });
+
+      return outRes;
+    }catch(e){
+      console.warn("Transaction error:", e);
+      return {ok:false, msg: (e && e.message) ? e.message : "Error al consumir en Firestore."};
+    }
   }
 
-
+  // =========================
+  // STATE + HELPERS UI
+  // =========================
   const state = { operator:null, sessionId:null, activeItemId:null, lastAction:null, view:"main" };
 
   const $wrap = document.getElementById('stepWrap');
@@ -328,13 +466,23 @@
     const r = refreshItemsFromStock();
     if(!r.ok){
       state.view='main'; setBadge();
-      $wrap.innerHTML = `<div class="row"><div><div class="pill">Stock real no disponible</div><div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div><div class="hint">${'${'}escapeHtml(r.reason){'}'}<br>Solución: abre <b>stock.html</b> (mismo navegador y misma URL) para inicializarla.</div></div></div><div class="sep"></div><button class="btn small ghost" id="back">⬅ Volver</button>`;
+      $wrap.innerHTML = `
+        <div class="row">
+          <div>
+            <div class="pill">Stock real no disponible</div>
+            <div style="margin-top:10px;font-size:26px;font-weight:900">No se puede leer el Stock</div>
+            <div class="hint">${escapeHtml(r.reason)}<br>
+            Si es la primera vez, espera a que cargue Firestore y vuelve a entrar.</div>
+          </div>
+        </div>
+        <div class="sep"></div>
+        <button class="btn small ghost" id="back">⬅ Volver</button>
+      `;
       byId('back').onclick=()=>screenOperator();
       return;
     }
 
     state.view="main"; setBadge();
-    // We keep families for the dropdown, but main view is now grouped sections
     const families = Array.from(new Set(ITEMS.map(i=>i.family))).sort((a,b)=>a.localeCompare(b,'es'));
     const famOptions = ['<option value="">(Todas)</option>'].concat(families.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`)).join('');
 
@@ -381,22 +529,18 @@
       const txt = (byId('fTxt').value||"").trim().toLowerCase();
       const step = parseInt(byId('fStep').value,10) || 1;
 
-      // Filter Logic
       const filtered = sortItems(ITEMS).filter(it=>{
         if(famFilter && it.family!==famFilter) return false;
         if(txt && !it.name.toLowerCase().includes(txt)) return false;
         return true;
       });
 
-      // Group Logic
       const groups = {};
       filtered.forEach(it => {
         if(!groups[it.family]) groups[it.family] = [];
         groups[it.family].push(it);
       });
       const sortedFamKeys = Object.keys(groups).sort();
-
-      // If user is searching text, expand groups automatically
       const autoExpand = txt.length > 0;
 
       if(filtered.length === 0) {
@@ -409,7 +553,6 @@
         const isOpenClass = autoExpand ? 'open' : '';
         const isShowClass = autoExpand ? 'show' : '';
 
-        // Generate items HTML
         const itemsHtml = list.map(it => {
             const [cls,lbl]=detectLowTag(it.stock);
             const warnTag = cls ? `<span class="tag ${cls}">${lbl}</span>`:'';
@@ -438,7 +581,6 @@
             `;
         }).join("");
 
-        // Generate Group Header + Body
         return `
           <div class="groupWrap">
             <div class="groupHdr ${isOpenClass}" data-tog="${escapeHtml(famName)}">
@@ -452,7 +594,6 @@
         `;
       }).join("");
 
-      // Events for Headers
       $wrap.querySelectorAll(".groupHdr").forEach(h => {
         h.onclick = () => {
           const fam = h.getAttribute('data-tog');
@@ -462,7 +603,6 @@
         };
       });
 
-      // Events for Items
       $wrap.querySelectorAll("[data-sel]").forEach(b=>{
         b.onclick = ()=>{
           const id=b.getAttribute("data-sel");
@@ -471,14 +611,15 @@
           state.activeItemId=id; screenConsume();
         };
       });
+
       $wrap.querySelectorAll("[data-quick]").forEach(b=>{
-        b.onclick = ()=>{
+        b.onclick = async ()=>{
           const id=b.getAttribute("data-quick");
           const it=ITEMS.find(x=>x.id===id);
           if(!it){ return; }
           if(it.stock<step){ toast("No hay suficiente stock.", false); return; }
-          consume(it, step);
-          render(); // Re-render to update stock numbers
+          await consume(it, step);
+          render();
         };
       });
     };
@@ -490,13 +631,14 @@
     render();
   }
 
-  function consume(it, qty){
+  async function consume(it, qty){
     const beforeStock = it.stock;
     const beforeUse = it.usageCount;
     state.lastAction = {itemId: it.id, stockBefore: beforeStock, usageBefore: beforeUse, qty};
 
-    const res = applyConsumeToStock(it.id, qty);
+    const res = await applyConsumeToStockFS(it.id, qty);
     if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
+
     refreshItemsFromStock();
     const it2 = ITEMS.find(x=>x.id===it.id);
     if(it2) it.stock = it2.stock;
@@ -513,7 +655,7 @@
       unit: it.unit,
       stockBefore: beforeStock,
       stockAfter: (res.stockAfter!==undefined?res.stockAfter:it.stock),
-      device: "DEMO_TABLET"
+      device: "TABLET_FERRETERIA_FS"
     });
 
     toast(`Descontado ${qty} ${it.unit} (${it.stock} restantes).`, true);
@@ -552,7 +694,7 @@
         <div>
           <div class="hint" style="margin:0 0 8px">Cantidad a consumir (${escapeHtml(it.unit)})</div>
           <input id="qtyIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
-          <div class="hint">Puedes escribir cualquier cifra. Si no hay suficiente stock, no te dejará.</div>
+          <div class="hint">Si no hay suficiente stock, no te dejará.</div>
         </div>
         <button class="btn ${canUse ? 'accent':'disabled'}" id="useCustom">CONSUMIR</button>
       </div>
@@ -571,22 +713,22 @@
     byId('chgItem').onclick = ()=>{ state.activeItemId=null; screenItems(); };
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
 
-    byId('use1').onclick = ()=>{ if(it.stock<1) return; consume(it,1); screenConsume(); };
-    byId('use5').onclick = ()=>{ if(it.stock<5) return; consume(it,5); screenConsume(); };
-    byId('use10').onclick = ()=>{ if(it.stock<10) return; consume(it,10); screenConsume(); };
+    byId('use1').onclick = async ()=>{ if(it.stock<1) return; await consume(it,1); screenConsume(); };
+    byId('use5').onclick = async ()=>{ if(it.stock<5) return; await consume(it,5); screenConsume(); };
+    byId('use10').onclick = async ()=>{ if(it.stock<10) return; await consume(it,10); screenConsume(); };
 
-    byId('useCustom').onclick = ()=>{
+    byId('useCustom').onclick = async ()=>{
       const raw = (byId('qtyIn').value||'').trim();
       const qty = parseInt(raw,10);
       if(!raw || isNaN(qty) || qty<=0){ toast('Introduce una cantidad válida.', false); return; }
       if(it.stock<qty){ toast('No hay suficiente stock para esa cantidad.', false); return; }
-      consume(it, qty);
+      await consume(it, qty);
       byId('qtyIn').value='';
       screenConsume();
     };
   }
 
-  // --- operarios screen
+  // --- operarios
   function screenOps(){
     state.view="ops"; setBadge();
     const ops = loadOps();
@@ -653,7 +795,7 @@
     };
   }
 
-  // --- history aggregated
+  // --- historial
   function screenHist(){
     state.view="hist"; setBadge();
     const hist=loadHist();
@@ -784,18 +926,21 @@
     toast("Exportación iniciada.",false);
   }
 
-  // --- undo
+  // --- undo (solo hist local)
   byId('undoBtn').onclick=()=>{
     const la=state.lastAction; if(!la) return;
     const it=ITEMS.find(x=>x.id===la.itemId); if(!it) return;
-    it.stock=la.stockBefore; it.usageCount=la.usageBefore;
+
+    it.stock=la.stockBefore;
+    it.usageCount=la.usageBefore;
     state.lastAction=null;
 
     const hist=loadHist();
     if(hist[0] && hist[0].itemId===it.id && hist[0].operator===state.operator && (hist[0].sessionId||"")===(state.sessionId||"")){
       hist.shift(); saveHist(hist);
     }
-    toast("Acción deshecha.",false);
+
+    toast("Acción deshecha (historial local).",false);
     goBackMain();
   };
 
@@ -803,8 +948,42 @@
   document.getElementById("btnOps").onclick=()=>screenOps();
   document.getElementById("btnHist").onclick=()=>screenHist();
 
-  // start
-  screenOperator();
+  // =========================
+  // START: Firestore Sync + Listener
+  // =========================
+  (async ()=>{
+    try{
+      if(USE_FIRESTORE){
+        fbEnsure();
+        await fsLoginHidden();
+        const first = await fsLoadOnceToLocal();
+        fsReady = true;
+
+        fsStartRealtimeListener(()=>{
+          // Recalcular ITEMS y refrescar pantalla actual si procede
+          refreshItemsFromStock();
+          if(state.view==="main"){
+            if(!state.operator) screenOperator();
+            else if(!state.activeItemId) screenItems();
+            else screenConsume();
+          }
+        });
+
+        if(!first.ok){
+          console.warn("No se pudo cargar inicialmente Firestore:", first.reason);
+          // Aun así, seguimos: si no hay local, se verá aviso.
+        }
+      }
+    }catch(e){
+      console.warn("Firestore init falló:", e);
+      fsReady = false;
+    }
+
+    // UI start
+    refreshItemsFromStock();
+    screenOperator();
+  })();
+
 })();
 </script>
 </body>
