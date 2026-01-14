@@ -5,100 +5,109 @@
 <title>Preparación de pedidos</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-    /* === ESTILOS BASE === */
-    body { margin:0; font-family:Segoe UI,Arial; background:#0b1220; color:#e6edf7; padding:24px; }
-    .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-    
-    /* === BOTONES CORPORATIVOS === */
-    .btn { 
-        background:linear-gradient(180deg,#0f3c55,#0b2a3d); 
-        border:1px solid rgba(255,255,255,.15); 
-        color:#6dd6ff; 
-        padding:8px 14px; 
-        border-radius:10px; 
-        cursor:pointer; 
-        font-weight:600; 
-        transition: filter 0.2s; 
-    }
-    .btn:hover { filter:brightness(1.15); }
-    
-    .btn-danger { background:linear-gradient(180deg,#7f1d1d,#450a0a); border-color:#b91c1c; color:#fecaca; }
-    .btn-success { background:linear-gradient(180deg,#14532d,#052e16); border-color:#16a34a; color:#86efac; }
-    
-    /* === BOTÓN MINI === */
-    .btn-mini {
-        background: linear-gradient(180deg, #0f3c55, #0b2a3d);
-        border: 1px solid rgba(255,255,255,.15);
-        color: #6dd6ff;
-        padding: 5px 12px; 
-        font-size: 11px; 
-        border-radius: 6px;
-        cursor: pointer; 
-        font-weight: 700; 
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        transition: filter 0.2s, box-shadow 0.2s;
-        white-space: nowrap;
-    }
-    .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
-    .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
+  body { margin:0; font-family:Segoe UI,Arial; background:#0b1220; color:#e6edf7; padding:24px; }
+  .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 
-    /* LAYOUT */
-    .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
-    .hidden { display:none !important; }
-    .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
-    
-    /* TABLAS E INPUTS */
-    table { width:100%; border-collapse:collapse; margin-top:6px; }
-    th, td { border-bottom:1px solid rgba(255,255,255,.08); padding:8px; vertical-align: middle; }
-    th { color:#9fb0c8; font-size:12px; text-align:left; }
-    input { background:#020617; border:1px solid rgba(255,255,255,.12); color:#e6edf7; border-radius:8px; padding:6px; }
-    input[type=number] { width:70px; text-align: center; }
-    input:focus { outline: none; border-color: #6dd6ff; }
-    
-    /* Input especial Unidades */
-    .input-unidades { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 14px; font-weight: bold; width: 60px; text-align: center; border-radius: 6px; padding: 4px; transition: all 0.3s; }
-    .input-unidades:focus { border-color: #6dd6ff; background: rgba(0,0,0,0.3); }
+  .btn {
+    background:linear-gradient(180deg,#0f3c55,#0b2a3d);
+    border:1px solid rgba(255,255,255,.15);
+    color:#6dd6ff;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:600;
+    transition: filter 0.2s;
+  }
+  .btn:hover { filter:brightness(1.15); }
+  .btn-danger { background:linear-gradient(180deg,#7f1d1d,#450a0a); border-color:#b91c1c; color:#fecaca; }
+  .btn-success { background:linear-gradient(180deg,#14532d,#052e16); border-color:#16a34a; color:#86efac; }
 
-    /* Estado Filas */
-    tr.ok { background: linear-gradient(180deg, rgba(24,130,72,.28), rgba(12,78,44,.18)); box-shadow: inset 0 0 0 1px rgba(110,255,170,.18); }
-    tr.ok td { color: #e9fff1; }
-    .flash-limit { animation: clampFlash .5s ease-in-out 1; border-color: #ef4444 !important; }
-    @keyframes clampFlash { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); } }
+  .btn-mini{
+    background: linear-gradient(180deg, #0f3c55, #0b2a3d);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #6dd6ff;
+    padding: 5px 12px;
+    font-size: 11px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: filter 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+  .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
+  .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
 
-    /* Listado */
-    .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
-    .item { padding:12px; border-radius:12px; background:#020617; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition: border-color 0.2s; }
-    .item:hover { border-color:rgba(109,214,255,.35); background: rgba(255,255,255,0.02); }
-    .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight: bold; text-transform: uppercase; }
-    .b-p { background:#f59e0b; color:#111; }
-    .b-pa { background:#fb923c; color:#111; }
-    .b-c { background:#22c55e; color:#111; }
+  .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+  .hidden { display:none !important; }
+  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
-    /* Control Panel */
-    .control-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px; margin: 15px 0; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; }
-    .radio-group { display:flex; gap:10px; }
-    .radio-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.3); cursor:pointer; user-select: none; }
-    .radio-btn input { margin:0; }
-    .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1); }
+  table { width:100%; border-collapse:collapse; margin-top:6px; }
+  th, td { border-bottom:1px solid rgba(255,255,255,.08); padding:8px; vertical-align: middle; }
+  th { color:#9fb0c8; font-size:12px; text-align:left; }
+  input { background:#020617; border:1px solid rgba(255,255,255,.12); color:#e6edf7; border-radius:8px; padding:6px; }
+  input[type=number] { width:70px; text-align: center; }
+  input:focus { outline: none; border-color: #6dd6ff; }
 
-    /* === MODAL DE CREACIÓN === */
-    .modal-backdrop { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
-    .modal-backdrop.active { opacity:1; pointer-events:auto; }
-    
-    .modal-box { width:90%; max-width:450px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
-    .modal-backdrop.active .modal-box { transform:translateY(0); }
-    
-    .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; }
-    .modal-field { margin-bottom:14px; }
-    .modal-label { display:block; font-size:12px; color:#9fb0c8; margin-bottom:5px; font-weight:600; }
-    
-    .input-group { display:flex; gap:8px; }
-    .modal-select { flex:1; background:#020617; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px; border-radius:8px; outline:none; font-family:inherit; }
-    .modal-input { flex:1; background:#020617; border:1px solid #38bdf8; color:#fff; padding:8px; border-radius:8px; outline:none; }
-    .btn-icon { width:36px; padding:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
-    
-    .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:16px; }
+  .input-unidades { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 14px; font-weight: bold; width: 60px; text-align: center; border-radius: 6px; padding: 4px; transition: all 0.3s; }
+  .input-unidades:focus { border-color: #6dd6ff; background: rgba(0,0,0,0.3); }
+
+  tr.ok { background: linear-gradient(180deg, rgba(24,130,72,.28), rgba(12,78,44,.18)); box-shadow: inset 0 0 0 1px rgba(110,255,170,.18); }
+  tr.ok td { color: #e9fff1; }
+  .flash-limit { animation: clampFlash .5s ease-in-out 1; border-color: #ef4444 !important; }
+  @keyframes clampFlash { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); } }
+
+  .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+  .item { padding:12px; border-radius:12px; background:#020617; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition: border-color 0.2s; }
+  .item:hover { border-color:rgba(109,214,255,.35); background: rgba(255,255,255,0.02); }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight: bold; text-transform: uppercase; }
+  .b-p { background:#f59e0b; color:#111; }
+  .b-pa { background:#fb923c; color:#111; }
+  .b-c { background:#22c55e; color:#111; }
+  .b-fab { background:#22c55e; color:#111; }
+
+  .control-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px; margin: 15px 0; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; }
+  .radio-group { display:flex; gap:10px; }
+  .radio-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.3); cursor:pointer; user-select: none; }
+  .radio-btn input { margin:0; }
+  .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1); }
+
+  .stock-mini { font-size:10px; opacity:0.65; margin-top:2px; }
+  .link-mini { font-size:10px; opacity:0.8; margin-top:3px; display:flex; gap:8px; align-items:center; }
+  .link-pill { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); cursor:pointer; }
+  .link-pill:hover { border-color: rgba(109,214,255,.35); }
+  .link-pill strong { font-weight:700; color:#e6edf7; }
+
+  /* === MODALES === */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+  .modal-backdrop.active { opacity:1; pointer-events:auto; }
+  .modal-box { width:90%; max-width:780px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
+  .modal-backdrop.active .modal-box { transform:translateY(0); }
+  .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .modal-sub { font-size:12px; color:#9fb0c8; margin:-6px 0 10px 0; }
+  .modal-field { margin-bottom:12px; }
+  .modal-label { display:block; font-size:12px; color:#9fb0c8; margin-bottom:5px; font-weight:600; }
+  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:12px; }
+  .input-group { display:flex; gap:8px; }
+  .modal-select { flex:1; background:#020617; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px; border-radius:8px; outline:none; font-family:inherit; }
+  .modal-input { flex:1; background:#020617; border:1px solid #38bdf8; color:#fff; padding:8px; border-radius:8px; outline:none; }
+  .btn-icon { width:36px; padding:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+
+  /* Modal vinculacion */
+  .link-grid { display:grid; grid-template-columns: 1fr 320px; gap:14px; }
+  @media (max-width: 900px){ .link-grid{ grid-template-columns:1fr; } }
+  .link-list { border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; }
+  .link-row { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; background: rgba(0,0,0,.12); }
+  .link-row:hover { background: rgba(255,255,255,.03); }
+  .link-row:last-child { border-bottom:none; }
+  .link-row .name { font-weight:700; color:#fff; }
+  .link-row .meta { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
+  .link-row.active { outline: 2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
+  .side-card { border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px; background: rgba(0,0,0,.15); }
+  .side-title { font-size:12px; color:#9fb0c8; text-transform: uppercase; letter-spacing:.08em; font-weight:800; }
+  .side-big { font-size:16px; font-weight:800; color:#fff; margin-top:6px; }
+  .side-small { font-size:12px; color:#9fb0c8; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -118,33 +127,33 @@
 
 <div id="vistaDetalle" class="card hidden">
   <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-      <div>
-        <div style="font-size:12px; color:#9fb0c8;">REFERENCIA</div>
-        <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
-        <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-            <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
-            <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-                <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
-                <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
-            </div>
+    <div>
+      <div style="font-size:12px; color:#9fb0c8;">REFERENCIA</div>
+      <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
+      <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
+        <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
+        <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+          <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
+          <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
         </div>
       </div>
-      <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
+    </div>
+    <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
   </div>
 
   <div id="panelHierro" class="hidden control-panel">
-      <span style="font-weight:700; color:#cbd5e1;">Tipo de Perfilería:</span>
-      <div class="radio-group">
-          <label class="radio-btn"><input type="radio" name="th" value="galvanizado" onchange="guardarTipoHierro()"> Galvanizado</label>
-          <label class="radio-btn"><input type="radio" name="th" value="negro" onchange="guardarTipoHierro()"> Negro</label>
-      </div>
-      <span style="font-size:11px; opacity:0.6; margin-left:auto;">(Requerido para guardar barras)</span>
+    <span style="font-weight:700; color:#cbd5e1;">Tipo de Perfilería:</span>
+    <div class="radio-group">
+      <label class="radio-btn"><input type="radio" name="th" value="galvanizado" onchange="guardarTipoHierro()"> Galvanizado</label>
+      <label class="radio-btn"><input type="radio" name="th" value="negro" onchange="guardarTipoHierro()"> Negro</label>
+    </div>
+    <span style="font-size:11px; opacity:0.6; margin-left:auto;">(Requerido para guardar barras)</span>
   </div>
 
   <div id="bloqueBarras" class="hidden">
     <div class="section-title">PERFILERÍA · BARRAS</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="140">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="190">Acción</th><th>Obs</th></tr></thead>
       <tbody id="tbodyBarras"></tbody>
     </table>
   </div>
@@ -152,7 +161,7 @@
   <div id="bloqueUnidades" class="hidden">
     <div class="section-title">ACCESORIOS · UNIDADES</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="140">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="190">Acción</th><th>Obs</th></tr></thead>
       <tbody id="tbodyUnidades"></tbody>
     </table>
   </div>
@@ -163,490 +172,1012 @@
   </div>
 </div>
 
+<!-- Modal creación ficha stock -->
 <div id="modalCrear" class="modal-backdrop">
-    <div class="modal-box">
-        <div class="modal-title">Crear Ficha de Stock</div>
-        
-        <div class="modal-info">
-            El material <strong><span id="modMatName"></span></strong> no existe.<br>
-            Defínelo para añadirlo al stock.
-        </div>
+  <div class="modal-box" style="max-width:450px;">
+    <div class="modal-title">Crear Ficha de Stock</div>
 
-        <div class="modal-field">
-            <span class="modal-label">CATEGORÍA</span>
-            <div class="input-group">
-                <select id="modCatSelect" class="modal-select" onchange="cargarGruposModal()"></select>
-                <input id="modCatInput" class="modal-input hidden" placeholder="Nueva Categoría...">
-                <button class="btn btn-icon" onclick="toggleInput('cat')">＋</button>
-            </div>
-        </div>
-
-        <div class="modal-field">
-            <span class="modal-label">GRUPO / FAMILIA</span>
-            <div class="input-group">
-                <select id="modGrpSelect" class="modal-select"></select>
-                <input id="modGrpInput" class="modal-input hidden" placeholder="Nuevo Grupo...">
-                <button class="btn btn-icon" onclick="toggleInput('grp')">＋</button>
-            </div>
-        </div>
-
-        <div style="display:flex; gap:12px;">
-            <div class="modal-field" style="flex:1;">
-                <span class="modal-label">CANTIDAD A SUMAR</span>
-                <input id="modQtyInput" type="number" class="modal-select" style="width:100%; box-sizing:border-box; border-color:#38bdf8; color:#38bdf8; font-weight:bold; text-align:center;">
-            </div>
-            
-            <div class="modal-field" style="flex:1;">
-                <span class="modal-label">UNIDAD (Ej: Caja)</span>
-                <input id="modUnitInput" class="modal-select" placeholder="ud" style="width:100%; box-sizing:border-box;">
-            </div>
-            
-            <div class="modal-field" style="width:80px;">
-                <span class="modal-label">MÍNIMO</span>
-                <input id="modMinInput" type="number" class="modal-select" placeholder="0" style="width:100%; box-sizing:border-box; text-align:center;">
-            </div>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-            <button class="btn" style="background:transparent; border:none; color:#9fb0c8;" onclick="cerrarModalCreacion()">Cancelar</button>
-            <button class="btn btn-success" onclick="guardarNuevoMaterial()">Guardar y Añadir</button>
-        </div>
+    <div class="modal-info">
+      El material <strong><span id="modMatName"></span></strong> no existe.<br>
+      Defínelo para añadirlo al stock.
     </div>
+
+    <div class="modal-field">
+      <span class="modal-label">CATEGORÍA</span>
+      <div class="input-group">
+        <select id="modCatSelect" class="modal-select" onchange="cargarGruposModal()"></select>
+        <input id="modCatInput" class="modal-input hidden" placeholder="Nueva Categoría...">
+        <button class="btn btn-icon" onclick="toggleInput('cat')">＋</button>
+      </div>
+    </div>
+
+    <div class="modal-field">
+      <span class="modal-label">GRUPO / FAMILIA</span>
+      <div class="input-group">
+        <select id="modGrpSelect" class="modal-select"></select>
+        <input id="modGrpInput" class="modal-input hidden" placeholder="Nuevo Grupo...">
+        <button class="btn btn-icon" onclick="toggleInput('grp')">＋</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px;">
+      <div class="modal-field" style="flex:1;">
+        <span class="modal-label">CANTIDAD A SUMAR</span>
+        <input id="modQtyInput" type="number" class="modal-select" style="width:100%; box-sizing:border-box; border-color:#38bdf8; color:#38bdf8; font-weight:bold; text-align:center;">
+      </div>
+
+      <div class="modal-field" style="flex:1;">
+        <span class="modal-label">UNIDAD (Ej: Caja)</span>
+        <input id="modUnitInput" class="modal-select" placeholder="ud" style="width:100%; box-sizing:border-box;">
+      </div>
+
+      <div class="modal-field" style="width:80px;">
+        <span class="modal-label">MÍNIMO</span>
+        <input id="modMinInput" type="number" class="modal-select" placeholder="0" style="width:100%; box-sizing:border-box; text-align:center;">
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+      <button class="btn" style="background:transparent; border:none; color:#9fb0c8;" onclick="cerrarModalCreacion()">Cancelar</button>
+      <button class="btn btn-success" onclick="guardarNuevoMaterial()">Guardar y Añadir</button>
+    </div>
+  </div>
 </div>
 
+<!-- Modal vinculación a Stock -->
+<div id="modalLink" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>Vincular línea al Stock</span>
+      <button class="btn" style="background:transparent; border:none; color:#9fb0c8; padding:6px 10px;" onclick="cerrarModalLink()">Cerrar</button>
+    </div>
+    <div class="modal-sub">
+      Línea: <strong id="linkLineName"></strong>
+      <span style="opacity:.6">·</span>
+      Unidad: <strong id="linkLineUnit"></strong>
+    </div>
+
+    <div class="link-grid">
+      <div>
+        <div class="modal-field">
+          <div class="input-group">
+            <input id="linkSearch" class="modal-select" placeholder="Buscar material en stock (nombre, categoría o grupo)..." oninput="renderLinkList()">
+            <button class="btn" onclick="refrescarStockParaLink()">↻ Refrescar stock</button>
+          </div>
+        </div>
+        <div class="link-list" id="linkList"></div>
+      </div>
+
+      <div class="side-card">
+        <div class="side-title">Selección</div>
+        <div class="side-big" id="linkPickName">—</div>
+        <div class="side-small" id="linkPickMeta">—</div>
+        <div class="side-small" id="linkPickStock">—</div>
+
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button class="btn" style="flex:1" onclick="desvincularLinea()">Desvincular</button>
+          <button class="btn btn-success" style="flex:1" onclick="confirmarVinculo()">Vincular</button>
+        </div>
+
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.08); font-size:12px; color:#9fb0c8;">
+          Recomendación: vincula por ID (no por nombre) para que el stock sea fiable aunque el texto del pedido no coincida.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase (Compat, igual que Stock) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
 <script>
-// === CONSTANTES ===
-let currentOrderId = null; 
+// =====================
+// === CONSTANTES APP ===
+// =====================
 const LS = localStorage;
 const KP = r => "prep_recepcion_" + r;
-const KM = r => "prep_meta_" + r; 
-const STOCK_DB_KEY = "taller_stock_v3_data"; 
+const KM = r => "prep_meta_" + r;
+const STOCK_DB_KEY = "taller_stock_v3_data";
 const uuid = () => Math.random().toString(36).substr(2,9);
 
-// Variables Globales
+// Estado
 let refActual = "";
 let estadoMateriales = [];
 let metaActual = {};
-let pendingCreation = null; 
+let pendingCreation = null;
 
-// === IMPORTACIÓN DE DATOS ===
-(function verificarImports() {
-    const encontrarNumero = (obj) => {
-        if (!obj) return null;
-        const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
-        for (let key of posiblesKeys) { if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]); }
-        if (obj.vars) { for (let key of posiblesKeys) { if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]); } }
-        return null; 
-    };
+// Estado modal vinculación
+let linkCtx = { index: null, selectedMatId: null };
 
-    const snapRaw = LS.getItem("latest_materials_v1");
-    if (snapRaw) {
-        try {
-            const snap = JSON.parse(snapRaw);
-            const ref = String(snap.referencia || "SIN_REF_" + Date.now());
-            let qty = encontrarNumero(snap) || 1;
+// ============================
+// === FIRESTORE (Stock Main) ===
+// ============================
+const USE_FIRESTORE = true;
+const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
-            let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
-            metaParaGuardar.referencia = ref;
-            metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
-            metaParaGuardar.unidades = qty;
-            metaParaGuardar.fecha = Date.now();
-            if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
+const firebaseConfig = {
+  apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+  authDomain: "gestion-taller-2a439.firebaseapp.com",
+  projectId: "gestion-taller-2a439",
+  storageBucket: "gestion-taller-2a439.firebasestorage.app",
+  messagingSenderId: "498579673950",
+  appId: "1:498579673950:web:eb626781a5b509957db5cf"
+};
 
-            LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
-            if (!LS.getItem(KP(ref))) LS.setItem(KP(ref), JSON.stringify(snap.materiales || []));
-            
-            LS.removeItem("latest_materials_v1");
-            LS.removeItem("pedido_en_preparacion"); 
-        } catch (e) { console.error("Error importando:", e); }
+let fbApp=null, fbAuth=null, fbDb=null;
+
+function fbEnsure(){
+  if(firebase.apps && firebase.apps.length){
+    fbApp = firebase.apps[0];
+  }else{
+    fbApp = firebase.initializeApp(firebaseConfig);
+  }
+  fbAuth = firebase.auth();
+  fbDb   = firebase.firestore();
+}
+async function fsLoginHidden(){
+  try{
+    if(!fbAuth.currentUser){
+      await fbAuth.signInAnonymously();
     }
-})();
-
-// === NAVEGACIÓN Y RENDERIZADO ===
-function volverIndex() { location.href = "index.html"; }
-function volverLista() {
-    document.getElementById("vistaDetalle").classList.add("hidden");
-    document.getElementById("vistaLista").classList.remove("hidden");
-    refActual = "";
-    cargarLista();
+  }catch(e){
+    console.warn("Auth anónimo no disponible:", e);
+  }
+}
+function fsDocRef(){
+  return fbDb.collection(FIRESTORE_DOC_PATH.col).doc(FIRESTORE_DOC_PATH.doc);
 }
 
+// Carga una vez Firestore -> local cache
+async function fsLoadStockOnceToLocal(){
+  if(!USE_FIRESTORE) return false;
+  try{
+    fbEnsure();
+    await fsLoginHidden();
+    const snap = await fsDocRef().get();
+    if(!snap.exists) return false;
+    const data = snap.data() || {};
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
+
+    LS.setItem(STOCK_DB_KEY, JSON.stringify({
+      materials: data.materials || [],
+      movements: data.movements || [],
+      categoryOrder: data.categoryOrder || []
+    }));
+    return true;
+  }catch(e){
+    console.warn("No se pudo cargar stock desde Firestore:", e);
+    return false;
+  }
+}
+
+// Inserción segura sin pisar arrays completos
+async function fsAppendMovement(mov){
+  if(!USE_FIRESTORE) return;
+  fbEnsure();
+  await fsLoginHidden();
+  const FieldValue = firebase.firestore.FieldValue;
+  await fsDocRef().set({
+    movements: FieldValue.arrayUnion(mov),
+    updatedAt: new Date().toISOString()
+  }, { merge:true });
+}
+async function fsAppendMaterialAndMovement(mat, mov){
+  if(!USE_FIRESTORE) return;
+  fbEnsure();
+  await fsLoginHidden();
+  const FieldValue = firebase.firestore.FieldValue;
+  await fsDocRef().set({
+    materials: FieldValue.arrayUnion(mat),
+    movements: FieldValue.arrayUnion(mov),
+    updatedAt: new Date().toISOString()
+  }, { merge:true });
+}
+
+// =======================
+// === IMPORTACIÓN DATOS ===
+// =======================
+(function verificarImports() {
+  const encontrarNumero = (obj) => {
+    if (!obj) return null;
+    const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
+    for (let key of posiblesKeys) {
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]);
+    }
+    if (obj.vars) {
+      for (let key of posiblesKeys) {
+        if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]);
+      }
+    }
+    return null;
+  };
+
+  const snapRaw = LS.getItem("latest_materials_v1");
+  if (snapRaw) {
+    try {
+      const snap = JSON.parse(snapRaw);
+      const ref = String(snap.referencia || "SIN_REF_" + Date.now());
+      let qty = encontrarNumero(snap) || 1;
+
+      let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
+      metaParaGuardar.referencia = ref;
+      metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
+      metaParaGuardar.unidades = qty;
+      metaParaGuardar.fecha = Date.now();
+      if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
+      if (metaParaGuardar.en_fabricacion === undefined) metaParaGuardar.en_fabricacion = false;
+
+      // Normaliza líneas (por si vienen sin campos)
+      const lines = (snap.materiales || []).map(l => ({
+        ...l,
+        qty_pedida: Number(l.qty_pedida || l.qty || l.cantidad || 0) || 0,
+        qty_recibida: Number(l.qty_recibida || 0) || 0,
+        aplicado_qty: Number(l.aplicado_qty || 0) || 0,
+        ok: !!l.ok,
+        note: l.note || "",
+        // NUEVO: vinculación
+        stock_matId: l.stock_matId || null,
+        stock_label: l.stock_label || ""
+      }));
+
+      LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
+      if (!LS.getItem(KP(ref))) LS.setItem(KP(ref), JSON.stringify(lines));
+
+      LS.removeItem("latest_materials_v1");
+      LS.removeItem("pedido_en_preparacion");
+    } catch (e) { console.error("Error importando:", e); }
+  }
+})();
+
+// =====================
+// === NAVEGACIÓN/UI  ===
+// =====================
+function volverIndex() { location.href = "index.html"; }
+function volverLista() {
+  document.getElementById("vistaDetalle").classList.add("hidden");
+  document.getElementById("vistaLista").classList.remove("hidden");
+  refActual = "";
+  cargarLista();
+}
+
+// =====================
+// === STOCK LOCAL DB ===
+// =====================
+function _db() {
+  const raw = LS.getItem(STOCK_DB_KEY);
+  const db = raw ? JSON.parse(raw) : { materials:[], movements:[] };
+  if(!db.materials) db.materials = [];
+  if(!db.movements) db.movements = [];
+  return db;
+}
+function _calcStockByMatId(db, matId){
+  if(!db || !Array.isArray(db.movements)) return 0;
+  return db.movements
+    .filter(m => m.matId === matId)
+    .reduce((acc, m) => (m.type === 'in' ? acc + (Number(m.qty)||0) : acc - (Number(m.qty)||0)), 0);
+}
+
+// Resolver material por nombre (fallback)
+function _findStockMatByNameWithHints(baseName, ironType, unit) {
+  const db = _db();
+  let candidates = [];
+
+  // Preferencia si es barra: intenta localizar por hint de hierro
+  if (ironType && unit && String(unit).toLowerCase().includes('barra')) {
+    const hint = (ironType === 'negro') ? 'negro' : 'galva';
+    const preferred = db.materials.find(m =>
+      (m.name||'').trim().toLowerCase() === String(baseName||'').trim().toLowerCase() &&
+      (((m.grp||'').toLowerCase().includes(hint)) || ((m.cat||'').toLowerCase().includes(hint)))
+    );
+    if (preferred) return { success:true, mat: preferred, db };
+  }
+
+  if (ironType) {
+    candidates.push(baseName + " " + ironType.charAt(0).toUpperCase() + ironType.slice(1));
+    candidates.push(baseName + " " + ironType.toLowerCase());
+  }
+  candidates.push(baseName);
+
+  let mat = null;
+  for (let candidate of candidates) {
+    mat = db.materials.find(m => (m.name||'').trim().toLowerCase() === String(candidate||'').trim().toLowerCase());
+    if (mat) break;
+  }
+
+  const searchedName = candidates.length > 0 ? candidates[0] : baseName;
+  if (!mat) return { success:false, searchedName, db };
+  return { success:true, mat, db };
+}
+
+// ===============================
+// === STOCK INFO POR LÍNEA (ID) ===
+// ===============================
+function getStockInfoForLine(linea){
+  const db = _db();
+
+  // 1) Si está vinculado, usar ID sí o sí
+  if(linea && linea.stock_matId){
+    const mat = db.materials.find(m => m.id === linea.stock_matId);
+    if(mat){
+      const stock = _calcStockByMatId(db, mat.id);
+      return { found:true, stock, name: mat.name, matId: mat.id, linked:true };
+    }
+    // Si el ID ya no existe en stock (caso raro), consideramos no encontrado
+    return { found:false, stock:null, name: linea.stock_label || linea.mat, linked:false, brokenLink:true };
+  }
+
+  // 2) Fallback: búsqueda por nombre (como antes)
+  const ironType = (linea.unit === 'barra') ? (metaActual.tipo_hierro || null) : null;
+  const check = _findStockMatByNameWithHints(linea.mat, ironType, linea.unit);
+  if(!check.success) return { found:false, stock:null, name: check.searchedName, linked:false };
+  const stock = _calcStockByMatId(check.db, check.mat.id);
+  return { found:true, stock, name: check.mat.name, matId: check.mat.id, linked:false };
+}
+
+// =======================
+// === LISTA DE PEDIDOS ===
+// =======================
 function cargarLista() {
-    const lista = document.getElementById("lista");
-    lista.innerHTML = "";
-    const keys = Object.keys(LS).filter(k => k.startsWith("prep_recepcion_"));
-    if(keys.length === 0) { lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>"; return; }
+  const lista = document.getElementById("lista");
+  lista.innerHTML = "";
+  const keys = Object.keys(LS).filter(k => k.startsWith("prep_recepcion_"));
+  if(keys.length === 0) { lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>"; return; }
 
-    keys.reverse().forEach(k => {
-        const ref = k.replace("prep_recepcion_", "");
-        const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
-        const lines = JSON.parse(LS.getItem(k) || "[]");
-        const totalLines = lines.length;
-        const completeLines = lines.filter(l => (l.aplicado_qty || 0) >= (l.qty_pedida || 0)).length;
-        
-        let badgeClass = "b-p"; let badgeText = "Pendiente";
-        if (totalLines > 0 && completeLines > 0 && completeLines < totalLines) { badgeClass = "b-pa"; badgeText = "Parcial"; }
-        else if (totalLines > 0 && completeLines === totalLines) { badgeClass = "b-c"; badgeText = "Completo"; }
+  keys.reverse().forEach(k => {
+    const ref = k.replace("prep_recepcion_", "");
+    const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
+    const lines = JSON.parse(LS.getItem(k) || "[]");
 
-        const item = document.createElement("div");
-        item.className = "item";
-        item.innerHTML = `
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <span style="font-weight:bold; color:#fff">${ref}</span>
-                <span class="badge ${badgeClass}">${badgeText}</span>
-            </div>
-            <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)
-            </div>`;
-        item.onclick = () => abrirPedido(ref);
-        lista.appendChild(item);
-    });
+    const totalLines = lines.length;
+    const completeLines = lines.filter(l => (Number(l.aplicado_qty)||0) >= (Number(l.qty_pedida)||0)).length;
+
+    let badgeClass = "b-p"; let badgeText = "Pendiente";
+    if (totalLines > 0 && completeLines > 0 && completeLines < totalLines) { badgeClass = "b-pa"; badgeText = "Parcial"; }
+    else if (totalLines > 0 && completeLines === totalLines) { badgeClass = "b-c"; badgeText = "Completo"; }
+
+    const fab = !!meta.en_fabricacion;
+    const fabHtml = fab ? `<div style="margin-top:6px;"><span class="badge b-fab">En fabricación</span></div>` : "";
+
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px; align-items:flex-start;">
+        <span style="font-weight:bold; color:#fff">${ref}</span>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)
+      </div>
+      ${fabHtml}
+    `;
+    item.onclick = async () => {
+      await fsLoadStockOnceToLocal(); // refresca cache antes de abrir
+      abrirPedido(ref);
+    };
+    lista.appendChild(item);
+  });
 }
 
 function abrirPedido(ref) {
-    refActual = ref;
-    document.getElementById("vistaLista").classList.add("hidden");
-    document.getElementById("vistaDetalle").classList.remove("hidden");
-    metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
-    estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
-    
-    document.getElementById("ref").textContent = ref;
-    document.getElementById("concepto").textContent = metaActual.concepto || "";
-    document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
-    
-    const radios = document.getElementsByName("th");
-    radios.forEach(r => r.checked = (r.value === metaActual.tipo_hierro));
-    renderTabla();
+  refActual = ref;
+  document.getElementById("vistaLista").classList.add("hidden");
+  document.getElementById("vistaDetalle").classList.remove("hidden");
+
+  metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
+  if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
+
+  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]").map(l => ({
+    ...l,
+    qty_pedida: Number(l.qty_pedida || 0) || 0,
+    qty_recibida: Number(l.qty_recibida || 0) || 0,
+    aplicado_qty: Number(l.aplicado_qty || 0) || 0,
+    ok: !!l.ok,
+    note: l.note || "",
+    stock_matId: l.stock_matId || null,
+    stock_label: l.stock_label || ""
+  }));
+
+  document.getElementById("ref").textContent = ref;
+  document.getElementById("concepto").textContent = metaActual.concepto || "";
+  document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
+
+  const radios = document.getElementsByName("th");
+  radios.forEach(r => r.checked = (r.value === metaActual.tipo_hierro));
+  renderTabla();
 }
 
 function guardarUnidadesManual() {
-    const val = parseFloat(document.getElementById("inputUnidades").value) || 1;
-    metaActual.unidades = val;
-    LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  const val = parseFloat(document.getElementById("inputUnidades").value) || 1;
+  metaActual.unidades = val;
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
 }
 
+// ==========================
+// === RENDER TABLA LÍNEAS ===
+// ==========================
 function renderTabla() {
-    const tbodyBarras = document.getElementById("tbodyBarras");
-    const tbodyUnidades = document.getElementById("tbodyUnidades");
-    tbodyBarras.innerHTML = ""; tbodyUnidades.innerHTML = "";
-    let hasBarras = false; let hasUnidades = false;
+  const tbodyBarras = document.getElementById("tbodyBarras");
+  const tbodyUnidades = document.getElementById("tbodyUnidades");
+  tbodyBarras.innerHTML = ""; tbodyUnidades.innerHTML = "";
+  let hasBarras = false; let hasUnidades = false;
 
-    estadoMateriales.forEach((linea, index) => {
-        const pedida = parseFloat(linea.qty_pedida) || 0;
-        const recibida = parseFloat(linea.qty_recibida) || 0;
-        const yaAplicada = parseFloat(linea.aplicado_qty) || 0;
-        const diff = recibida - yaAplicada;
-        
-        const isComplete = linea.ok || (pedida > 0 && recibida >= pedida) || (pedida > 0 && yaAplicada >= pedida);
-        const rowClass = isComplete ? "ok" : "";
-        
-        let btnHtml = "";
-        if (diff > 0) btnHtml = `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
-        else if (yaAplicada > 0) btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
-        else btnHtml = `<span style="opacity:0.2">-</span>`;
+  estadoMateriales.forEach((linea, index) => {
+    const pedida = parseFloat(linea.qty_pedida) || 0;
+    const recibida = parseFloat(linea.qty_recibida) || 0;
+    const yaAplicada = parseFloat(linea.aplicado_qty) || 0;
+    const diff = recibida - yaAplicada;
 
-        const tr = document.createElement("tr");
-        tr.className = rowClass;
-        tr.innerHTML = `
-            <td><input type="checkbox" ${linea.ok ? "checked" : ""} onchange="toggleOk(${index}, this.checked)"></td>
-            <td><div style="font-weight:600">${linea.mat}</div>${yaAplicada > 0 ? `<div style="font-size:10px; opacity:0.6">Sumado: ${yaAplicada}</div>` : ''}</td>
-            <td>${pedida} <span style="font-size:10px;opacity:0.5">${linea.unit || 'ud'}</span></td>
-            <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
-            <td>${btnHtml}</td>
-            <td><input type="text" value="${linea.note || ''}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>`;
+    const isComplete = linea.ok || (pedida > 0 && recibida >= pedida) || (pedida > 0 && yaAplicada >= pedida);
+    const rowClass = isComplete ? "ok" : "";
 
-        if (linea.unit === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
-        else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
+    let btnHtml = "";
+    if (diff > 0) btnHtml = `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
+    else if (yaAplicada > 0) btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
+    else btnHtml = `<span style="opacity:0.2">-</span>`;
+
+    // Stock info (por ID o fallback)
+    const info = getStockInfoForLine(linea);
+    let stockHtml = "";
+    if(info.found){
+      stockHtml = `<div class="stock-mini">Stock: <strong>${info.stock}</strong></div>`;
+    }else{
+      stockHtml = `<div class="stock-mini" style="opacity:0.45;">Stock: (no vinculado)</div>`;
+    }
+
+    // Vínculo visible
+    const linkLabel = (linea.stock_matId && info.found) ? (info.name || linea.stock_label || "Material vinculado") : (linea.stock_matId && !info.found ? (linea.stock_label || "Vínculo roto") : "Sin vincular");
+    const linkState = (linea.stock_matId && info.found) ? "Vinculado a" : (linea.stock_matId && !info.found ? "Vínculo" : "Vincular");
+    const linkHint = (linea.stock_matId && info.found) ? "Cambiar vínculo" : "Vincular";
+
+    const linkHtml = `
+      <div class="link-mini">
+        <span class="link-pill" onclick="abrirModalLink(${index})" title="${linkHint}">
+          🔗 <span style="opacity:.8">${linkState}:</span> <strong>${escapeHtml(linkLabel)}</strong>
+        </span>
+        <span class="link-pill" onclick="editarNombreLinea(${index})" title="Editar texto del pedido (no cambia el stock)">
+          ✎ <span style="opacity:.8">Editar nombre</span>
+        </span>
+      </div>
+    `;
+
+    const tr = document.createElement("tr");
+    tr.className = rowClass;
+    tr.innerHTML = `
+      <td><input type="checkbox" ${linea.ok ? "checked" : ""} onchange="toggleOk(${index}, this.checked)"></td>
+      <td>
+        <div style="font-weight:600">${escapeHtml(linea.mat)}</div>
+        ${stockHtml}
+        ${linkHtml}
+        ${yaAplicada > 0 ? `<div style="font-size:10px; opacity:0.6">Sumado: ${yaAplicada}</div>` : ''}
+      </td>
+      <td>${pedida} <span style="font-size:10px;opacity:0.5">${escapeHtml(linea.unit || 'ud')}</span></td>
+      <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
+      <td>
+        <div style="display:flex; gap:8px; align-items:center;">
+          ${btnHtml}
+          <button class="btn-mini" onclick="abrirModalLink(${index})" title="Vincular o cambiar vínculo">Vincular</button>
+        </div>
+      </td>
+      <td><input type="text" value="${escapeHtml(linea.note || '')}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
+    `;
+
+    if (linea.unit === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
+    else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
+  });
+
+  document.getElementById("bloqueBarras").classList.toggle("hidden", !hasBarras);
+  document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
+  document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
+
+  // Auto-retirada: solo si en fabricación y TODO completo
+  if(metaActual && metaActual.en_fabricacion){
+    const totalLines = estadoMateriales.length;
+    const completeLines = estadoMateriales.filter(l => (Number(l.aplicado_qty)||0) >= (Number(l.qty_pedida)||0)).length;
+    if(totalLines > 0 && completeLines === totalLines){
+      LS.removeItem(KP(refActual));
+      LS.removeItem(KM(refActual));
+      alert("✅ Pedido completo: se ha retirado de Preparación.");
+      volverLista();
+    }
+  }
+}
+
+// ===============================
+// === VINCULACIÓN: MODAL STOCK ===
+// ===============================
+function abrirModalLink(index){
+  linkCtx.index = index;
+  linkCtx.selectedMatId = null;
+
+  const linea = estadoMateriales[index];
+  document.getElementById("linkLineName").textContent = linea.mat || "";
+  document.getElementById("linkLineUnit").textContent = linea.unit || "ud";
+  document.getElementById("linkSearch").value = "";
+
+  // Preselección si ya está vinculado
+  if(linea.stock_matId){
+    linkCtx.selectedMatId = linea.stock_matId;
+  }
+
+  // Render lista
+  renderLinkList();
+  renderLinkSelectionCard();
+
+  document.getElementById("modalLink").classList.add("active");
+}
+function cerrarModalLink(){
+  document.getElementById("modalLink").classList.remove("active");
+  linkCtx = { index:null, selectedMatId:null };
+}
+
+async function refrescarStockParaLink(){
+  await fsLoadStockOnceToLocal();
+  renderLinkList();
+  renderLinkSelectionCard();
+}
+
+function renderLinkList(){
+  const db = _db();
+  const list = document.getElementById("linkList");
+  const q = (document.getElementById("linkSearch").value || "").trim().toLowerCase();
+
+  // Orden: primero los que “contienen” el texto del pedido, luego el resto
+  const idx = linkCtx.index;
+  const linea = (idx !== null) ? estadoMateriales[idx] : null;
+  const hint = linea ? String(linea.mat||"").trim().toLowerCase() : "";
+
+  let mats = Array.isArray(db.materials) ? db.materials.slice() : [];
+  if(q){
+    mats = mats.filter(m => {
+      const name = String(m.name||"").toLowerCase();
+      const cat  = String(m.cat||"").toLowerCase();
+      const grp  = String(m.grp||"").toLowerCase();
+      return name.includes(q) || cat.includes(q) || grp.includes(q);
     });
+  }
 
-    document.getElementById("bloqueBarras").classList.toggle("hidden", !hasBarras);
-    document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
-    document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
+  // Ranking simple por relevancia (si hay hint)
+  if(hint){
+    mats.sort((a,b)=>{
+      const an = String(a.name||"").toLowerCase();
+      const bn = String(b.name||"").toLowerCase();
+      const as = (an.includes(hint) ? 0 : 1);
+      const bs = (bn.includes(hint) ? 0 : 1);
+      if(as !== bs) return as - bs;
+      return an.localeCompare(bn);
+    });
+  }else{
+    mats.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  }
+
+  if(mats.length === 0){
+    list.innerHTML = `<div class="link-row" style="cursor:default; opacity:.7">Sin resultados.</div>`;
+    return;
+  }
+
+  const dbNow = _db();
+  list.innerHTML = "";
+  mats.slice(0, 400).forEach(m => { // límite defensivo
+    const stock = _calcStockByMatId(dbNow, m.id);
+    const row = document.createElement("div");
+    row.className = "link-row" + (linkCtx.selectedMatId === m.id ? " active" : "");
+    row.innerHTML = `
+      <div class="name">${escapeHtml(m.name || "")}</div>
+      <div class="meta">
+        <span>${escapeHtml((m.cat||"") + " > " + (m.grp||""))}</span>
+        <span><strong>${stock}</strong> ${escapeHtml(m.unit||"")}</span>
+      </div>
+    `;
+    row.onclick = ()=>{
+      linkCtx.selectedMatId = m.id;
+      // repintar selección visual
+      document.querySelectorAll("#linkList .link-row").forEach(el=>el.classList.remove("active"));
+      row.classList.add("active");
+      renderLinkSelectionCard();
+    };
+    list.appendChild(row);
+  });
 }
 
-// === LÓGICA DE STOCK (CORE) ===
-function _db() {
-    const raw = LS.getItem(STOCK_DB_KEY);
-    const db = raw ? JSON.parse(raw) : { materials:[], movements:[] };
-    if(!db.materials) db.materials = [];
-    if(!db.movements) db.movements = [];
-    return db;
+function renderLinkSelectionCard(){
+  const db = _db();
+  const pickName = document.getElementById("linkPickName");
+  const pickMeta = document.getElementById("linkPickMeta");
+  const pickStock = document.getElementById("linkPickStock");
+
+  if(!linkCtx.selectedMatId){
+    pickName.textContent = "—";
+    pickMeta.textContent = "—";
+    pickStock.textContent = "—";
+    return;
+  }
+  const m = db.materials.find(x=>x.id===linkCtx.selectedMatId);
+  if(!m){
+    pickName.textContent = "Material no encontrado";
+    pickMeta.textContent = "—";
+    pickStock.textContent = "—";
+    return;
+  }
+  const stock = _calcStockByMatId(db, m.id);
+  pickName.textContent = m.name || "";
+  pickMeta.textContent = (m.cat||"") + " > " + (m.grp||"");
+  pickStock.textContent = "Stock actual: " + stock + " " + (m.unit||"");
 }
 
-function _addToRealStock(baseName, qty, ironType, unit) {
-    const db = _db();
-    
-    // Lógica de búsqueda
-    let candidates = [];
-    if (ironType && unit && unit.toLowerCase().includes('barra')) {
-      const hint = (ironType === 'negro') ? 'negro' : 'galva';
-      const preferred = db.materials.find(m => 
-        (m.name||'').trim().toLowerCase() === baseName.trim().toLowerCase() &&
-        (((m.grp||'').toLowerCase().includes(hint)) || ((m.cat||'').toLowerCase().includes(hint)))
-      );
-      if (preferred) return { success: true, mat: preferred, db: db };
-    }
+function confirmarVinculo(){
+  const idx = linkCtx.index;
+  if(idx === null) return;
+  if(!linkCtx.selectedMatId){
+    alert("Selecciona un material de stock para vincular.");
+    return;
+  }
+  const db = _db();
+  const m = db.materials.find(x=>x.id===linkCtx.selectedMatId);
+  if(!m){
+    alert("No se encontró el material seleccionado en el stock.");
+    return;
+  }
 
-    if (ironType) {
-        candidates.push(baseName + " " + ironType.charAt(0).toUpperCase() + ironType.slice(1)); 
-        candidates.push(baseName + " " + ironType.toLowerCase());
-    }
-    candidates.push(baseName);
+  // Guardar vínculo en la línea
+  estadoMateriales[idx].stock_matId = m.id;
+  estadoMateriales[idx].stock_label = m.name || "";
 
-    let mat = null;
-    for (let candidate of candidates) {
-        mat = db.materials.find(m => m.name.trim().toLowerCase() === candidate.trim().toLowerCase());
-        if (mat) break;
-    }
-    
-    // Definimos el nombre que se intentará crear si falla
-    const searchedName = candidates.length > 0 ? candidates[0] : baseName;
-
-    if (!mat) return { success: false, searchedName: searchedName };
-
-    return { success: true, mat: mat, db: db };
+  guardarEstadoLocal();
+  cerrarModalLink();
+  renderTabla();
 }
 
-// === FUNCIÓN PRINCIPAL DE GUARDADO ===
+function desvincularLinea(){
+  const idx = linkCtx.index;
+  if(idx === null) return;
+
+  if(!confirm("¿Desvincular esta línea del stock?")) return;
+
+  estadoMateriales[idx].stock_matId = null;
+  estadoMateriales[idx].stock_label = "";
+
+  guardarEstadoLocal();
+  cerrarModalLink();
+  renderTabla();
+}
+
+function editarNombreLinea(index){
+  const linea = estadoMateriales[index];
+  const nuevo = prompt("Editar nombre del material (solo texto del pedido):", linea.mat || "");
+  if(nuevo === null) return;
+  const v = String(nuevo).trim();
+  if(!v){ alert("Nombre no válido."); return; }
+  linea.mat = v;
+  guardarEstadoLocal();
+  renderTabla();
+}
+
+// ===============================
+// === AÑADIR RECEPCIÓN A STOCK ===
+// ===============================
 function guardarLinea(index) {
-    const linea = estadoMateriales[index];
-    const recibido = parseFloat(linea.qty_recibida) || 0;
-    const yaAplicado = parseFloat(linea.aplicado_qty) || 0;
-    const diff = recibido - yaAplicado;
+  const linea = estadoMateriales[index];
+  const recibido = parseFloat(linea.qty_recibida) || 0;
+  const yaAplicado = parseFloat(linea.aplicado_qty) || 0;
+  const diff = recibido - yaAplicado;
+  if (diff <= 0) return;
 
-    if (diff <= 0) return; 
+  // Validación hierro
+  let tipoHierro = null;
+  if (linea.unit === 'barra') {
+    tipoHierro = metaActual.tipo_hierro;
+    if (!tipoHierro) {
+      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
+      const p = document.getElementById("panelHierro");
+      p.style.boxShadow = "0 0 0 2px #ef4444";
+      setTimeout(()=>p.style.boxShadow="none", 2000);
+      return;
+    }
+  }
 
-    // Validación Hierro
-    let tipoHierro = null;
-    if (linea.unit === 'barra') {
-        tipoHierro = metaActual.tipo_hierro; 
-        if (!tipoHierro) {
-            alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
-            const p = document.getElementById("panelHierro");
-            p.style.boxShadow = "0 0 0 2px #ef4444";
-            setTimeout(()=>p.style.boxShadow="none", 2000);
-            return;
-        }
+  const db = _db();
+
+  // 1) Si hay vínculo por ID, sumar directo
+  if(linea.stock_matId){
+    const mat = db.materials.find(m => m.id === linea.stock_matId);
+    if(!mat){
+      alert("⚠️ El material vinculado ya no existe en el stock. Vuelve a vincular.");
+      abrirModalLink(index);
+      return;
     }
 
-    // 1. Intentar encontrar y sumar
-    const check = _addToRealStock(linea.mat, diff, tipoHierro, linea.unit);
-
-    if (!check.success) {
-        // NO EXISTE -> ABRIR MODAL
-        abrirModalCreacion({
-            name: check.searchedName,
-            unit: linea.unit, // Pasamos la unidad original
-            diff: diff,       // Pasamos la cantidad calculada
-            index: index
-        });
-        return;
-    }
-
-    // SI EXISTE -> ACTUALIZAR DB
-    const db = check.db;
-    db.movements.push({ id: uuid(), matId: check.mat.id, type: 'in', qty: diff, date: new Date().toISOString() });
+    const mov = { id: uuid(), matId: mat.id, type: 'in', qty: diff, date: new Date().toISOString() };
+    db.movements.push(mov);
     LS.setItem(STOCK_DB_KEY, JSON.stringify(db));
+    fsAppendMovement(mov).catch(err => console.warn("No se pudo subir movimiento:", err));
 
-    const newTotal = db.movements.filter(m => m.matId === check.mat.id).reduce((acc, m) => m.type === 'in' ? acc + m.qty : acc - m.qty, 0);
+    const newTotal = _calcStockByMatId(db, mat.id);
 
-    // Actualizar UI Local
-    linea.aplicado_qty = recibido; 
+    linea.aplicado_qty = recibido;
     guardarEstadoLocal();
-    
-    let msg = `✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`;
-    if (tipoHierro && !check.mat.name.toLowerCase().includes(tipoHierro.toLowerCase())) msg += `\n(Se sumó al genérico)`;
-    
-    alert(msg);
+
+    alert(`✅ Stock Actualizado.\nMaterial: ${mat.name}\nTotal: ${newTotal}`);
     renderTabla();
-}
+    return;
+  }
 
-// === MODAL INTERACTIVO DE CREACIÓN ===
-function abrirModalCreacion(data) {
-    pendingCreation = data; // Guardamos contexto
-    document.getElementById("modMatName").textContent = data.name;
-    
-    // Cargar Selects desde DB
-    const db = _db();
-    const cats = [...new Set(db.materials.map(m => m.cat))].sort();
-    
-    const selCat = document.getElementById("modCatSelect");
-    selCat.innerHTML = `<option value="" disabled selected>-- Elige Categoría --</option>` + 
-                       cats.map(c => `<option value="${c}">${c}</option>`).join("");
-    
-    document.getElementById("modGrpSelect").innerHTML = `<option value="" disabled selected>-- Elige Categoría primero --</option>`;
-    
-    // Configurar valores por defecto
-    document.getElementById("modQtyInput").value = data.diff; // Cantidad del pedido
-    document.getElementById("modUnitInput").value = data.unit || "ud"; // Unidad del pedido
-    document.getElementById("modMinInput").value = "";
-
-    // Resetear inputs de texto
-    document.getElementById("modCatInput").value = "";
-    document.getElementById("modGrpInput").value = "";
-    document.getElementById("modCatInput").classList.add("hidden");
-    document.getElementById("modGrpInput").classList.add("hidden");
-    document.getElementById("modCatSelect").classList.remove("hidden");
-    document.getElementById("modGrpSelect").classList.remove("hidden");
-
-    document.getElementById("modalCrear").classList.add("active");
-}
-
-function cerrarModalCreacion() {
-    document.getElementById("modalCrear").classList.remove("active");
-    pendingCreation = null;
-}
-
-function toggleInput(type) {
-    const sel = document.getElementById(type === 'cat' ? "modCatSelect" : "modGrpSelect");
-    const inp = document.getElementById(type === 'cat' ? "modCatInput" : "modGrpInput");
-    
-    if (inp.classList.contains("hidden")) {
-        sel.classList.add("hidden");
-        inp.classList.remove("hidden");
-        inp.focus();
-    } else {
-        inp.classList.add("hidden");
-        sel.classList.remove("hidden");
+  // 2) Si no hay vínculo, intentar por nombre (fallback)
+  const check = _findStockMatByNameWithHints(linea.mat, tipoHierro, linea.unit);
+  if (!check.success) {
+    // Antes de crear: ofrecer vincular
+    if(confirm("Este material no coincide con Stock.\n\n¿Quieres VINCULARLO a un material existente del stock? (Recomendado)")){
+      abrirModalLink(index);
+      return;
     }
+    // Si no, crear ficha
+    abrirModalCreacion({
+      name: check.searchedName,
+      unit: linea.unit,
+      diff: diff,
+      index: index
+    });
+    return;
+  }
+
+  // Existe por nombre: sumar
+  const mov = { id: uuid(), matId: check.mat.id, type: 'in', qty: diff, date: new Date().toISOString() };
+  check.db.movements.push(mov);
+  LS.setItem(STOCK_DB_KEY, JSON.stringify(check.db));
+  fsAppendMovement(mov).catch(err => console.warn("No se pudo subir movimiento:", err));
+
+  const newTotal = _calcStockByMatId(check.db, check.mat.id);
+
+  linea.aplicado_qty = recibido;
+  guardarEstadoLocal();
+
+  let msg = `✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`;
+  if (tipoHierro && !String(check.mat.name||"").toLowerCase().includes(tipoHierro.toLowerCase())) msg += `\n(Se sumó al genérico)`;
+
+  alert(msg);
+  renderTabla();
 }
 
+// ===============================
+// === MODAL CREACIÓN MATERIAL ===
+// ===============================
+function abrirModalCreacion(data) {
+  pendingCreation = data;
+  document.getElementById("modMatName").textContent = data.name;
+
+  const db = _db();
+  const cats = [...new Set(db.materials.map(m => m.cat).filter(Boolean))].sort();
+
+  const selCat = document.getElementById("modCatSelect");
+  selCat.innerHTML =
+    `<option value="" disabled selected>-- Elige Categoría --</option>` +
+    cats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+
+  document.getElementById("modGrpSelect").innerHTML = `<option value="" disabled selected>-- Elige Categoría primero --</option>`;
+
+  document.getElementById("modQtyInput").value = data.diff;
+  document.getElementById("modUnitInput").value = data.unit || "ud";
+  document.getElementById("modMinInput").value = "";
+
+  document.getElementById("modCatInput").value = "";
+  document.getElementById("modGrpInput").value = "";
+  document.getElementById("modCatInput").classList.add("hidden");
+  document.getElementById("modGrpInput").classList.add("hidden");
+  document.getElementById("modCatSelect").classList.remove("hidden");
+  document.getElementById("modGrpSelect").classList.remove("hidden");
+
+  document.getElementById("modalCrear").classList.add("active");
+}
+function cerrarModalCreacion() {
+  document.getElementById("modalCrear").classList.remove("active");
+  pendingCreation = null;
+}
+function toggleInput(type) {
+  const sel = document.getElementById(type === 'cat' ? "modCatSelect" : "modGrpSelect");
+  const inp = document.getElementById(type === 'cat' ? "modCatInput" : "modGrpInput");
+
+  if (inp.classList.contains("hidden")) {
+    sel.classList.add("hidden");
+    inp.classList.remove("hidden");
+    inp.focus();
+  } else {
+    inp.classList.add("hidden");
+    sel.classList.remove("hidden");
+  }
+}
 function cargarGruposModal() {
-    const db = _db();
-    const cat = document.getElementById("modCatSelect").value;
-    const grps = [...new Set(db.materials.filter(m => m.cat === cat).map(m => m.grp))].sort();
-    
-    const selGrp = document.getElementById("modGrpSelect");
-    selGrp.innerHTML = `<option value="" disabled selected>-- Elige Grupo --</option>` + 
-                       grps.map(g => `<option value="${g}">${g}</option>`).join("");
+  const db = _db();
+  const cat = document.getElementById("modCatSelect").value;
+  const grps = [...new Set(db.materials.filter(m => m.cat === cat).map(m => m.grp).filter(Boolean))].sort();
+
+  const selGrp = document.getElementById("modGrpSelect");
+  selGrp.innerHTML =
+    `<option value="" disabled selected>-- Elige Grupo --</option>` +
+    grps.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
 }
 
 function guardarNuevoMaterial() {
-    if (!pendingCreation) return;
+  if (!pendingCreation) return;
 
-    // Obtener valores
-    const catInput = document.getElementById("modCatInput");
-    const catVal = !catInput.classList.contains("hidden") ? catInput.value.trim() : document.getElementById("modCatSelect").value;
-    const grpInput = document.getElementById("modGrpInput");
-    const grpVal = !grpInput.classList.contains("hidden") ? grpInput.value.trim() : document.getElementById("modGrpSelect").value;
-    
-    // Nuevos campos: Cantidad, Unidad, Mínimo
-    const unitVal = document.getElementById("modUnitInput").value.trim() || "ud";
-    const minVal = parseInt(document.getElementById("modMinInput").value) || 0;
-    const qtyVal = parseFloat(document.getElementById("modQtyInput").value) || 0;
+  const catInput = document.getElementById("modCatInput");
+  const catVal = !catInput.classList.contains("hidden") ? catInput.value.trim() : document.getElementById("modCatSelect").value;
+  const grpInput = document.getElementById("modGrpInput");
+  const grpVal = !grpInput.classList.contains("hidden") ? grpInput.value.trim() : document.getElementById("modGrpSelect").value;
 
-    if (!catVal || !grpVal) { alert("Por favor, indica Categoría y Grupo."); return; }
-    if (qtyVal <= 0) { alert("La cantidad a sumar debe ser mayor que 0."); return; }
+  const unitVal = document.getElementById("modUnitInput").value.trim() || "ud";
+  const minVal = parseInt(document.getElementById("modMinInput").value) || 0;
+  const qtyVal = parseFloat(document.getElementById("modQtyInput").value) || 0;
 
-    // 1. Crear en DB
-    const db = _db();
-    const newId = uuid();
-    db.materials.push({
-        id: newId,
-        cat: catVal,
-        grp: grpVal,
-        name: pendingCreation.name,
-        unit: unitVal, 
-        min: minVal
-    });
-    
-    // 2. Añadir Movimiento (usando la cantidad definida por el usuario)
-    db.movements.push({
-        id: uuid(),
-        matId: newId,
-        type: 'in',
-        qty: qtyVal, // Aquí usamos el valor editado
-        date: new Date().toISOString()
-    });
+  if (!catVal || !grpVal) { alert("Por favor, indica Categoría y Grupo."); return; }
+  if (qtyVal <= 0) { alert("La cantidad a sumar debe ser mayor que 0."); return; }
 
-    LS.setItem(STOCK_DB_KEY, JSON.stringify(db));
+  const db = _db();
+  const newId = uuid();
+  const mat = { id: newId, cat: catVal, grp: grpVal, name: pendingCreation.name, unit: unitVal, min: minVal };
+  const mov = { id: uuid(), matId: newId, type: 'in', qty: qtyVal, date: new Date().toISOString() };
 
-    // 3. Finalizar (Marcamos la línea como aplicada según lo recibido en el pedido, aunque el stock haya sido diferente)
-    const linea = estadoMateriales[pendingCreation.index];
-    linea.aplicado_qty = parseFloat(linea.qty_recibida);
-    guardarEstadoLocal();
-    
-    alert(`✅ Ficha creada y stock añadido.\n\nUbicación: ${catVal} > ${grpVal}\nCantidad sumada: ${qtyVal} ${unitVal}`);
-    renderTabla();
-    cerrarModalCreacion();
+  db.materials.push(mat);
+  db.movements.push(mov);
+  LS.setItem(STOCK_DB_KEY, JSON.stringify(db));
+
+  fsAppendMaterialAndMovement(mat, mov).catch(err => console.warn("No se pudo subir material+mov:", err));
+
+  // Marcar línea aplicada
+  const linea = estadoMateriales[pendingCreation.index];
+  linea.aplicado_qty = parseFloat(linea.qty_recibida);
+
+  // (opcional) auto-vincular la línea a este nuevo material para futuras operaciones
+  linea.stock_matId = newId;
+  linea.stock_label = mat.name || "";
+
+  guardarEstadoLocal();
+
+  alert(`✅ Ficha creada y stock añadido.\n\nUbicación: ${catVal} > ${grpVal}\nCantidad sumada: ${qtyVal} ${unitVal}`);
+  renderTabla();
+  cerrarModalCreacion();
 }
 
-// === OTROS HELPERS ===
+// ===============================
+// === OTROS HELPERS / ESTADOS ===
+// ===============================
 function toggleOk(index, isChecked) {
-    const linea = estadoMateriales[index];
-    linea.ok = isChecked;
-    if (isChecked) {
-        const pedida = parseFloat(linea.qty_pedida) || 0;
-        if (pedida > 0) linea.qty_recibida = pedida;
-    }
-    guardarEstadoLocal();
-    renderTabla();
+  const linea = estadoMateriales[index];
+  linea.ok = isChecked;
+  if (isChecked) {
+    const pedida = parseFloat(linea.qty_pedida) || 0;
+    if (pedida > 0) linea.qty_recibida = pedida;
+  }
+  guardarEstadoLocal();
+  renderTabla();
 }
 
 function updateQty(index, inputEl) {
-    let val = parseFloat(inputEl.value);
-    if (isNaN(val)) val = 0;
-    const linea = estadoMateriales[index];
-    const pedida = parseFloat(linea.qty_pedida) || 0;
-    if (pedida > 0 && val > pedida) { val = pedida; inputEl.value = val; inputEl.classList.remove("flash-limit"); void inputEl.offsetWidth; inputEl.classList.add("flash-limit"); }
-    if (val < 0) { val = 0; inputEl.value = 0; }
-    linea.qty_recibida = val;
-    linea.ok = (pedida > 0 && val >= pedida);
-    LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
-    inputEl.onblur = () => renderTabla();
+  let val = parseFloat(inputEl.value);
+  if (isNaN(val)) val = 0;
+  const linea = estadoMateriales[index];
+  const pedida = parseFloat(linea.qty_pedida) || 0;
+  if (pedida > 0 && val > pedida) {
+    val = pedida;
+    inputEl.value = val;
+    inputEl.classList.remove("flash-limit"); void inputEl.offsetWidth; inputEl.classList.add("flash-limit");
+  }
+  if (val < 0) { val = 0; inputEl.value = 0; }
+  linea.qty_recibida = val;
+  linea.ok = (pedida > 0 && val >= pedida);
+  LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
+  inputEl.onblur = () => renderTabla();
 }
 
 function updateNote(index, txt) { estadoMateriales[index].note = txt; guardarEstadoLocal(); }
-function marcarTodoOk() { estadoMateriales.forEach(l => { l.ok = true; const pedida = parseFloat(l.qty_pedida)||0; if(pedida>0) l.qty_recibida=pedida; }); guardarEstadoLocal(); renderTabla(); }
+function marcarTodoOk() {
+  estadoMateriales.forEach(l => {
+    l.ok = true;
+    const pedida = parseFloat(l.qty_pedida)||0;
+    if(pedida>0) l.qty_recibida = pedida;
+  });
+  guardarEstadoLocal();
+  renderTabla();
+}
 function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
-function guardarTipoHierro() { const radios=document.getElementsByName("th"); let val=""; radios.forEach(r=>{if(r.checked)val=r.value}); metaActual.tipo_hierro=val; LS.setItem(KM(refActual), JSON.stringify(metaActual)); }
+function guardarTipoHierro() {
+  const radios=document.getElementsByName("th");
+  let val="";
+  radios.forEach(r=>{ if(r.checked) val=r.value; });
+  metaActual.tipo_hierro = val;
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+}
 
+// ===============================
+// === FABRICACIÓN (NO BORRAR) ===
+// ===============================
 function confirmarTodoRecepcion() {
-    const hayBarras = estadoMateriales.some(l => l.unit === 'barra');
-    if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
-    const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
-    if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
-    if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}`)) return;
-    mandarAFabricacion();
+  const hayBarras = estadoMateriales.some(l => l.unit === 'barra');
+  if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
+
+  const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
+  if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
+
+  // Aquí ya NO exigimos tener material completo
+  if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido quedará EN FABRICACIÓN y no desaparecerá de Preparación.)`)) return;
+  mandarAFabricacion();
 }
 
 function mandarAFabricacion() {
-    if (!refActual) return;
-    const inputVal = document.getElementById("inputUnidades").value;
-    const cantidadFinal = parseFloat(inputVal) || 0;
-    const rawDb = LS.getItem("ldh_db");
-    let db = { deliveries: [] };
-    if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
+  if (!refActual) return;
 
-    const idx = db.deliveries.findIndex(d => d.ref === refActual);
-    if (idx >= 0) { if (!db.deliveries[idx].id) db.deliveries.splice(idx, 1); else { alert("⚠️ Pedido ya existente."); return; } }
+  const cantidadFinal = parseFloat(document.getElementById("inputUnidades").value) || 0;
 
+  // DB entregas (fabricación) como ya usas
+  const rawDb = LS.getItem("ldh_db");
+  let db = { deliveries: [] };
+  if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
+
+  // Si ya existe, no duplicar
+  const idx = db.deliveries.findIndex(d => d.ref === refActual);
+  if (idx >= 0) {
+    // Si es una entrada "válida", no duplicar, pero podemos actualizar totales/notes si quieres
+    // Por seguridad, avisamos y dejamos el flujo.
+  } else {
     const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
     const notasFinales = notaHierro + (estadoMateriales.length > 0 ? "Procesado desde Preparación." : "");
 
     db.deliveries.push({
-        id: "PED-" + Date.now(),
-        client: "Taller / Interno",
-        ref: refActual,
-        concept: metaActual.concepto || "Sin concepto",
-        datePed: new Date().toISOString().split('T')[0],
-        datePrev: new Date().toISOString().split('T')[0],
-        status: "pendiente",
-        priority: "normal",
-        total: cantidadFinal,
-        delivered: 0,
-        history: [],
-        notes: notasFinales
+      id: "PED-" + Date.now(),
+      client: "Taller / Interno",
+      ref: refActual,
+      concept: metaActual.concepto || "Sin concepto",
+      datePed: new Date().toISOString().split('T')[0],
+      datePrev: new Date().toISOString().split('T')[0],
+      status: "pendiente",
+      priority: "normal",
+      total: cantidadFinal,
+      delivered: 0,
+      history: [],
+      notes: notasFinales
     });
-
     LS.setItem("ldh_db", JSON.stringify(db));
-    LS.removeItem(KP(refActual)); LS.removeItem(KM(refActual));
-    alert(`✅ Enviado a Fabricación.\nUds: ${cantidadFinal}`);
-    volverLista();
+  }
+
+  // Marcar en fabricación y NO borrar de preparación
+  metaActual.en_fabricacion = true;
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+
+  alert(`✅ Enviado a Fabricación.\nUds: ${cantidadFinal}\n\nEl pedido sigue en Preparación como "En fabricación".`);
+  volverLista();
 }
 
-function eliminarPedido() { if (confirm("⛔ ¿Eliminar?")) { LS.removeItem(KP(refActual)); LS.removeItem(KM(refActual)); volverLista(); } }
-cargarLista();
+function eliminarPedido() {
+  if (confirm("⛔ ¿Eliminar?")) {
+    LS.removeItem(KP(refActual));
+    LS.removeItem(KM(refActual));
+    volverLista();
+  }
+}
+
+// ===============================
+// === UTILS: escape HTML ===
+// ===============================
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function escapeAttr(str){
+  return escapeHtml(str).replaceAll("`","&#096;");
+}
+
+// ===============================
+// === ARRANQUE ===
+// ===============================
+(async function boot(){
+  // refresco suave del stock para que el primer render tenga datos reales
+  await fsLoadStockOnceToLocal();
+  cargarLista();
+})();
 </script>
 </body>
 </html>
