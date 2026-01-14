@@ -322,7 +322,33 @@ const KM = r => "prep_meta_" + r;
 const STOCK_DB_KEY = "taller_stock_v3_data";
 const uuid = () => Math.random().toString(36).substr(2,9);
 
-// Estado
+/* =========================
+   === MAPA GLOBAL ALIAS  ===
+   =========================
+   Guarda equivalencias: "40x40|barra|galvanizado" => matId del stock.
+   Así NO tienes que vincular en cada pedido.
+*/
+const ALIAS_MAP_KEY = "prep_stock_alias_map_v1";
+function normName(s){
+  return String(s||"").trim().toLowerCase().replace(/\s+/g," ");
+}
+function aliasKey(linea){
+  const n = normName(linea.mat);
+  const u = normName(linea.unit || "ud");
+  const th = (u.includes("barra") && metaActual && metaActual.tipo_hierro) ? normName(metaActual.tipo_hierro) : "";
+  return th ? `${n}|${u}|${th}` : `${n}|${u}`;
+}
+function loadAliasMap(){
+  try { return JSON.parse(LS.getItem(ALIAS_MAP_KEY) || "{}") || {}; }
+  catch(e){ return {}; }
+}
+function saveAliasMap(map){
+  LS.setItem(ALIAS_MAP_KEY, JSON.stringify(map || {}));
+}
+
+/* =====================
+   === ESTADO APP     ===
+   ===================== */
 let refActual = "";
 let estadoMateriales = [];
 let metaActual = {};
@@ -620,6 +646,23 @@ function abrirPedido(ref) {
     stock_label: l.stock_label || ""
   }));
 
+  // === AUTOVINCULAR POR ALIAS GLOBAL ===
+  // Si la línea no tiene stock_matId, intentamos recuperar por alias ("40x40|barra|galvanizado")
+  try{
+    const amap = loadAliasMap();
+    let changed = false;
+    estadoMateriales.forEach(l=>{
+      if(l.stock_matId) return;
+      const k = aliasKey(l);
+      if(amap[k] && amap[k].matId){
+        l.stock_matId = amap[k].matId;
+        l.stock_label = amap[k].label || l.stock_label || "";
+        changed = true;
+      }
+    });
+    if(changed) LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
+  }catch(e){}
+
   document.getElementById("ref").textContent = ref;
   document.getElementById("concepto").textContent = metaActual.concepto || "";
   document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
@@ -855,6 +898,15 @@ function confirmarVinculo(){
 
   estadoMateriales[idx].stock_matId = m.id;
   estadoMateriales[idx].stock_label = m.name || "";
+
+  // === GUARDAR COMO ALIAS GLOBAL (para futuros pedidos) ===
+  const linea = estadoMateriales[idx];
+  const k = aliasKey(linea);
+  if(confirm(`¿Guardar esta vinculación para futuros pedidos?\n\n"${linea.mat}" → "${m.name}"`)){
+    const amap = loadAliasMap();
+    amap[k] = { matId: m.id, label: m.name, unit: m.unit || "" };
+    saveAliasMap(amap);
+  }
 
   guardarEstadoLocal();
   cerrarModalLink();
@@ -1105,6 +1157,10 @@ function guardarTipoHierro() {
   radios.forEach(r=>{ if(r.checked) val=r.value; });
   metaActual.tipo_hierro = val;
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
+
+  // Si el tipo de hierro cambia, al volver a renderizar
+  // el aliasKey incluye el tipo -> se usarán aliases correctos.
+  renderTabla();
 }
 
 /* ===============================
