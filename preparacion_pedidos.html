@@ -5,9 +5,11 @@
 <title>Preparación de pedidos</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
+  /* === ESTILOS BASE === */
   body { margin:0; font-family:Segoe UI,Arial; background:#0b1220; color:#e6edf7; padding:24px; }
   .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
 
+  /* === BOTONES CORPORATIVOS === */
   .btn {
     background:linear-gradient(180deg,#0f3c55,#0b2a3d);
     border:1px solid rgba(255,255,255,.15);
@@ -19,10 +21,12 @@
     transition: filter 0.2s;
   }
   .btn:hover { filter:brightness(1.15); }
+
   .btn-danger { background:linear-gradient(180deg,#7f1d1d,#450a0a); border-color:#b91c1c; color:#fecaca; }
   .btn-success { background:linear-gradient(180deg,#14532d,#052e16); border-color:#16a34a; color:#86efac; }
 
-  .btn-mini{
+  /* === BOTÓN MINI === */
+  .btn-mini {
     background: linear-gradient(180deg, #0f3c55, #0b2a3d);
     border: 1px solid rgba(255,255,255,.15);
     color: #6dd6ff;
@@ -39,10 +43,12 @@
   .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
   .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
 
+  /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .hidden { display:none !important; }
   .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
+  /* TABLAS E INPUTS */
   table { width:100%; border-collapse:collapse; margin-top:6px; }
   th, td { border-bottom:1px solid rgba(255,255,255,.08); padding:8px; vertical-align: middle; }
   th { color:#9fb0c8; font-size:12px; text-align:left; }
@@ -50,14 +56,17 @@
   input[type=number] { width:70px; text-align: center; }
   input:focus { outline: none; border-color: #6dd6ff; }
 
+  /* Input especial Unidades */
   .input-unidades { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 14px; font-weight: bold; width: 60px; text-align: center; border-radius: 6px; padding: 4px; transition: all 0.3s; }
   .input-unidades:focus { border-color: #6dd6ff; background: rgba(0,0,0,0.3); }
 
+  /* Estado Filas */
   tr.ok { background: linear-gradient(180deg, rgba(24,130,72,.28), rgba(12,78,44,.18)); box-shadow: inset 0 0 0 1px rgba(110,255,170,.18); }
   tr.ok td { color: #e9fff1; }
   .flash-limit { animation: clampFlash .5s ease-in-out 1; border-color: #ef4444 !important; }
   @keyframes clampFlash { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); } }
 
+  /* Listado */
   .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
   .item { padding:12px; border-radius:12px; background:#020617; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition: border-color 0.2s; }
   .item:hover { border-color:rgba(109,214,255,.35); background: rgba(255,255,255,0.02); }
@@ -67,47 +76,78 @@
   .b-c { background:#22c55e; color:#111; }
   .b-fab { background:#22c55e; color:#111; }
 
+  /* Control Panel */
   .control-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px; margin: 15px 0; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; }
   .radio-group { display:flex; gap:10px; }
   .radio-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.3); cursor:pointer; user-select: none; }
   .radio-btn input { margin:0; }
   .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1); }
 
+  /* Mini info stock/vinculación */
   .stock-mini { font-size:10px; opacity:0.65; margin-top:2px; }
-  .link-mini { font-size:10px; opacity:0.8; margin-top:3px; display:flex; gap:8px; align-items:center; }
-  .link-pill { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.25); cursor:pointer; }
+  .link-mini { font-size:10px; opacity:0.85; margin-top:3px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .link-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:2px 8px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.25);
+    cursor:pointer;
+  }
   .link-pill:hover { border-color: rgba(109,214,255,.35); }
   .link-pill strong { font-weight:700; color:#e6edf7; }
 
   /* === MODALES === */
   .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
   .modal-backdrop.active { opacity:1; pointer-events:auto; }
+
   .modal-box { width:90%; max-width:780px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
   .modal-backdrop.active .modal-box { transform:translateY(0); }
+
   .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
   .modal-sub { font-size:12px; color:#9fb0c8; margin:-6px 0 10px 0; }
   .modal-field { margin-bottom:12px; }
   .modal-label { display:block; font-size:12px; color:#9fb0c8; margin-bottom:5px; font-weight:600; }
-  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:12px; }
+
   .input-group { display:flex; gap:8px; }
   .modal-select { flex:1; background:#020617; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px; border-radius:8px; outline:none; font-family:inherit; }
   .modal-input { flex:1; background:#020617; border:1px solid #38bdf8; color:#fff; padding:8px; border-radius:8px; outline:none; }
   .btn-icon { width:36px; padding:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
 
-  /* Modal vinculacion */
+  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:12px; }
+
+  /* Modal vinculación */
   .link-grid { display:grid; grid-template-columns: 1fr 320px; gap:14px; }
   @media (max-width: 900px){ .link-grid{ grid-template-columns:1fr; } }
-  .link-list { border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; }
+
+  .link-list { border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; background: rgba(0,0,0,.08); }
   .link-row { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; background: rgba(0,0,0,.12); }
   .link-row:hover { background: rgba(255,255,255,.03); }
   .link-row:last-child { border-bottom:none; }
   .link-row .name { font-weight:700; color:#fff; }
   .link-row .meta { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
   .link-row.active { outline: 2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
+
   .side-card { border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px; background: rgba(0,0,0,.15); }
   .side-title { font-size:12px; color:#9fb0c8; text-transform: uppercase; letter-spacing:.08em; font-weight:800; }
   .side-big { font-size:16px; font-weight:800; color:#fff; margin-top:6px; }
   .side-small { font-size:12px; color:#9fb0c8; margin-top:6px; }
+
+  /* === FIX: scroll modal vinculación (soluciona no poder desplazarse) === */
+  #modalLink .modal-box{
+    max-height: 86vh;
+    overflow: hidden;
+    display:flex;
+    flex-direction: column;
+  }
+  #modalLink .link-grid{
+    flex: 1;
+    min-height: 0; /* clave para que overflow funcione */
+  }
+  #modalLink .link-list{
+    max-height: 58vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 </style>
 </head>
 <body>
@@ -153,7 +193,7 @@
   <div id="bloqueBarras" class="hidden">
     <div class="section-title">PERFILERÍA · BARRAS</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="190">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="220">Acción</th><th>Obs</th></tr></thead>
       <tbody id="tbodyBarras"></tbody>
     </table>
   </div>
@@ -161,7 +201,7 @@
   <div id="bloqueUnidades" class="hidden">
     <div class="section-title">ACCESORIOS · UNIDADES</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="190">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="220">Acción</th><th>Obs</th></tr></thead>
       <tbody id="tbodyUnidades"></tbody>
     </table>
   </div>
@@ -273,9 +313,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-// =====================
-// === CONSTANTES APP ===
-// =====================
+/* =====================
+   === CONSTANTES APP ===
+   ===================== */
 const LS = localStorage;
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
@@ -291,9 +331,9 @@ let pendingCreation = null;
 // Estado modal vinculación
 let linkCtx = { index: null, selectedMatId: null };
 
-// ============================
-// === FIRESTORE (Stock Main) ===
-// ============================
+/* ============================
+   === FIRESTORE (Stock Main) ===
+   ============================ */
 const USE_FIRESTORE = true;
 const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
@@ -376,21 +416,15 @@ async function fsAppendMaterialAndMovement(mat, mov){
   }, { merge:true });
 }
 
-// =======================
-// === IMPORTACIÓN DATOS ===
-// =======================
+/* =======================
+   === IMPORTACIÓN DATOS ===
+   ======================= */
 (function verificarImports() {
   const encontrarNumero = (obj) => {
     if (!obj) return null;
     const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
-    for (let key of posiblesKeys) {
-      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]);
-    }
-    if (obj.vars) {
-      for (let key of posiblesKeys) {
-        if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]);
-      }
-    }
+    for (let key of posiblesKeys) { if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]); }
+    if (obj.vars) { for (let key of posiblesKeys) { if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]); } }
     return null;
   };
 
@@ -409,7 +443,6 @@ async function fsAppendMaterialAndMovement(mat, mov){
       if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
       if (metaParaGuardar.en_fabricacion === undefined) metaParaGuardar.en_fabricacion = false;
 
-      // Normaliza líneas (por si vienen sin campos)
       const lines = (snap.materiales || []).map(l => ({
         ...l,
         qty_pedida: Number(l.qty_pedida || l.qty || l.cantidad || 0) || 0,
@@ -417,7 +450,6 @@ async function fsAppendMaterialAndMovement(mat, mov){
         aplicado_qty: Number(l.aplicado_qty || 0) || 0,
         ok: !!l.ok,
         note: l.note || "",
-        // NUEVO: vinculación
         stock_matId: l.stock_matId || null,
         stock_label: l.stock_label || ""
       }));
@@ -431,9 +463,9 @@ async function fsAppendMaterialAndMovement(mat, mov){
   }
 })();
 
-// =====================
-// === NAVEGACIÓN/UI  ===
-// =====================
+/* =====================
+   === NAVEGACIÓN/UI  ===
+   ===================== */
 function volverIndex() { location.href = "index.html"; }
 function volverLista() {
   document.getElementById("vistaDetalle").classList.add("hidden");
@@ -442,9 +474,9 @@ function volverLista() {
   cargarLista();
 }
 
-// =====================
-// === STOCK LOCAL DB ===
-// =====================
+/* =====================
+   === STOCK LOCAL DB ===
+   ===================== */
 function _db() {
   const raw = LS.getItem(STOCK_DB_KEY);
   const db = raw ? JSON.parse(raw) : { materials:[], movements:[] };
@@ -459,17 +491,29 @@ function _calcStockByMatId(db, matId){
     .reduce((acc, m) => (m.type === 'in' ? acc + (Number(m.qty)||0) : acc - (Number(m.qty)||0)), 0);
 }
 
-// Resolver material por nombre (fallback)
+/* ===============================
+   === NORMALIZACIÓN CAT/GRP ===
+   (soluciona "sin grupos/familias")
+   =============================== */
+function matCat(m){
+  return (m && (m.cat ?? m.category ?? m.categoria ?? m.CAT ?? "")) || "";
+}
+function matGrp(m){
+  return (m && (m.grp ?? m.group ?? m.grupo ?? m.familia ?? m.GRP ?? "")) || "";
+}
+
+/* ==============================
+   === Fallback nombre con hints ===
+   ============================== */
 function _findStockMatByNameWithHints(baseName, ironType, unit) {
   const db = _db();
   let candidates = [];
 
-  // Preferencia si es barra: intenta localizar por hint de hierro
   if (ironType && unit && String(unit).toLowerCase().includes('barra')) {
     const hint = (ironType === 'negro') ? 'negro' : 'galva';
     const preferred = db.materials.find(m =>
       (m.name||'').trim().toLowerCase() === String(baseName||'').trim().toLowerCase() &&
-      (((m.grp||'').toLowerCase().includes(hint)) || ((m.cat||'').toLowerCase().includes(hint)))
+      ((String(matGrp(m)||'').toLowerCase().includes(hint)) || (String(matCat(m)||'').toLowerCase().includes(hint)))
     );
     if (preferred) return { success:true, mat: preferred, db };
   }
@@ -491,24 +535,21 @@ function _findStockMatByNameWithHints(baseName, ironType, unit) {
   return { success:true, mat, db };
 }
 
-// ===============================
-// === STOCK INFO POR LÍNEA (ID) ===
-// ===============================
+/* ===============================
+   === STOCK INFO POR LÍNEA (ID) ===
+   =============================== */
 function getStockInfoForLine(linea){
   const db = _db();
 
-  // 1) Si está vinculado, usar ID sí o sí
   if(linea && linea.stock_matId){
     const mat = db.materials.find(m => m.id === linea.stock_matId);
     if(mat){
       const stock = _calcStockByMatId(db, mat.id);
       return { found:true, stock, name: mat.name, matId: mat.id, linked:true };
     }
-    // Si el ID ya no existe en stock (caso raro), consideramos no encontrado
     return { found:false, stock:null, name: linea.stock_label || linea.mat, linked:false, brokenLink:true };
   }
 
-  // 2) Fallback: búsqueda por nombre (como antes)
   const ironType = (linea.unit === 'barra') ? (metaActual.tipo_hierro || null) : null;
   const check = _findStockMatByNameWithHints(linea.mat, ironType, linea.unit);
   if(!check.success) return { found:false, stock:null, name: check.searchedName, linked:false };
@@ -516,9 +557,9 @@ function getStockInfoForLine(linea){
   return { found:true, stock, name: check.mat.name, matId: check.mat.id, linked:false };
 }
 
-// =======================
-// === LISTA DE PEDIDOS ===
-// =======================
+/* =======================
+   === LISTA DE PEDIDOS ===
+   ======================= */
 function cargarLista() {
   const lista = document.getElementById("lista");
   lista.innerHTML = "";
@@ -544,16 +585,16 @@ function cargarLista() {
     item.className = "item";
     item.innerHTML = `
       <div style="display:flex;justify-content:space-between;margin-bottom:4px; align-items:flex-start;">
-        <span style="font-weight:bold; color:#fff">${ref}</span>
+        <span style="font-weight:bold; color:#fff">${escapeHtml(ref)}</span>
         <span class="badge ${badgeClass}">${badgeText}</span>
       </div>
       <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)
+        ${escapeHtml(meta.concepto || "Sin concepto")} (${escapeHtml(meta.unidades || 1)} uds)
       </div>
       ${fabHtml}
     `;
     item.onclick = async () => {
-      await fsLoadStockOnceToLocal(); // refresca cache antes de abrir
+      await fsLoadStockOnceToLocal();
       abrirPedido(ref);
     };
     lista.appendChild(item);
@@ -594,9 +635,9 @@ function guardarUnidadesManual() {
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 }
 
-// ==========================
-// === RENDER TABLA LÍNEAS ===
-// ==========================
+/* ==========================
+   === RENDER TABLA LÍNEAS ===
+   ========================== */
 function renderTabla() {
   const tbodyBarras = document.getElementById("tbodyBarras");
   const tbodyUnidades = document.getElementById("tbodyUnidades");
@@ -617,24 +658,21 @@ function renderTabla() {
     else if (yaAplicada > 0) btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
     else btnHtml = `<span style="opacity:0.2">-</span>`;
 
-    // Stock info (por ID o fallback)
     const info = getStockInfoForLine(linea);
-    let stockHtml = "";
-    if(info.found){
-      stockHtml = `<div class="stock-mini">Stock: <strong>${info.stock}</strong></div>`;
-    }else{
-      stockHtml = `<div class="stock-mini" style="opacity:0.45;">Stock: (no vinculado)</div>`;
-    }
+    let stockHtml = info.found
+      ? `<div class="stock-mini">Stock: <strong>${info.stock}</strong></div>`
+      : `<div class="stock-mini" style="opacity:0.45;">Stock: (no vinculado)</div>`;
 
-    // Vínculo visible
-    const linkLabel = (linea.stock_matId && info.found) ? (info.name || linea.stock_label || "Material vinculado") : (linea.stock_matId && !info.found ? (linea.stock_label || "Vínculo roto") : "Sin vincular");
-    const linkState = (linea.stock_matId && info.found) ? "Vinculado a" : (linea.stock_matId && !info.found ? "Vínculo" : "Vincular");
+    const linkLabel = (linea.stock_matId && info.found) ? (info.name || linea.stock_label || "Material vinculado") :
+                      (linea.stock_matId && !info.found ? (linea.stock_label || "Vínculo roto") : "Sin vincular");
+    const linkState = (linea.stock_matId && info.found) ? "Vinculado a" :
+                      (linea.stock_matId && !info.found ? "Vínculo" : "Vincular");
     const linkHint = (linea.stock_matId && info.found) ? "Cambiar vínculo" : "Vincular";
 
     const linkHtml = `
       <div class="link-mini">
-        <span class="link-pill" onclick="abrirModalLink(${index})" title="${linkHint}">
-          🔗 <span style="opacity:.8">${linkState}:</span> <strong>${escapeHtml(linkLabel)}</strong>
+        <span class="link-pill" onclick="abrirModalLink(${index})" title="${escapeAttr(linkHint)}">
+          🔗 <span style="opacity:.8">${escapeHtml(linkState)}:</span> <strong>${escapeHtml(linkLabel)}</strong>
         </span>
         <span class="link-pill" onclick="editarNombreLinea(${index})" title="Editar texto del pedido (no cambia el stock)">
           ✎ <span style="opacity:.8">Editar nombre</span>
@@ -655,12 +693,12 @@ function renderTabla() {
       <td>${pedida} <span style="font-size:10px;opacity:0.5">${escapeHtml(linea.unit || 'ud')}</span></td>
       <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
       <td>
-        <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           ${btnHtml}
           <button class="btn-mini" onclick="abrirModalLink(${index})" title="Vincular o cambiar vínculo">Vincular</button>
         </div>
       </td>
-      <td><input type="text" value="${escapeHtml(linea.note || '')}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
+      <td><input type="text" value="${escapeAttr(linea.note || '')}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
     `;
 
     if (linea.unit === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
@@ -684,9 +722,9 @@ function renderTabla() {
   }
 }
 
-// ===============================
-// === VINCULACIÓN: MODAL STOCK ===
-// ===============================
+/* ===============================
+   === VINCULACIÓN: MODAL STOCK ===
+   =============================== */
 function abrirModalLink(index){
   linkCtx.index = index;
   linkCtx.selectedMatId = null;
@@ -696,12 +734,10 @@ function abrirModalLink(index){
   document.getElementById("linkLineUnit").textContent = linea.unit || "ud";
   document.getElementById("linkSearch").value = "";
 
-  // Preselección si ya está vinculado
   if(linea.stock_matId){
     linkCtx.selectedMatId = linea.stock_matId;
   }
 
-  // Render lista
   renderLinkList();
   renderLinkSelectionCard();
 
@@ -711,7 +747,6 @@ function cerrarModalLink(){
   document.getElementById("modalLink").classList.remove("active");
   linkCtx = { index:null, selectedMatId:null };
 }
-
 async function refrescarStockParaLink(){
   await fsLoadStockOnceToLocal();
   renderLinkList();
@@ -723,22 +758,21 @@ function renderLinkList(){
   const list = document.getElementById("linkList");
   const q = (document.getElementById("linkSearch").value || "").trim().toLowerCase();
 
-  // Orden: primero los que “contienen” el texto del pedido, luego el resto
   const idx = linkCtx.index;
   const linea = (idx !== null) ? estadoMateriales[idx] : null;
   const hint = linea ? String(linea.mat||"").trim().toLowerCase() : "";
 
   let mats = Array.isArray(db.materials) ? db.materials.slice() : [];
+
   if(q){
     mats = mats.filter(m => {
       const name = String(m.name||"").toLowerCase();
-      const cat  = String(m.cat||"").toLowerCase();
-      const grp  = String(m.grp||"").toLowerCase();
+      const cat  = String(matCat(m)||"").toLowerCase();
+      const grp  = String(matGrp(m)||"").toLowerCase();
       return name.includes(q) || cat.includes(q) || grp.includes(q);
     });
   }
 
-  // Ranking simple por relevancia (si hay hint)
   if(hint){
     mats.sort((a,b)=>{
       const an = String(a.name||"").toLowerCase();
@@ -759,20 +793,19 @@ function renderLinkList(){
 
   const dbNow = _db();
   list.innerHTML = "";
-  mats.slice(0, 400).forEach(m => { // límite defensivo
+  mats.slice(0, 500).forEach(m => {
     const stock = _calcStockByMatId(dbNow, m.id);
     const row = document.createElement("div");
     row.className = "link-row" + (linkCtx.selectedMatId === m.id ? " active" : "");
     row.innerHTML = `
       <div class="name">${escapeHtml(m.name || "")}</div>
       <div class="meta">
-        <span>${escapeHtml((m.cat||"") + " > " + (m.grp||""))}</span>
+        <span>${escapeHtml((matCat(m)||"") + " > " + (matGrp(m)||""))}</span>
         <span><strong>${stock}</strong> ${escapeHtml(m.unit||"")}</span>
       </div>
     `;
     row.onclick = ()=>{
       linkCtx.selectedMatId = m.id;
-      // repintar selección visual
       document.querySelectorAll("#linkList .link-row").forEach(el=>el.classList.remove("active"));
       row.classList.add("active");
       renderLinkSelectionCard();
@@ -802,7 +835,7 @@ function renderLinkSelectionCard(){
   }
   const stock = _calcStockByMatId(db, m.id);
   pickName.textContent = m.name || "";
-  pickMeta.textContent = (m.cat||"") + " > " + (m.grp||"");
+  pickMeta.textContent = (matCat(m)||"") + " > " + (matGrp(m)||"");
   pickStock.textContent = "Stock actual: " + stock + " " + (m.unit||"");
 }
 
@@ -820,7 +853,6 @@ function confirmarVinculo(){
     return;
   }
 
-  // Guardar vínculo en la línea
   estadoMateriales[idx].stock_matId = m.id;
   estadoMateriales[idx].stock_label = m.name || "";
 
@@ -854,9 +886,9 @@ function editarNombreLinea(index){
   renderTabla();
 }
 
-// ===============================
-// === AÑADIR RECEPCIÓN A STOCK ===
-// ===============================
+/* ===============================
+   === AÑADIR RECEPCIÓN A STOCK ===
+   =============================== */
 function guardarLinea(index) {
   const linea = estadoMateriales[index];
   const recibido = parseFloat(linea.qty_recibida) || 0;
@@ -864,7 +896,6 @@ function guardarLinea(index) {
   const diff = recibido - yaAplicado;
   if (diff <= 0) return;
 
-  // Validación hierro
   let tipoHierro = null;
   if (linea.unit === 'barra') {
     tipoHierro = metaActual.tipo_hierro;
@@ -903,15 +934,13 @@ function guardarLinea(index) {
     return;
   }
 
-  // 2) Si no hay vínculo, intentar por nombre (fallback)
+  // 2) Sin vínculo: intentar por nombre (fallback)
   const check = _findStockMatByNameWithHints(linea.mat, tipoHierro, linea.unit);
   if (!check.success) {
-    // Antes de crear: ofrecer vincular
     if(confirm("Este material no coincide con Stock.\n\n¿Quieres VINCULARLO a un material existente del stock? (Recomendado)")){
       abrirModalLink(index);
       return;
     }
-    // Si no, crear ficha
     abrirModalCreacion({
       name: check.searchedName,
       unit: linea.unit,
@@ -921,7 +950,6 @@ function guardarLinea(index) {
     return;
   }
 
-  // Existe por nombre: sumar
   const mov = { id: uuid(), matId: check.mat.id, type: 'in', qty: diff, date: new Date().toISOString() };
   check.db.movements.push(mov);
   LS.setItem(STOCK_DB_KEY, JSON.stringify(check.db));
@@ -939,15 +967,15 @@ function guardarLinea(index) {
   renderTabla();
 }
 
-// ===============================
-// === MODAL CREACIÓN MATERIAL ===
-// ===============================
+/* ===============================
+   === MODAL CREACIÓN MATERIAL ===
+   =============================== */
 function abrirModalCreacion(data) {
   pendingCreation = data;
   document.getElementById("modMatName").textContent = data.name;
 
   const db = _db();
-  const cats = [...new Set(db.materials.map(m => m.cat).filter(Boolean))].sort();
+  const cats = [...new Set(db.materials.map(m => matCat(m)).filter(Boolean))].sort();
 
   const selCat = document.getElementById("modCatSelect");
   selCat.innerHTML =
@@ -989,7 +1017,7 @@ function toggleInput(type) {
 function cargarGruposModal() {
   const db = _db();
   const cat = document.getElementById("modCatSelect").value;
-  const grps = [...new Set(db.materials.filter(m => m.cat === cat).map(m => m.grp).filter(Boolean))].sort();
+  const grps = [...new Set(db.materials.filter(m => matCat(m) === cat).map(m => matGrp(m)).filter(Boolean))].sort();
 
   const selGrp = document.getElementById("modGrpSelect");
   selGrp.innerHTML =
@@ -1023,11 +1051,10 @@ function guardarNuevoMaterial() {
 
   fsAppendMaterialAndMovement(mat, mov).catch(err => console.warn("No se pudo subir material+mov:", err));
 
-  // Marcar línea aplicada
   const linea = estadoMateriales[pendingCreation.index];
   linea.aplicado_qty = parseFloat(linea.qty_recibida);
 
-  // (opcional) auto-vincular la línea a este nuevo material para futuras operaciones
+  // auto-vincular a lo recién creado
   linea.stock_matId = newId;
   linea.stock_label = mat.name || "";
 
@@ -1038,9 +1065,9 @@ function guardarNuevoMaterial() {
   cerrarModalCreacion();
 }
 
-// ===============================
-// === OTROS HELPERS / ESTADOS ===
-// ===============================
+/* ===============================
+   === OTROS HELPERS / ESTADOS ===
+   =============================== */
 function toggleOk(index, isChecked) {
   const linea = estadoMateriales[index];
   linea.ok = isChecked;
@@ -1070,15 +1097,7 @@ function updateQty(index, inputEl) {
 }
 
 function updateNote(index, txt) { estadoMateriales[index].note = txt; guardarEstadoLocal(); }
-function marcarTodoOk() {
-  estadoMateriales.forEach(l => {
-    l.ok = true;
-    const pedida = parseFloat(l.qty_pedida)||0;
-    if(pedida>0) l.qty_recibida = pedida;
-  });
-  guardarEstadoLocal();
-  renderTabla();
-}
+function marcarTodoOk() { estadoMateriales.forEach(l => { l.ok = true; const pedida = parseFloat(l.qty_pedida)||0; if(pedida>0) l.qty_recibida=pedida; }); guardarEstadoLocal(); renderTabla(); }
 function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
 function guardarTipoHierro() {
   const radios=document.getElementsByName("th");
@@ -1088,9 +1107,9 @@ function guardarTipoHierro() {
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 }
 
-// ===============================
-// === FABRICACIÓN (NO BORRAR) ===
-// ===============================
+/* ===============================
+   === FABRICACIÓN (NO BORRAR) ===
+   =============================== */
 function confirmarTodoRecepcion() {
   const hayBarras = estadoMateriales.some(l => l.unit === 'barra');
   if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
@@ -1098,7 +1117,6 @@ function confirmarTodoRecepcion() {
   const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
   if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
 
-  // Aquí ya NO exigimos tener material completo
   if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido quedará EN FABRICACIÓN y no desaparecerá de Preparación.)`)) return;
   mandarAFabricacion();
 }
@@ -1108,17 +1126,12 @@ function mandarAFabricacion() {
 
   const cantidadFinal = parseFloat(document.getElementById("inputUnidades").value) || 0;
 
-  // DB entregas (fabricación) como ya usas
   const rawDb = LS.getItem("ldh_db");
   let db = { deliveries: [] };
   if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
 
-  // Si ya existe, no duplicar
   const idx = db.deliveries.findIndex(d => d.ref === refActual);
-  if (idx >= 0) {
-    // Si es una entrada "válida", no duplicar, pero podemos actualizar totales/notes si quieres
-    // Por seguridad, avisamos y dejamos el flujo.
-  } else {
+  if (idx < 0) {
     const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
     const notasFinales = notaHierro + (estadoMateriales.length > 0 ? "Procesado desde Preparación." : "");
 
@@ -1139,7 +1152,6 @@ function mandarAFabricacion() {
     LS.setItem("ldh_db", JSON.stringify(db));
   }
 
-  // Marcar en fabricación y NO borrar de preparación
   metaActual.en_fabricacion = true;
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 
@@ -1147,17 +1159,11 @@ function mandarAFabricacion() {
   volverLista();
 }
 
-function eliminarPedido() {
-  if (confirm("⛔ ¿Eliminar?")) {
-    LS.removeItem(KP(refActual));
-    LS.removeItem(KM(refActual));
-    volverLista();
-  }
-}
+function eliminarPedido() { if (confirm("⛔ ¿Eliminar?")) { LS.removeItem(KP(refActual)); LS.removeItem(KM(refActual)); volverLista(); } }
 
-// ===============================
-// === UTILS: escape HTML ===
-// ===============================
+/* ===============================
+   === UTILS: escape HTML ===
+   =============================== */
 function escapeHtml(str){
   return String(str ?? "")
     .replaceAll("&","&amp;")
@@ -1170,11 +1176,10 @@ function escapeAttr(str){
   return escapeHtml(str).replaceAll("`","&#096;");
 }
 
-// ===============================
-// === ARRANQUE ===
-// ===============================
+/* ===============================
+   === ARRANQUE ===
+   =============================== */
 (async function boot(){
-  // refresco suave del stock para que el primer render tenga datos reales
   await fsLoadStockOnceToLocal();
   cargarLista();
 })();
