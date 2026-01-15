@@ -317,6 +317,7 @@
    - Muestra stock disponible por línea (del módulo Stock).
    - Vinculación persistente: recuerda que “40x40” -> “40x40x1.5” etc (global, para futuros pedidos).
    - Mantiene tu lógica de sumar a stock con movimientos "in".
+   - NUEVO: Permite CONSUMIR de stock (movimiento "out") con confirmación si queda negativo.
    - Sin romper Stock online: usa Firestore doc igual que tu stock.html para leer/escribir stock.
 ======================================================================================= */
 
@@ -720,10 +721,8 @@ function renderLinkResults(){
   host.innerHTML = "";
 
   const q = normName(document.getElementById("linkSearch").value || "");
-  const line = linkModalCtx ? estadoMateriales[linkModalCtx.lineIndex] : null;
+  // const line = linkModalCtx ? estadoMateriales[linkModalCtx.lineIndex] : null;
 
-  // preferencia: si es barra, filtrar a materiales que contengan galva/negro?
-  // Aquí no filtramos agresivo para no ocultar cosas; solo ordenamos.
   let arr = stockMaterials.slice();
 
   if(q){
@@ -808,13 +807,21 @@ function renderTabla() {
 
     // botón añadir a stock (usa aplicado_qty para evitar duplicados)
     const diff = recibida - yaAplicada;
+
+    // NUEVO: botón consumir stock (lo que falta para completar la línea)
+    const falta = Math.max(0, pedida - recibida);
+
     let btnHtml = "";
     if (diff > 0) {
-      btnHtml = `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
+      btnHtml += `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
     } else if (yaAplicada > 0) {
-      btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
+      btnHtml += `<button class="btn-mini disabled">✅ OK</button>`;
     } else {
-      btnHtml = `<span style="opacity:0.2">-</span>`;
+      btnHtml += `<span style="opacity:0.2">-</span>`;
+    }
+
+    if (falta > 0) {
+      btnHtml += `<button class="btn-mini" onclick="consumirDeStock(${index})">Consumir stock (-${falta})</button>`;
     }
 
     // botón vincular siempre disponible
@@ -851,7 +858,7 @@ function renderTabla() {
   autoCerrarSiCompletoPorRecepcion();
 }
 
-/* ========= LÓGICA DE STOCK: sumar movimiento "in" ========= */
+/* ========= LÓGICA DE STOCK: localizar material (vínculo o nombre) ========= */
 function _addToRealStock_byLinkedOrName(linea, ironType) {
   // 0) si hay vínculo, usarlo
   const linkedId = getLinkedMatIdForLine(linea);
@@ -881,7 +888,7 @@ function _addToRealStock_byLinkedOrName(linea, ironType) {
   return { success:true, mat, matId: mat.id };
 }
 
-/* ========= FUNCIÓN PRINCIPAL: AÑADIR A STOCK ========= */
+/* ========= FUNCIÓN PRINCIPAL: AÑADIR A STOCK (movimiento "in") ========= */
 function guardarLinea(index) {
   const linea = estadoMateriales[index];
   const recibido = toNum(linea.qty_recibida);
@@ -929,6 +936,83 @@ function guardarLinea(index) {
 
   alert(msg);
   renderTabla();
+}
+
+/* ========= NUEVO: CONSUMIR DE STOCK (movimiento "out") ========= */
+function consumirDeStock(index){
+  const linea = estadoMateriales[index];
+
+  const pedida = toNum(linea.qty_pedida);
+  const recibida = toNum(linea.qty_recibida);
+
+  // Consumimos SOLO lo que falta para completar la línea
+  const falta = Math.max(0, pedida - recibida);
+  if(falta <= 0){
+    alert("Esta línea ya está completa.");
+    return;
+  }
+
+  // Validación Hierro (mismo criterio que para guardar)
+  let tipoHierro = null;
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
+    tipoHierro = metaActual.tipo_hierro;
+    if (!tipoHierro) {
+      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
+      const p = document.getElementById("panelHierro");
+      p.style.boxShadow = "0 0 0 2px #ef4444";
+      setTimeout(()=>p.style.boxShadow="none", 2000);
+      return;
+    }
+  }
+
+  // Localiza material en stock (primero por vínculo, luego por nombre)
+  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
+  if(!check.success){
+    alert("Este material no está vinculado / no existe en Stock.\nPulsa “Vincular” y selecciona el material correcto antes de consumir.");
+    return;
+  }
+
+  const matId = check.matId;
+  const mat = check.mat;
+
+  const disponible = toNum(getStockQty(matId));
+  const quedaria = disponible - falta;
+
+  // Permitir negativo con confirmación
+  if(quedaria < 0){
+    const deficit = Math.abs(quedaria);
+    const ok = confirm(
+      `Stock insuficiente para consumir.\n\n` +
+      `Material: ${mat.name}\n` +
+      `Disponible: ${disponible}\n` +
+      `Necesario: ${falta}\n\n` +
+      `Esto dejará el stock en NEGATIVO: -${deficit}\n\n` +
+      `¿Confirmas consumir igualmente?`
+    );
+    if(!ok) return;
+  }
+
+  // Movimiento OUT
+  stockMovements.push({
+    id: uuid(),
+    matId: matId,
+    type: 'out',
+    qty: falta,
+    date: new Date().toISOString(),
+    ref: refActual,
+    concept: metaActual.concepto || ""
+  });
+  saveStockLocal();
+
+  // Marcar línea como cubierta por stock (equivalente a recibido para Preparación)
+  linea.qty_recibida = recibida + falta;
+  linea.ok = (toNum(linea.qty_recibida) >= pedida);
+
+  guardarEstadoLocal();
+
+  alert(`✅ Consumido de stock.\nMaterial: ${mat.name}\nCantidad: ${falta}\nStock actual: ${getStockQty(matId)}`);
+  renderTabla();
+  cargarLista();
 }
 
 /* ========= MODAL CREACIÓN ========= */
