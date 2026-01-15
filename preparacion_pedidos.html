@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Preparación de pedidos</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <style>
   /* === ESTILOS BASE === */
   body { margin:0; font-family:Segoe UI,Arial; background:#0b1220; color:#e6edf7; padding:24px; }
@@ -39,6 +39,7 @@
     letter-spacing: 0.5px;
     transition: filter 0.2s, box-shadow 0.2s;
     white-space: nowrap;
+    margin-right: 6px;
   }
   .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
   .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
@@ -70,11 +71,12 @@
   .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
   .item { padding:12px; border-radius:12px; background:#020617; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition: border-color 0.2s; }
   .item:hover { border-color:rgba(109,214,255,.35); background: rgba(255,255,255,0.02); }
-  .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight: bold; text-transform: uppercase; }
+  .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight: bold; text-transform: uppercase; display:inline-flex; align-items:center; gap:6px; }
   .b-p { background:#f59e0b; color:#111; }
   .b-pa { background:#fb923c; color:#111; }
   .b-c { background:#22c55e; color:#111; }
-  .b-fab { background:#22c55e; color:#111; }
+  .b-fab { background:#16a34a; color:#06100a; border:1px solid rgba(255,255,255,.25); }
+  .dot { width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block; }
 
   /* Control Panel */
   .control-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px; margin: 15px 0; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; }
@@ -83,29 +85,24 @@
   .radio-btn input { margin:0; }
   .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1); }
 
-  /* Mini info stock/vinculación */
-  .stock-mini { font-size:10px; opacity:0.65; margin-top:2px; }
-  .link-mini { font-size:10px; opacity:0.85; margin-top:3px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .link-pill {
-    display:inline-flex; align-items:center; gap:6px;
-    padding:2px 8px; border-radius:999px;
-    border:1px solid rgba(255,255,255,.12);
-    background: rgba(0,0,0,.25);
-    cursor:pointer;
-  }
-  .link-pill:hover { border-color: rgba(109,214,255,.35); }
-  .link-pill strong { font-weight:700; color:#e6edf7; }
+  /* ======= VINCULACIÓN ======= */
+  .link-pill { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:800; border:1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.25); color:#9fb0c8; margin-right:6px; }
+  .link-pill.ok { color:#86efac; border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.12); }
+  .link-pill.warn { color:#fbbf24; border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.12); }
+  .link-pill.danger { color:#fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); }
+
+  .stock-mini { font-size:11px; opacity:.75; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; }
+  .stock-mini b { opacity:1; }
 
   /* === MODALES === */
-  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+  .modal-backdrop { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
   .modal-backdrop.active { opacity:1; pointer-events:auto; }
 
-  .modal-box { width:90%; max-width:780px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
+  .modal-box { width:92%; max-width:760px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
   .modal-backdrop.active .modal-box { transform:translateY(0); }
 
-  .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
-  .modal-sub { font-size:12px; color:#9fb0c8; margin:-6px 0 10px 0; }
-  .modal-field { margin-bottom:12px; }
+  .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; justify-content:space-between; gap:12px; align-items:center; }
+  .modal-field { margin-bottom:14px; }
   .modal-label { display:block; font-size:12px; color:#9fb0c8; margin-bottom:5px; font-weight:600; }
 
   .input-group { display:flex; gap:8px; }
@@ -113,41 +110,22 @@
   .modal-input { flex:1; background:#020617; border:1px solid #38bdf8; color:#fff; padding:8px; border-radius:8px; outline:none; }
   .btn-icon { width:36px; padding:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
 
-  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:12px; }
+  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:16px; }
 
-  /* Modal vinculación */
-  .link-grid { display:grid; grid-template-columns: 1fr 320px; gap:14px; }
-  @media (max-width: 900px){ .link-grid{ grid-template-columns:1fr; } }
+  /* Modal Vincular */
+  .link-grid { display:grid; grid-template-columns: 260px 1fr; gap:14px; }
+  @media(max-width: 820px){ .link-grid{ grid-template-columns:1fr; } }
+  .link-panel { background: rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:12px; }
+  .link-search { display:flex; gap:8px; align-items:center; background: rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px 10px; margin-bottom:10px; }
+  .link-search input { width:100%; background:transparent; border:none; color:#e6edf7; outline:none; padding:0; }
+  .link-list { max-height: 420px; overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.15); }
+  .link-item { padding:10px; border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; }
+  .link-item:hover { background: rgba(255,255,255,.04); }
+  .link-item .t { font-weight:800; color:#fff; }
+  .link-item .s { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
+  .link-item.active { outline:2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
+  .small { font-size:11px; opacity:.75; }
 
-  .link-list { border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; background: rgba(0,0,0,.08); }
-  .link-row { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; background: rgba(0,0,0,.12); }
-  .link-row:hover { background: rgba(255,255,255,.03); }
-  .link-row:last-child { border-bottom:none; }
-  .link-row .name { font-weight:700; color:#fff; }
-  .link-row .meta { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
-  .link-row.active { outline: 2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
-
-  .side-card { border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px; background: rgba(0,0,0,.15); }
-  .side-title { font-size:12px; color:#9fb0c8; text-transform: uppercase; letter-spacing:.08em; font-weight:800; }
-  .side-big { font-size:16px; font-weight:800; color:#fff; margin-top:6px; }
-  .side-small { font-size:12px; color:#9fb0c8; margin-top:6px; }
-
-  /* === FIX: scroll modal vinculación (soluciona no poder desplazarse) === */
-  #modalLink .modal-box{
-    max-height: 86vh;
-    overflow: hidden;
-    display:flex;
-    flex-direction: column;
-  }
-  #modalLink .link-grid{
-    flex: 1;
-    min-height: 0; /* clave para que overflow funcione */
-  }
-  #modalLink .link-list{
-    max-height: 58vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-  }
 </style>
 </head>
 <body>
@@ -161,39 +139,47 @@
 </div>
 
 <div id="vistaLista" class="card">
-  <h3>Pedidos en curso</h3>
+  <h3 style="margin:0 0 10px 0;">Pedidos en curso</h3>
   <div id="lista" class="list"></div>
 </div>
 
 <div id="vistaDetalle" class="card hidden">
-  <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-    <div>
-      <div style="font-size:12px; color:#9fb0c8;">REFERENCIA</div>
-      <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
-      <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-        <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
-        <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-          <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
-          <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:14px;">
+      <div>
+        <div style="font-size:12px; color:#9fb0c8;">REFERENCIA</div>
+        <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
+            <span id="pillFab" class="badge b-fab hidden"><span class="dot"></span> En fabricación</span>
+            <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
+                <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
+            </div>
         </div>
       </div>
-    </div>
-    <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
+      <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
   </div>
 
   <div id="panelHierro" class="hidden control-panel">
-    <span style="font-weight:700; color:#cbd5e1;">Tipo de Perfilería:</span>
-    <div class="radio-group">
-      <label class="radio-btn"><input type="radio" name="th" value="galvanizado" onchange="guardarTipoHierro()"> Galvanizado</label>
-      <label class="radio-btn"><input type="radio" name="th" value="negro" onchange="guardarTipoHierro()"> Negro</label>
-    </div>
-    <span style="font-size:11px; opacity:0.6; margin-left:auto;">(Requerido para guardar barras)</span>
+      <span style="font-weight:700; color:#cbd5e1;">Tipo de Perfilería:</span>
+      <div class="radio-group">
+          <label class="radio-btn"><input type="radio" name="th" value="galvanizado" onchange="guardarTipoHierro()"> Galvanizado</label>
+          <label class="radio-btn"><input type="radio" name="th" value="negro" onchange="guardarTipoHierro()"> Negro</label>
+      </div>
+      <span style="font-size:11px; opacity:0.6; margin-left:auto;">(Requerido para guardar barras)</span>
   </div>
 
   <div id="bloqueBarras" class="hidden">
     <div class="section-title">PERFILERÍA · BARRAS</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="220">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr>
+        <th width="30">OK</th>
+        <th>Material</th>
+        <th>Pedida</th>
+        <th>Recibida</th>
+        <th width="220">Acción</th>
+        <th>Obs</th>
+      </tr></thead>
       <tbody id="tbodyBarras"></tbody>
     </table>
   </div>
@@ -201,166 +187,150 @@
   <div id="bloqueUnidades" class="hidden">
     <div class="section-title">ACCESORIOS · UNIDADES</div>
     <table>
-      <thead><tr><th width="30">OK</th><th>Material</th><th>Pedida</th><th>Recibida</th><th width="220">Acción</th><th>Obs</th></tr></thead>
+      <thead><tr>
+        <th width="30">OK</th>
+        <th>Material</th>
+        <th>Pedida</th>
+        <th>Recibida</th>
+        <th width="220">Acción</th>
+        <th>Obs</th>
+      </tr></thead>
       <tbody id="tbodyUnidades"></tbody>
     </table>
   </div>
 
   <div class="actions">
     <button class="btn-danger btn" onclick="eliminarPedido()">🗑 Eliminar pedido</button>
+    <button class="btn btn-success" onclick="marcarEnFabricacion()">🏭 Marcar en fabricación</button>
     <button class="btn" onclick="confirmarTodoRecepcion()">💾 Mandar a fabricación</button>
   </div>
 </div>
 
-<!-- Modal creación ficha stock -->
+<!-- MODAL CREACIÓN MATERIAL (si no existe en Stock) -->
 <div id="modalCrear" class="modal-backdrop">
-  <div class="modal-box" style="max-width:450px;">
-    <div class="modal-title">Crear Ficha de Stock</div>
-
-    <div class="modal-info">
-      El material <strong><span id="modMatName"></span></strong> no existe.<br>
-      Defínelo para añadirlo al stock.
-    </div>
-
-    <div class="modal-field">
-      <span class="modal-label">CATEGORÍA</span>
-      <div class="input-group">
-        <select id="modCatSelect" class="modal-select" onchange="cargarGruposModal()"></select>
-        <input id="modCatInput" class="modal-input hidden" placeholder="Nueva Categoría...">
-        <button class="btn btn-icon" onclick="toggleInput('cat')">＋</button>
-      </div>
-    </div>
-
-    <div class="modal-field">
-      <span class="modal-label">GRUPO / FAMILIA</span>
-      <div class="input-group">
-        <select id="modGrpSelect" class="modal-select"></select>
-        <input id="modGrpInput" class="modal-input hidden" placeholder="Nuevo Grupo...">
-        <button class="btn btn-icon" onclick="toggleInput('grp')">＋</button>
-      </div>
-    </div>
-
-    <div style="display:flex; gap:12px;">
-      <div class="modal-field" style="flex:1;">
-        <span class="modal-label">CANTIDAD A SUMAR</span>
-        <input id="modQtyInput" type="number" class="modal-select" style="width:100%; box-sizing:border-box; border-color:#38bdf8; color:#38bdf8; font-weight:bold; text-align:center;">
+  <div class="modal-box" style="max-width:540px;">
+      <div class="modal-title">
+        <span>Crear Ficha de Stock</span>
+        <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalCreacion()">✕</button>
       </div>
 
-      <div class="modal-field" style="flex:1;">
-        <span class="modal-label">UNIDAD (Ej: Caja)</span>
-        <input id="modUnitInput" class="modal-select" placeholder="ud" style="width:100%; box-sizing:border-box;">
+      <div class="modal-info">
+          El material <strong><span id="modMatName"></span></strong> no existe.<br>
+          Defínelo para añadirlo al stock.
       </div>
 
-      <div class="modal-field" style="width:80px;">
-        <span class="modal-label">MÍNIMO</span>
-        <input id="modMinInput" type="number" class="modal-select" placeholder="0" style="width:100%; box-sizing:border-box; text-align:center;">
+      <div class="modal-field">
+          <span class="modal-label">CATEGORÍA</span>
+          <div class="input-group">
+              <select id="modCatSelect" class="modal-select" onchange="cargarGruposModal()"></select>
+              <input id="modCatInput" class="modal-input hidden" placeholder="Nueva Categoría...">
+              <button class="btn btn-icon" onclick="toggleInput('cat')">＋</button>
+          </div>
       </div>
-    </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-      <button class="btn" style="background:transparent; border:none; color:#9fb0c8;" onclick="cerrarModalCreacion()">Cancelar</button>
-      <button class="btn btn-success" onclick="guardarNuevoMaterial()">Guardar y Añadir</button>
-    </div>
+      <div class="modal-field">
+          <span class="modal-label">GRUPO / FAMILIA</span>
+          <div class="input-group">
+              <select id="modGrpSelect" class="modal-select"></select>
+              <input id="modGrpInput" class="modal-input hidden" placeholder="Nuevo Grupo...">
+              <button class="btn btn-icon" onclick="toggleInput('grp')">＋</button>
+          </div>
+      </div>
+
+      <div style="display:flex; gap:12px;">
+          <div class="modal-field" style="flex:1;">
+              <span class="modal-label">CANTIDAD A SUMAR</span>
+              <input id="modQtyInput" type="number" class="modal-select" style="width:100%; box-sizing:border-box; border-color:#38bdf8; color:#38bdf8; font-weight:bold; text-align:center;">
+          </div>
+
+          <div class="modal-field" style="flex:1;">
+              <span class="modal-label">UNIDAD (Ej: Caja)</span>
+              <input id="modUnitInput" class="modal-select" placeholder="ud" style="width:100%; box-sizing:border-box;">
+          </div>
+
+          <div class="modal-field" style="width:80px;">
+              <span class="modal-label">MÍNIMO</span>
+              <input id="modMinInput" type="number" class="modal-select" placeholder="0" style="width:100%; box-sizing:border-box; text-align:center;">
+          </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+          <button class="btn" style="background:transparent; border:none; color:#9fb0c8;" onclick="cerrarModalCreacion()">Cancelar</button>
+          <button class="btn btn-success" onclick="guardarNuevoMaterial()">Guardar y Añadir</button>
+      </div>
   </div>
 </div>
 
-<!-- Modal vinculación a Stock -->
-<div id="modalLink" class="modal-backdrop">
+<!-- MODAL VINCULAR -->
+<div id="modalVincular" class="modal-backdrop">
   <div class="modal-box">
     <div class="modal-title">
-      <span>Vincular línea al Stock</span>
-      <button class="btn" style="background:transparent; border:none; color:#9fb0c8; padding:6px 10px;" onclick="cerrarModalLink()">Cerrar</button>
+      <span>Vincular material de Stock</span>
+      <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalVincular()">✕</button>
     </div>
-    <div class="modal-sub">
-      Línea: <strong id="linkLineName"></strong>
-      <span style="opacity:.6">·</span>
-      Unidad: <strong id="linkLineUnit"></strong>
+
+    <div class="modal-info" style="margin-bottom:12px;">
+      Línea de pedido: <strong id="linkLineName"></strong>
+      <div class="small" style="margin-top:6px;">
+        Consejo: vincula una vez y el sistema lo recordará para próximos pedidos con el mismo nombre.
+      </div>
     </div>
 
     <div class="link-grid">
-      <div>
-        <div class="modal-field">
-          <div class="input-group">
-            <input id="linkSearch" class="modal-select" placeholder="Buscar material en stock (nombre, categoría o grupo)..." oninput="renderLinkList()">
-            <button class="btn" onclick="refrescarStockParaLink()">↻ Refrescar stock</button>
-          </div>
+      <div class="link-panel">
+        <div class="modal-label" style="margin-bottom:6px;">Buscar</div>
+        <div class="link-search">
+          <span style="opacity:.75">🔎</span>
+          <input id="linkSearch" placeholder="Escribe para filtrar..." autocomplete="off" />
         </div>
-        <div class="link-list" id="linkList"></div>
+        <div class="small">Se muestran materiales del Stock (con categoría y grupo).</div>
       </div>
 
-      <div class="side-card">
-        <div class="side-title">Selección</div>
-        <div class="side-big" id="linkPickName">—</div>
-        <div class="side-small" id="linkPickMeta">—</div>
-        <div class="side-small" id="linkPickStock">—</div>
+      <div class="link-panel">
+        <div class="modal-label" style="margin-bottom:6px;">Resultados</div>
+        <div id="linkResults" class="link-list"></div>
+      </div>
+    </div>
 
-        <div style="display:flex; gap:10px; margin-top:14px;">
-          <button class="btn" style="flex:1" onclick="desvincularLinea()">Desvincular</button>
-          <button class="btn btn-success" style="flex:1" onclick="confirmarVinculo()">Vincular</button>
-        </div>
-
-        <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,.08); font-size:12px; color:#9fb0c8;">
-          Recomendación: vincula por ID (no por nombre) para que el stock sea fiable aunque el texto del pedido no coincida.
-        </div>
+    <div style="display:flex; justify-content:space-between; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-danger" onclick="desvincularActual()">Desvincular</button>
+      <div style="display:flex; gap:10px; margin-left:auto;">
+        <button class="btn" onclick="cerrarModalVincular()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmarVinculo()">Vincular</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Firebase (Compat, igual que Stock) -->
+<!-- Firebase (Compat, sin bundlers) PARA SINCRONIZAR STOCK ONLINE IGUAL QUE TU STOCK.html -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-/* =====================
-   === CONSTANTES APP ===
-   ===================== */
+/* =======================================================================================
+   PREPARACIÓN DE PEDIDOS (vNEXT)
+   - Arregla pill Pendiente/Parcial/Completo: se calcula por RECEPCIÓN (qty_recibida).
+   - Auto-cierra (desaparece de Preparación) cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
+   - Permite “Mandar a fabricación” aunque esté parcial, pero NO desaparece.
+   - Añade “En fabricación” (pill) en la ficha del pedido y en la lista.
+   - Muestra stock disponible por línea (del módulo Stock).
+   - Vinculación persistente: recuerda que “40x40” -> “40x40x1.5” etc (global, para futuros pedidos).
+   - Mantiene tu lógica de sumar a stock con movimientos "in".
+   - Sin romper Stock online: usa Firestore doc igual que tu stock.html para leer/escribir stock.
+======================================================================================= */
+
+/* ========= CONSTANTES ========= */
 const LS = localStorage;
+let currentOrderId = null;
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
+
 const STOCK_DB_KEY = "taller_stock_v3_data";
-const uuid = () => Math.random().toString(36).substr(2,9);
+const LINK_MAP_KEY = "prep_stock_linkmap_v1";
 
-/* =========================
-   === MAPA GLOBAL ALIAS  ===
-   =========================
-   Guarda equivalencias: "40x40|barra|galvanizado" => matId del stock.
-   Así NO tienes que vincular en cada pedido.
-*/
-const ALIAS_MAP_KEY = "prep_stock_alias_map_v1";
-function normName(s){
-  return String(s||"").trim().toLowerCase().replace(/\s+/g," ");
-}
-function aliasKey(linea){
-  const n = normName(linea.mat);
-  const u = normName(linea.unit || "ud");
-  const th = (u.includes("barra") && metaActual && metaActual.tipo_hierro) ? normName(metaActual.tipo_hierro) : "";
-  return th ? `${n}|${u}|${th}` : `${n}|${u}`;
-}
-function loadAliasMap(){
-  try { return JSON.parse(LS.getItem(ALIAS_MAP_KEY) || "{}") || {}; }
-  catch(e){ return {}; }
-}
-function saveAliasMap(map){
-  LS.setItem(ALIAS_MAP_KEY, JSON.stringify(map || {}));
-}
-
-/* =====================
-   === ESTADO APP     ===
-   ===================== */
-let refActual = "";
-let estadoMateriales = [];
-let metaActual = {};
-let pendingCreation = null;
-
-// Estado modal vinculación
-let linkCtx = { index: null, selectedMatId: null };
-
-/* ============================
-   === FIRESTORE (Stock Main) ===
-   ============================ */
-const USE_FIRESTORE = true;
+/* ========= FIRESTORE (igual que stock.html) ========= */
+const USE_FIRESTORE_STOCK = true;
 const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
 
 const firebaseConfig = {
@@ -373,13 +343,47 @@ const firebaseConfig = {
 };
 
 let fbApp=null, fbAuth=null, fbDb=null;
+let fsUnsub=null;
+let fsReady=false;
+let ignoreNextLocalSave=false;
+let pendingSaveTimer=null;
 
+/* ========= STATE ========= */
+let refActual = "";
+let estadoMateriales = [];
+let metaActual = {};
+let pendingCreation = null;
+
+let stockMaterials = [];
+let stockMovements = [];
+let stockCategoryOrder = [];
+
+let linkMap = {}; // { "keyNorm|unit": { matId, name, cat, grp, unit } }
+let linkModalCtx = null; // { lineIndex, chosenMatId }
+
+/* ========= HELPERS ========= */
+const uuid = () => Math.random().toString(36).substr(2,9);
+
+function normName(s){
+  return String(s||"")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g," ")
+    .replace(/[’'"]/g,"")
+    .replace(/×/g,"x");
+}
+function linkKeyFor(line){
+  // clave global por nombre+unidad, para recordar vínculos entre pedidos distintos
+  const n = normName(line.mat);
+  const u = normName(line.unit || "");
+  return `${n}|${u}`;
+}
+function toNum(x){ const n = Number(x); return isNaN(n)?0:n; }
+
+/* ========= FIRESTORE helpers ========= */
 function fbEnsure(){
-  if(firebase.apps && firebase.apps.length){
-    fbApp = firebase.apps[0];
-  }else{
-    fbApp = firebase.initializeApp(firebaseConfig);
-  }
+  if(fbApp) return;
+  fbApp = firebase.initializeApp(firebaseConfig);
   fbAuth = firebase.auth();
   fbDb   = firebase.firestore();
 }
@@ -395,62 +399,115 @@ async function fsLoginHidden(){
 function fsDocRef(){
   return fbDb.collection(FIRESTORE_DOC_PATH.col).doc(FIRESTORE_DOC_PATH.doc);
 }
+async function fsLoadOnceToLocal(){
+  const snap = await fsDocRef().get();
+  if(!snap.exists) return false;
+  const data = snap.data() || {};
+  if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
 
-// Carga una vez Firestore -> local cache
-async function fsLoadStockOnceToLocal(){
-  if(!USE_FIRESTORE) return false;
-  try{
-    fbEnsure();
-    await fsLoginHidden();
-    const snap = await fsDocRef().get();
-    if(!snap.exists) return false;
+  ignoreNextLocalSave = true;
+  LS.setItem(STOCK_DB_KEY, JSON.stringify({
+    materials: data.materials || [],
+    movements: data.movements || [],
+    categoryOrder: data.categoryOrder || []
+  }));
+  ignoreNextLocalSave = false;
+
+  stockMaterials = data.materials || [];
+  stockMovements = data.movements || [];
+  stockCategoryOrder = data.categoryOrder || [];
+  return true;
+}
+function fsStartRealtimeListener(){
+  if(fsUnsub) fsUnsub();
+  fsUnsub = fsDocRef().onSnapshot((snap)=>{
+    if(!snap.exists) return;
     const data = snap.data() || {};
-    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
+    if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
 
+    ignoreNextLocalSave = true;
     LS.setItem(STOCK_DB_KEY, JSON.stringify({
       materials: data.materials || [],
       movements: data.movements || [],
       categoryOrder: data.categoryOrder || []
     }));
-    return true;
-  }catch(e){
-    console.warn("No se pudo cargar stock desde Firestore:", e);
-    return false;
-  }
+    ignoreNextLocalSave = false;
+
+    stockMaterials = data.materials || [];
+    stockMovements = data.movements || [];
+    stockCategoryOrder = data.categoryOrder || [];
+
+    // Si estamos dentro de un pedido, refresca stocks mostrados
+    if(refActual) renderTabla();
+  }, (err)=>console.warn("Firestore onSnapshot error:", err));
+}
+function scheduleFsSaveStock(){
+  if(!USE_FIRESTORE_STOCK || !fsReady) return;
+  if(ignoreNextLocalSave) return;
+
+  clearTimeout(pendingSaveTimer);
+  pendingSaveTimer = setTimeout(async ()=>{
+    try{
+      const payload = {
+        materials: stockMaterials,
+        movements: stockMovements,
+        categoryOrder: stockCategoryOrder,
+        updatedAt: new Date().toISOString()
+      };
+      await fsDocRef().set(payload, { merge: true });
+    }catch(e){
+      console.warn("No se pudo guardar en Firestore:", e);
+    }
+  }, 450);
 }
 
-// Inserción segura sin pisar arrays completos
-async function fsAppendMovement(mov){
-  if(!USE_FIRESTORE) return;
-  fbEnsure();
-  await fsLoginHidden();
-  const FieldValue = firebase.firestore.FieldValue;
-  await fsDocRef().set({
-    movements: FieldValue.arrayUnion(mov),
-    updatedAt: new Date().toISOString()
-  }, { merge:true });
+/* ========= STOCK local ========= */
+function loadStockLocal(){
+  const raw = LS.getItem(STOCK_DB_KEY);
+  const db = raw ? JSON.parse(raw) : { materials:[], movements:[], categoryOrder:[] };
+  stockMaterials = Array.isArray(db.materials) ? db.materials : [];
+  stockMovements = Array.isArray(db.movements) ? db.movements : [];
+  stockCategoryOrder = Array.isArray(db.categoryOrder) ? db.categoryOrder : [];
 }
-async function fsAppendMaterialAndMovement(mat, mov){
-  if(!USE_FIRESTORE) return;
-  fbEnsure();
-  await fsLoginHidden();
-  const FieldValue = firebase.firestore.FieldValue;
-  await fsDocRef().set({
-    materials: FieldValue.arrayUnion(mat),
-    movements: FieldValue.arrayUnion(mov),
-    updatedAt: new Date().toISOString()
-  }, { merge:true });
+function saveStockLocal(){
+  LS.setItem(STOCK_DB_KEY, JSON.stringify({
+    materials: stockMaterials,
+    movements: stockMovements,
+    categoryOrder: stockCategoryOrder
+  }));
+  scheduleFsSaveStock();
+}
+function getStockQty(matId){
+  return stockMovements
+    .filter(m => m.matId === matId)
+    .reduce((acc, m) => m.type === 'in' ? acc + toNum(m.qty) : acc - toNum(m.qty), 0);
+}
+function getMatById(id){
+  return stockMaterials.find(m => m.id === id) || null;
 }
 
-/* =======================
-   === IMPORTACIÓN DATOS ===
-   ======================= */
+/* ========= LINKMAP ========= */
+function loadLinkMap(){
+  try { linkMap = JSON.parse(LS.getItem(LINK_MAP_KEY) || "{}") || {}; }
+  catch(e){ linkMap = {}; }
+}
+function saveLinkMap(){
+  LS.setItem(LINK_MAP_KEY, JSON.stringify(linkMap || {}));
+}
+
+/* ========= IMPORTACIÓN DE DATOS DESDE CALCULO/OTROS ========= */
 (function verificarImports() {
   const encontrarNumero = (obj) => {
     if (!obj) return null;
     const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
-    for (let key of posiblesKeys) { if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]); }
-    if (obj.vars) { for (let key of posiblesKeys) { if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]); } }
+    for (let key of posiblesKeys) {
+      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]);
+    }
+    if (obj.vars) {
+      for (let key of posiblesKeys) {
+        if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]);
+      }
+    }
     return null;
   };
 
@@ -469,19 +526,8 @@ async function fsAppendMaterialAndMovement(mat, mov){
       if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
       if (metaParaGuardar.en_fabricacion === undefined) metaParaGuardar.en_fabricacion = false;
 
-      const lines = (snap.materiales || []).map(l => ({
-        ...l,
-        qty_pedida: Number(l.qty_pedida || l.qty || l.cantidad || 0) || 0,
-        qty_recibida: Number(l.qty_recibida || 0) || 0,
-        aplicado_qty: Number(l.aplicado_qty || 0) || 0,
-        ok: !!l.ok,
-        note: l.note || "",
-        stock_matId: l.stock_matId || null,
-        stock_label: l.stock_label || ""
-      }));
-
       LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
-      if (!LS.getItem(KP(ref))) LS.setItem(KP(ref), JSON.stringify(lines));
+      if (!LS.getItem(KP(ref))) LS.setItem(KP(ref), JSON.stringify(snap.materiales || []));
 
       LS.removeItem("latest_materials_v1");
       LS.removeItem("pedido_en_preparacion");
@@ -489,144 +535,60 @@ async function fsAppendMaterialAndMovement(mat, mov){
   }
 })();
 
-/* =====================
-   === NAVEGACIÓN/UI  ===
-   ===================== */
-function volverIndex() { location.href = "index.html"; }
-function volverLista() {
+/* ========= NAVEGACIÓN ========= */
+function volverIndex(){ location.href = "index.html"; }
+function volverLista(){
   document.getElementById("vistaDetalle").classList.add("hidden");
   document.getElementById("vistaLista").classList.remove("hidden");
   refActual = "";
   cargarLista();
 }
 
-/* =====================
-   === STOCK LOCAL DB ===
-   ===================== */
-function _db() {
-  const raw = LS.getItem(STOCK_DB_KEY);
-  const db = raw ? JSON.parse(raw) : { materials:[], movements:[] };
-  if(!db.materials) db.materials = [];
-  if(!db.movements) db.movements = [];
-  return db;
-}
-function _calcStockByMatId(db, matId){
-  if(!db || !Array.isArray(db.movements)) return 0;
-  return db.movements
-    .filter(m => m.matId === matId)
-    .reduce((acc, m) => (m.type === 'in' ? acc + (Number(m.qty)||0) : acc - (Number(m.qty)||0)), 0);
-}
-
-/* ===============================
-   === NORMALIZACIÓN CAT/GRP ===
-   (soluciona "sin grupos/familias")
-   =============================== */
-function matCat(m){
-  return (m && (m.cat ?? m.category ?? m.categoria ?? m.CAT ?? "")) || "";
-}
-function matGrp(m){
-  return (m && (m.grp ?? m.group ?? m.grupo ?? m.familia ?? m.GRP ?? "")) || "";
-}
-
-/* ==============================
-   === Fallback nombre con hints ===
-   ============================== */
-function _findStockMatByNameWithHints(baseName, ironType, unit) {
-  const db = _db();
-  let candidates = [];
-
-  if (ironType && unit && String(unit).toLowerCase().includes('barra')) {
-    const hint = (ironType === 'negro') ? 'negro' : 'galva';
-    const preferred = db.materials.find(m =>
-      (m.name||'').trim().toLowerCase() === String(baseName||'').trim().toLowerCase() &&
-      ((String(matGrp(m)||'').toLowerCase().includes(hint)) || (String(matCat(m)||'').toLowerCase().includes(hint)))
-    );
-    if (preferred) return { success:true, mat: preferred, db };
-  }
-
-  if (ironType) {
-    candidates.push(baseName + " " + ironType.charAt(0).toUpperCase() + ironType.slice(1));
-    candidates.push(baseName + " " + ironType.toLowerCase());
-  }
-  candidates.push(baseName);
-
-  let mat = null;
-  for (let candidate of candidates) {
-    mat = db.materials.find(m => (m.name||'').trim().toLowerCase() === String(candidate||'').trim().toLowerCase());
-    if (mat) break;
-  }
-
-  const searchedName = candidates.length > 0 ? candidates[0] : baseName;
-  if (!mat) return { success:false, searchedName, db };
-  return { success:true, mat, db };
-}
-
-/* ===============================
-   === STOCK INFO POR LÍNEA (ID) ===
-   =============================== */
-function getStockInfoForLine(linea){
-  const db = _db();
-
-  if(linea && linea.stock_matId){
-    const mat = db.materials.find(m => m.id === linea.stock_matId);
-    if(mat){
-      const stock = _calcStockByMatId(db, mat.id);
-      return { found:true, stock, name: mat.name, matId: mat.id, linked:true };
-    }
-    return { found:false, stock:null, name: linea.stock_label || linea.mat, linked:false, brokenLink:true };
-  }
-
-  const ironType = (linea.unit === 'barra') ? (metaActual.tipo_hierro || null) : null;
-  const check = _findStockMatByNameWithHints(linea.mat, ironType, linea.unit);
-  if(!check.success) return { found:false, stock:null, name: check.searchedName, linked:false };
-  const stock = _calcStockByMatId(check.db, check.mat.id);
-  return { found:true, stock, name: check.mat.name, matId: check.mat.id, linked:false };
-}
-
-/* =======================
-   === LISTA DE PEDIDOS ===
-   ======================= */
+/* ========= LISTA DE PEDIDOS (pill por RECEPCIÓN) ========= */
 function cargarLista() {
   const lista = document.getElementById("lista");
   lista.innerHTML = "";
   const keys = Object.keys(LS).filter(k => k.startsWith("prep_recepcion_"));
-  if(keys.length === 0) { lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>"; return; }
+  if(keys.length === 0) {
+    lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>";
+    return;
+  }
 
   keys.reverse().forEach(k => {
     const ref = k.replace("prep_recepcion_", "");
     const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
     const lines = JSON.parse(LS.getItem(k) || "[]");
-
     const totalLines = lines.length;
-    const completeLines = lines.filter(l => (Number(l.aplicado_qty)||0) >= (Number(l.qty_pedida)||0)).length;
+
+    // COMPLETO / PARCIAL por RECEPCIÓN
+    const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
+    const anyReceived = lines.some(l => (toNum(l.qty_recibida)) > 0);
 
     let badgeClass = "b-p"; let badgeText = "Pendiente";
-    if (totalLines > 0 && completeLines > 0 && completeLines < totalLines) { badgeClass = "b-pa"; badgeText = "Parcial"; }
-    else if (totalLines > 0 && completeLines === totalLines) { badgeClass = "b-c"; badgeText = "Completo"; }
+    if (totalLines > 0 && completeLines === totalLines) { badgeClass = "b-c"; badgeText = "Completo"; }
+    else if (totalLines > 0 && anyReceived) { badgeClass = "b-pa"; badgeText = "Parcial"; }
 
     const fab = !!meta.en_fabricacion;
-    const fabHtml = fab ? `<div style="margin-top:6px;"><span class="badge b-fab">En fabricación</span></div>` : "";
 
     const item = document.createElement("div");
     item.className = "item";
     item.innerHTML = `
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px; align-items:flex-start;">
-        <span style="font-weight:bold; color:#fff">${escapeHtml(ref)}</span>
-        <span class="badge ${badgeClass}">${badgeText}</span>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px; gap:10px; align-items:flex-start;">
+        <span style="font-weight:bold; color:#fff">${ref}</span>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+          ${fab ? `<span class="badge b-fab"><span class="dot"></span> En fabricación</span>` : ``}
+          <span class="badge ${badgeClass}">${badgeText}</span>
+        </div>
       </div>
       <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-        ${escapeHtml(meta.concepto || "Sin concepto")} (${escapeHtml(meta.unidades || 1)} uds)
-      </div>
-      ${fabHtml}
-    `;
-    item.onclick = async () => {
-      await fsLoadStockOnceToLocal();
-      abrirPedido(ref);
-    };
+        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)
+      </div>`;
+    item.onclick = () => abrirPedido(ref);
     lista.appendChild(item);
   });
 }
 
+/* ========= ABRIR PEDIDO ========= */
 function abrirPedido(ref) {
   refActual = ref;
   document.getElementById("vistaLista").classList.add("hidden");
@@ -635,116 +597,249 @@ function abrirPedido(ref) {
   metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
   if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
 
-  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]").map(l => ({
-    ...l,
-    qty_pedida: Number(l.qty_pedida || 0) || 0,
-    qty_recibida: Number(l.qty_recibida || 0) || 0,
-    aplicado_qty: Number(l.aplicado_qty || 0) || 0,
-    ok: !!l.ok,
-    note: l.note || "",
-    stock_matId: l.stock_matId || null,
-    stock_label: l.stock_label || ""
-  }));
-
-  // === AUTOVINCULAR POR ALIAS GLOBAL ===
-  // Si la línea no tiene stock_matId, intentamos recuperar por alias ("40x40|barra|galvanizado")
-  try{
-    const amap = loadAliasMap();
-    let changed = false;
-    estadoMateriales.forEach(l=>{
-      if(l.stock_matId) return;
-      const k = aliasKey(l);
-      if(amap[k] && amap[k].matId){
-        l.stock_matId = amap[k].matId;
-        l.stock_label = amap[k].label || l.stock_label || "";
-        changed = true;
-      }
-    });
-    if(changed) LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
-  }catch(e){}
+  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
 
   document.getElementById("ref").textContent = ref;
   document.getElementById("concepto").textContent = metaActual.concepto || "";
   document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
+  document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
 
   const radios = document.getElementsByName("th");
   radios.forEach(r => r.checked = (r.value === metaActual.tipo_hierro));
+
   renderTabla();
 }
 
+/* ========= GUARDADOS META ========= */
 function guardarUnidadesManual() {
   const val = parseFloat(document.getElementById("inputUnidades").value) || 1;
   metaActual.unidades = val;
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 }
+function guardarTipoHierro(){
+  const radios=document.getElementsByName("th");
+  let val=""; radios.forEach(r=>{if(r.checked)val=r.value});
+  metaActual.tipo_hierro=val;
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+}
+function marcarEnFabricacion(){
+  metaActual.en_fabricacion = true;
+  metaActual.fabricacion_ts = Date.now();
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  document.getElementById("pillFab").classList.remove("hidden");
+  cargarLista();
+  alert("✅ Marcado como EN FABRICACIÓN (no se elimina hasta que esté todo recibido).");
+}
 
-/* ==========================
-   === RENDER TABLA LÍNEAS ===
-   ========================== */
+/* ========= AUTOCIERRE POR RECEPCIÓN (lo que tú quieres) ========= */
+function autoCerrarSiCompletoPorRecepcion(){
+  const totalLines = estadoMateriales.length;
+  if(totalLines === 0) return;
+
+  const completeLines = estadoMateriales.filter(l =>
+    toNum(l.qty_recibida) >= toNum(l.qty_pedida)
+  ).length;
+
+  if(completeLines === totalLines){
+    LS.removeItem(KP(refActual));
+    LS.removeItem(KM(refActual));
+    alert("✅ Pedido completo (material recibido): se ha retirado de Preparación.");
+    volverLista();
+  }
+}
+
+/* ========= VINCULACIÓN: elegir matId de stock para una línea ========= */
+function getLinkedMatIdForLine(line){
+  // 1) si línea ya tiene link explícito, úsalo
+  if(line.linked_matId && getMatById(line.linked_matId)) return line.linked_matId;
+
+  // 2) si existe mapeo global por nombre+unidad, úsalo
+  const k = linkKeyFor(line);
+  const rec = linkMap[k];
+  if(rec && rec.matId && getMatById(rec.matId)) return rec.matId;
+
+  return null;
+}
+function setLinkForLine(index, matId){
+  const line = estadoMateriales[index];
+  const mat = getMatById(matId);
+  if(!mat) return;
+
+  line.linked_matId = matId;
+
+  // guarda global
+  const k = linkKeyFor(line);
+  linkMap[k] = { matId: matId, name: mat.name, cat: mat.cat, grp: mat.grp, unit: mat.unit };
+  saveLinkMap();
+
+  guardarEstadoLocal();
+  renderTabla();
+  cargarLista();
+}
+function clearLinkForLine(index){
+  const line = estadoMateriales[index];
+  line.linked_matId = null;
+  guardarEstadoLocal();
+  renderTabla();
+}
+
+/* ========= MODAL VINCULAR ========= */
+function abrirModalVincular(index){
+  linkModalCtx = { lineIndex: index, chosenMatId: null };
+
+  const line = estadoMateriales[index];
+  document.getElementById("linkLineName").textContent = `${line.mat} (${line.unit || "ud"})`;
+
+  // construir lista
+  const input = document.getElementById("linkSearch");
+  input.value = "";
+  input.oninput = () => renderLinkResults();
+
+  renderLinkResults();
+  document.getElementById("modalVincular").classList.add("active");
+}
+function cerrarModalVincular(){
+  document.getElementById("modalVincular").classList.remove("active");
+  linkModalCtx = null;
+}
+function desvincularActual(){
+  if(!linkModalCtx) return;
+  clearLinkForLine(linkModalCtx.lineIndex);
+  cerrarModalVincular();
+}
+function confirmarVinculo(){
+  if(!linkModalCtx || !linkModalCtx.chosenMatId){
+    alert("Selecciona un material del listado.");
+    return;
+  }
+  setLinkForLine(linkModalCtx.lineIndex, linkModalCtx.chosenMatId);
+  cerrarModalVincular();
+}
+function renderLinkResults(){
+  const host = document.getElementById("linkResults");
+  host.innerHTML = "";
+
+  const q = normName(document.getElementById("linkSearch").value || "");
+  const line = linkModalCtx ? estadoMateriales[linkModalCtx.lineIndex] : null;
+
+  // preferencia: si es barra, filtrar a materiales que contengan galva/negro?
+  // Aquí no filtramos agresivo para no ocultar cosas; solo ordenamos.
+  let arr = stockMaterials.slice();
+
+  if(q){
+    arr = arr.filter(m => {
+      const t = normName(`${m.name} ${m.cat} ${m.grp}`);
+      return t.includes(q);
+    });
+  }
+
+  // orden simple: categoría > grupo > nombre
+  arr.sort((a,b) => {
+    const ac = normName(a.cat).localeCompare(normName(b.cat));
+    if(ac!==0) return ac;
+    const ag = normName(a.grp).localeCompare(normName(b.grp));
+    if(ag!==0) return ag;
+    return normName(a.name).localeCompare(normName(b.name));
+  });
+
+  if(arr.length===0){
+    host.innerHTML = `<div style="padding:12px; opacity:.7;">Sin resultados.</div>`;
+    return;
+  }
+
+  arr.forEach(m => {
+    const qty = getStockQty(m.id);
+    const el = document.createElement("div");
+    el.className = "link-item" + (linkModalCtx && linkModalCtx.chosenMatId===m.id ? " active" : "");
+    el.innerHTML = `
+      <div class="t">${m.name}</div>
+      <div class="s">
+        <span>${m.cat} › ${m.grp}</span>
+        <span><b>${qty}</b> ${m.unit || ""}</span>
+      </div>
+    `;
+    el.onclick = () => {
+      linkModalCtx.chosenMatId = m.id;
+      renderLinkResults();
+    };
+    host.appendChild(el);
+  });
+}
+
+/* ========= RENDER TABLA (muestra stock y vínculo) ========= */
 function renderTabla() {
   const tbodyBarras = document.getElementById("tbodyBarras");
   const tbodyUnidades = document.getElementById("tbodyUnidades");
-  tbodyBarras.innerHTML = ""; tbodyUnidades.innerHTML = "";
-  let hasBarras = false; let hasUnidades = false;
+  tbodyBarras.innerHTML = "";
+  tbodyUnidades.innerHTML = "";
+
+  let hasBarras = false;
+  let hasUnidades = false;
+
+  // pill fabricación
+  document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
 
   estadoMateriales.forEach((linea, index) => {
-    const pedida = parseFloat(linea.qty_pedida) || 0;
-    const recibida = parseFloat(linea.qty_recibida) || 0;
-    const yaAplicada = parseFloat(linea.aplicado_qty) || 0;
-    const diff = recibida - yaAplicada;
+    const pedida = toNum(linea.qty_pedida);
+    const recibida = toNum(linea.qty_recibida);
+    const yaAplicada = toNum(linea.aplicado_qty);
 
-    const isComplete = linea.ok || (pedida > 0 && recibida >= pedida) || (pedida > 0 && yaAplicada >= pedida);
+    // criterio de OK de línea = RECEPCIÓN (tu uso real)
+    const isComplete = linea.ok || (pedida > 0 && recibida >= pedida);
     const rowClass = isComplete ? "ok" : "";
 
+    // link/stock info
+    const linkedId = getLinkedMatIdForLine(linea);
+    const linkedMat = linkedId ? getMatById(linkedId) : null;
+    const stockQty = linkedId ? getStockQty(linkedId) : null;
+
+    let stockPill = "";
+    if(linkedMat){
+      // estado stock vs pedida (orientativo)
+      const s = toNum(stockQty);
+      let cls = "ok";
+      if(s <= 0) cls = "danger";
+      else if(pedida > 0 && s < pedida) cls = "warn";
+
+      stockPill = `<span class="link-pill ${cls}">Stock: <b>${s}</b> ${linkedMat.unit || ""}</span>`;
+    } else {
+      stockPill = `<span class="link-pill">Sin vínculo</span>`;
+    }
+
+    // botón añadir a stock (usa aplicado_qty para evitar duplicados)
+    const diff = recibida - yaAplicada;
     let btnHtml = "";
-    if (diff > 0) btnHtml = `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
-    else if (yaAplicada > 0) btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
-    else btnHtml = `<span style="opacity:0.2">-</span>`;
+    if (diff > 0) {
+      btnHtml = `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
+    } else if (yaAplicada > 0) {
+      btnHtml = `<button class="btn-mini disabled">✅ OK</button>`;
+    } else {
+      btnHtml = `<span style="opacity:0.2">-</span>`;
+    }
 
-    const info = getStockInfoForLine(linea);
-    let stockHtml = info.found
-      ? `<div class="stock-mini">Stock: <strong>${info.stock}</strong></div>`
-      : `<div class="stock-mini" style="opacity:0.45;">Stock: (no vinculado)</div>`;
-
-    const linkLabel = (linea.stock_matId && info.found) ? (info.name || linea.stock_label || "Material vinculado") :
-                      (linea.stock_matId && !info.found ? (linea.stock_label || "Vínculo roto") : "Sin vincular");
-    const linkState = (linea.stock_matId && info.found) ? "Vinculado a" :
-                      (linea.stock_matId && !info.found ? "Vínculo" : "Vincular");
-    const linkHint = (linea.stock_matId && info.found) ? "Cambiar vínculo" : "Vincular";
-
-    const linkHtml = `
-      <div class="link-mini">
-        <span class="link-pill" onclick="abrirModalLink(${index})" title="${escapeAttr(linkHint)}">
-          🔗 <span style="opacity:.8">${escapeHtml(linkState)}:</span> <strong>${escapeHtml(linkLabel)}</strong>
-        </span>
-        <span class="link-pill" onclick="editarNombreLinea(${index})" title="Editar texto del pedido (no cambia el stock)">
-          ✎ <span style="opacity:.8">Editar nombre</span>
-        </span>
-      </div>
-    `;
+    // botón vincular siempre disponible
+    const btnVincular = `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
 
     const tr = document.createElement("tr");
     tr.className = rowClass;
+
     tr.innerHTML = `
       <td><input type="checkbox" ${linea.ok ? "checked" : ""} onchange="toggleOk(${index}, this.checked)"></td>
       <td>
-        <div style="font-weight:600">${escapeHtml(linea.mat)}</div>
-        ${stockHtml}
-        ${linkHtml}
-        ${yaAplicada > 0 ? `<div style="font-size:10px; opacity:0.6">Sumado: ${yaAplicada}</div>` : ''}
-      </td>
-      <td>${pedida} <span style="font-size:10px;opacity:0.5">${escapeHtml(linea.unit || 'ud')}</span></td>
-      <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
-      <td>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          ${btnHtml}
-          <button class="btn-mini" onclick="abrirModalLink(${index})" title="Vincular o cambiar vínculo">Vincular</button>
+        <div style="font-weight:700; color:#fff;">${linea.mat}</div>
+        <div class="stock-mini">
+          ${stockPill}
+          ${linkedMat ? `<span class="small">Vinculado a: <b>${linkedMat.name}</b></span>` : `<span class="small">Pulsa “Vincular” para emparejar con Stock</span>`}
+          ${yaAplicada > 0 ? `<span class="small">Sumado a stock: <b>${yaAplicada}</b></span>` : ``}
         </div>
       </td>
-      <td><input type="text" value="${escapeAttr(linea.note || '')}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
+      <td>${pedida} <span style="font-size:10px;opacity:0.5">${linea.unit || 'ud'}</span></td>
+      <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
+      <td>${btnHtml}${btnVincular}</td>
+      <td><input type="text" value="${linea.note || ''}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
     `;
 
-    if (linea.unit === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
+    if ((linea.unit || "").toLowerCase() === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
     else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
   });
 
@@ -752,204 +847,52 @@ function renderTabla() {
   document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
   document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
 
-  // Auto-retirada: solo si en fabricación y TODO completo
-  if(metaActual && metaActual.en_fabricacion){
-    const totalLines = estadoMateriales.length;
-    const completeLines = estadoMateriales.filter(l => (Number(l.aplicado_qty)||0) >= (Number(l.qty_pedida)||0)).length;
-    if(totalLines > 0 && completeLines === totalLines){
-      LS.removeItem(KP(refActual));
-      LS.removeItem(KM(refActual));
-      alert("✅ Pedido completo: se ha retirado de Preparación.");
-      volverLista();
-    }
-  }
+  // AUTO-CIERRE por RECEPCIÓN
+  autoCerrarSiCompletoPorRecepcion();
 }
 
-/* ===============================
-   === VINCULACIÓN: MODAL STOCK ===
-   =============================== */
-function abrirModalLink(index){
-  linkCtx.index = index;
-  linkCtx.selectedMatId = null;
-
-  const linea = estadoMateriales[index];
-  document.getElementById("linkLineName").textContent = linea.mat || "";
-  document.getElementById("linkLineUnit").textContent = linea.unit || "ud";
-  document.getElementById("linkSearch").value = "";
-
-  if(linea.stock_matId){
-    linkCtx.selectedMatId = linea.stock_matId;
+/* ========= LÓGICA DE STOCK: sumar movimiento "in" ========= */
+function _addToRealStock_byLinkedOrName(linea, ironType) {
+  // 0) si hay vínculo, usarlo
+  const linkedId = getLinkedMatIdForLine(linea);
+  if(linkedId){
+    const mat = getMatById(linkedId);
+    if(mat) return { success:true, mat, matId: linkedId };
   }
 
-  renderLinkList();
-  renderLinkSelectionCard();
-
-  document.getElementById("modalLink").classList.add("active");
-}
-function cerrarModalLink(){
-  document.getElementById("modalLink").classList.remove("active");
-  linkCtx = { index:null, selectedMatId:null };
-}
-async function refrescarStockParaLink(){
-  await fsLoadStockOnceToLocal();
-  renderLinkList();
-  renderLinkSelectionCard();
-}
-
-function renderLinkList(){
-  const db = _db();
-  const list = document.getElementById("linkList");
-  const q = (document.getElementById("linkSearch").value || "").trim().toLowerCase();
-
-  const idx = linkCtx.index;
-  const linea = (idx !== null) ? estadoMateriales[idx] : null;
-  const hint = linea ? String(linea.mat||"").trim().toLowerCase() : "";
-
-  let mats = Array.isArray(db.materials) ? db.materials.slice() : [];
-
-  if(q){
-    mats = mats.filter(m => {
-      const name = String(m.name||"").toLowerCase();
-      const cat  = String(matCat(m)||"").toLowerCase();
-      const grp  = String(matGrp(m)||"").toLowerCase();
-      return name.includes(q) || cat.includes(q) || grp.includes(q);
-    });
+  // 1) si no, intentar match por nombre con candidatos (incluye ironType en barras)
+  const baseName = String(linea.mat||"");
+  let candidates = [];
+  if (ironType && (String(linea.unit||"").toLowerCase().includes('barra'))) {
+    candidates.push(baseName + " " + ironType.charAt(0).toUpperCase() + ironType.slice(1));
+    candidates.push(baseName + " " + ironType.toLowerCase());
   }
+  candidates.push(baseName);
 
-  if(hint){
-    mats.sort((a,b)=>{
-      const an = String(a.name||"").toLowerCase();
-      const bn = String(b.name||"").toLowerCase();
-      const as = (an.includes(hint) ? 0 : 1);
-      const bs = (bn.includes(hint) ? 0 : 1);
-      if(as !== bs) return as - bs;
-      return an.localeCompare(bn);
-    });
-  }else{
-    mats.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  let mat = null;
+  for (let candidate of candidates) {
+    const cn = normName(candidate);
+    mat = stockMaterials.find(m => normName(m.name) === cn);
+    if (mat) break;
   }
+  const searchedName = candidates.length > 0 ? candidates[0] : baseName;
+  if (!mat) return { success:false, searchedName };
 
-  if(mats.length === 0){
-    list.innerHTML = `<div class="link-row" style="cursor:default; opacity:.7">Sin resultados.</div>`;
-    return;
-  }
-
-  const dbNow = _db();
-  list.innerHTML = "";
-  mats.slice(0, 500).forEach(m => {
-    const stock = _calcStockByMatId(dbNow, m.id);
-    const row = document.createElement("div");
-    row.className = "link-row" + (linkCtx.selectedMatId === m.id ? " active" : "");
-    row.innerHTML = `
-      <div class="name">${escapeHtml(m.name || "")}</div>
-      <div class="meta">
-        <span>${escapeHtml((matCat(m)||"") + " > " + (matGrp(m)||""))}</span>
-        <span><strong>${stock}</strong> ${escapeHtml(m.unit||"")}</span>
-      </div>
-    `;
-    row.onclick = ()=>{
-      linkCtx.selectedMatId = m.id;
-      document.querySelectorAll("#linkList .link-row").forEach(el=>el.classList.remove("active"));
-      row.classList.add("active");
-      renderLinkSelectionCard();
-    };
-    list.appendChild(row);
-  });
+  return { success:true, mat, matId: mat.id };
 }
 
-function renderLinkSelectionCard(){
-  const db = _db();
-  const pickName = document.getElementById("linkPickName");
-  const pickMeta = document.getElementById("linkPickMeta");
-  const pickStock = document.getElementById("linkPickStock");
-
-  if(!linkCtx.selectedMatId){
-    pickName.textContent = "—";
-    pickMeta.textContent = "—";
-    pickStock.textContent = "—";
-    return;
-  }
-  const m = db.materials.find(x=>x.id===linkCtx.selectedMatId);
-  if(!m){
-    pickName.textContent = "Material no encontrado";
-    pickMeta.textContent = "—";
-    pickStock.textContent = "—";
-    return;
-  }
-  const stock = _calcStockByMatId(db, m.id);
-  pickName.textContent = m.name || "";
-  pickMeta.textContent = (matCat(m)||"") + " > " + (matGrp(m)||"");
-  pickStock.textContent = "Stock actual: " + stock + " " + (m.unit||"");
-}
-
-function confirmarVinculo(){
-  const idx = linkCtx.index;
-  if(idx === null) return;
-  if(!linkCtx.selectedMatId){
-    alert("Selecciona un material de stock para vincular.");
-    return;
-  }
-  const db = _db();
-  const m = db.materials.find(x=>x.id===linkCtx.selectedMatId);
-  if(!m){
-    alert("No se encontró el material seleccionado en el stock.");
-    return;
-  }
-
-  estadoMateriales[idx].stock_matId = m.id;
-  estadoMateriales[idx].stock_label = m.name || "";
-
-  // === GUARDAR COMO ALIAS GLOBAL (para futuros pedidos) ===
-  const linea = estadoMateriales[idx];
-  const k = aliasKey(linea);
-  if(confirm(`¿Guardar esta vinculación para futuros pedidos?\n\n"${linea.mat}" → "${m.name}"`)){
-    const amap = loadAliasMap();
-    amap[k] = { matId: m.id, label: m.name, unit: m.unit || "" };
-    saveAliasMap(amap);
-  }
-
-  guardarEstadoLocal();
-  cerrarModalLink();
-  renderTabla();
-}
-
-function desvincularLinea(){
-  const idx = linkCtx.index;
-  if(idx === null) return;
-
-  if(!confirm("¿Desvincular esta línea del stock?")) return;
-
-  estadoMateriales[idx].stock_matId = null;
-  estadoMateriales[idx].stock_label = "";
-
-  guardarEstadoLocal();
-  cerrarModalLink();
-  renderTabla();
-}
-
-function editarNombreLinea(index){
-  const linea = estadoMateriales[index];
-  const nuevo = prompt("Editar nombre del material (solo texto del pedido):", linea.mat || "");
-  if(nuevo === null) return;
-  const v = String(nuevo).trim();
-  if(!v){ alert("Nombre no válido."); return; }
-  linea.mat = v;
-  guardarEstadoLocal();
-  renderTabla();
-}
-
-/* ===============================
-   === AÑADIR RECEPCIÓN A STOCK ===
-   =============================== */
+/* ========= FUNCIÓN PRINCIPAL: AÑADIR A STOCK ========= */
 function guardarLinea(index) {
   const linea = estadoMateriales[index];
-  const recibido = parseFloat(linea.qty_recibida) || 0;
-  const yaAplicado = parseFloat(linea.aplicado_qty) || 0;
+  const recibido = toNum(linea.qty_recibida);
+  const yaAplicado = toNum(linea.aplicado_qty);
   const diff = recibido - yaAplicado;
+
   if (diff <= 0) return;
 
+  // Validación Hierro
   let tipoHierro = null;
-  if (linea.unit === 'barra') {
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -960,39 +903,10 @@ function guardarLinea(index) {
     }
   }
 
-  const db = _db();
+  // Intentar encontrar
+  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
 
-  // 1) Si hay vínculo por ID, sumar directo
-  if(linea.stock_matId){
-    const mat = db.materials.find(m => m.id === linea.stock_matId);
-    if(!mat){
-      alert("⚠️ El material vinculado ya no existe en el stock. Vuelve a vincular.");
-      abrirModalLink(index);
-      return;
-    }
-
-    const mov = { id: uuid(), matId: mat.id, type: 'in', qty: diff, date: new Date().toISOString() };
-    db.movements.push(mov);
-    LS.setItem(STOCK_DB_KEY, JSON.stringify(db));
-    fsAppendMovement(mov).catch(err => console.warn("No se pudo subir movimiento:", err));
-
-    const newTotal = _calcStockByMatId(db, mat.id);
-
-    linea.aplicado_qty = recibido;
-    guardarEstadoLocal();
-
-    alert(`✅ Stock Actualizado.\nMaterial: ${mat.name}\nTotal: ${newTotal}`);
-    renderTabla();
-    return;
-  }
-
-  // 2) Sin vínculo: intentar por nombre (fallback)
-  const check = _findStockMatByNameWithHints(linea.mat, tipoHierro, linea.unit);
   if (!check.success) {
-    if(confirm("Este material no coincide con Stock.\n\n¿Quieres VINCULARLO a un material existente del stock? (Recomendado)")){
-      abrirModalLink(index);
-      return;
-    }
     abrirModalCreacion({
       name: check.searchedName,
       unit: linea.unit,
@@ -1002,37 +916,32 @@ function guardarLinea(index) {
     return;
   }
 
-  const mov = { id: uuid(), matId: check.mat.id, type: 'in', qty: diff, date: new Date().toISOString() };
-  check.db.movements.push(mov);
-  LS.setItem(STOCK_DB_KEY, JSON.stringify(check.db));
-  fsAppendMovement(mov).catch(err => console.warn("No se pudo subir movimiento:", err));
+  // Guardar movimiento IN
+  stockMovements.push({ id: uuid(), matId: check.matId, type: 'in', qty: diff, date: new Date().toISOString() });
+  saveStockLocal();
 
-  const newTotal = _calcStockByMatId(check.db, check.mat.id);
-
-  linea.aplicado_qty = recibido;
+  // Actualizar aplicado_qty incremental (para no duplicar)
+  linea.aplicado_qty = yaAplicado + diff;
   guardarEstadoLocal();
 
+  const newTotal = getStockQty(check.matId);
   let msg = `✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`;
-  if (tipoHierro && !String(check.mat.name||"").toLowerCase().includes(tipoHierro.toLowerCase())) msg += `\n(Se sumó al genérico)`;
 
   alert(msg);
   renderTabla();
 }
 
-/* ===============================
-   === MODAL CREACIÓN MATERIAL ===
-   =============================== */
+/* ========= MODAL CREACIÓN ========= */
 function abrirModalCreacion(data) {
   pendingCreation = data;
   document.getElementById("modMatName").textContent = data.name;
 
-  const db = _db();
-  const cats = [...new Set(db.materials.map(m => matCat(m)).filter(Boolean))].sort();
+  // Cargar selects desde stock
+  const cats = [...new Set(stockMaterials.map(m => m.cat).filter(Boolean))].sort();
 
   const selCat = document.getElementById("modCatSelect");
-  selCat.innerHTML =
-    `<option value="" disabled selected>-- Elige Categoría --</option>` +
-    cats.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+  selCat.innerHTML = `<option value="" disabled selected>-- Elige Categoría --</option>` +
+                     cats.map(c => `<option value="${c}">${c}</option>`).join("");
 
   document.getElementById("modGrpSelect").innerHTML = `<option value="" disabled selected>-- Elige Categoría primero --</option>`;
 
@@ -1040,6 +949,7 @@ function abrirModalCreacion(data) {
   document.getElementById("modUnitInput").value = data.unit || "ud";
   document.getElementById("modMinInput").value = "";
 
+  // Reset
   document.getElementById("modCatInput").value = "";
   document.getElementById("modGrpInput").value = "";
   document.getElementById("modCatInput").classList.add("hidden");
@@ -1067,16 +977,13 @@ function toggleInput(type) {
   }
 }
 function cargarGruposModal() {
-  const db = _db();
   const cat = document.getElementById("modCatSelect").value;
-  const grps = [...new Set(db.materials.filter(m => matCat(m) === cat).map(m => matGrp(m)).filter(Boolean))].sort();
+  const grps = [...new Set(stockMaterials.filter(m => m.cat === cat).map(m => m.grp).filter(Boolean))].sort();
 
   const selGrp = document.getElementById("modGrpSelect");
-  selGrp.innerHTML =
-    `<option value="" disabled selected>-- Elige Grupo --</option>` +
-    grps.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
+  selGrp.innerHTML = `<option value="" disabled selected>-- Elige Grupo --</option>` +
+                     grps.map(g => `<option value="${g}">${g}</option>`).join("");
 }
-
 function guardarNuevoMaterial() {
   if (!pendingCreation) return;
 
@@ -1092,88 +999,99 @@ function guardarNuevoMaterial() {
   if (!catVal || !grpVal) { alert("Por favor, indica Categoría y Grupo."); return; }
   if (qtyVal <= 0) { alert("La cantidad a sumar debe ser mayor que 0."); return; }
 
-  const db = _db();
+  // Crear material en stock
   const newId = uuid();
-  const mat = { id: newId, cat: catVal, grp: grpVal, name: pendingCreation.name, unit: unitVal, min: minVal };
-  const mov = { id: uuid(), matId: newId, type: 'in', qty: qtyVal, date: new Date().toISOString() };
+  stockMaterials.push({
+    id: newId,
+    cat: catVal,
+    grp: grpVal,
+    name: pendingCreation.name,
+    unit: unitVal,
+    min: minVal
+  });
 
-  db.materials.push(mat);
-  db.movements.push(mov);
-  LS.setItem(STOCK_DB_KEY, JSON.stringify(db));
+  stockMovements.push({
+    id: uuid(),
+    matId: newId,
+    type: 'in',
+    qty: qtyVal,
+    date: new Date().toISOString()
+  });
 
-  fsAppendMaterialAndMovement(mat, mov).catch(err => console.warn("No se pudo subir material+mov:", err));
+  saveStockLocal();
 
+  // Vincular esta línea automáticamente al nuevo material + marcar aplicado incremental
   const linea = estadoMateriales[pendingCreation.index];
-  linea.aplicado_qty = parseFloat(linea.qty_recibida);
+  linea.linked_matId = newId;
 
-  // auto-vincular a lo recién creado
-  linea.stock_matId = newId;
-  linea.stock_label = mat.name || "";
+  const k = linkKeyFor(linea);
+  linkMap[k] = { matId: newId, name: pendingCreation.name, cat: catVal, grp: grpVal, unit: unitVal };
+  saveLinkMap();
 
+  linea.aplicado_qty = toNum(linea.aplicado_qty) + qtyVal;
   guardarEstadoLocal();
 
   alert(`✅ Ficha creada y stock añadido.\n\nUbicación: ${catVal} > ${grpVal}\nCantidad sumada: ${qtyVal} ${unitVal}`);
-  renderTabla();
   cerrarModalCreacion();
+  renderTabla();
 }
 
-/* ===============================
-   === OTROS HELPERS / ESTADOS ===
-   =============================== */
+/* ========= OTROS HELPERS ========= */
 function toggleOk(index, isChecked) {
   const linea = estadoMateriales[index];
   linea.ok = isChecked;
   if (isChecked) {
-    const pedida = parseFloat(linea.qty_pedida) || 0;
+    const pedida = toNum(linea.qty_pedida);
     if (pedida > 0) linea.qty_recibida = pedida;
   }
   guardarEstadoLocal();
   renderTabla();
+  cargarLista();
 }
-
 function updateQty(index, inputEl) {
   let val = parseFloat(inputEl.value);
   if (isNaN(val)) val = 0;
   const linea = estadoMateriales[index];
-  const pedida = parseFloat(linea.qty_pedida) || 0;
+  const pedida = toNum(linea.qty_pedida);
+
   if (pedida > 0 && val > pedida) {
     val = pedida;
     inputEl.value = val;
     inputEl.classList.remove("flash-limit"); void inputEl.offsetWidth; inputEl.classList.add("flash-limit");
   }
   if (val < 0) { val = 0; inputEl.value = 0; }
+
   linea.qty_recibida = val;
+
+  // OK por recepción
   linea.ok = (pedida > 0 && val >= pedida);
-  LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
-  inputEl.onblur = () => renderTabla();
-}
 
+  guardarEstadoLocal();
+  inputEl.onblur = () => { renderTabla(); cargarLista(); };
+}
 function updateNote(index, txt) { estadoMateriales[index].note = txt; guardarEstadoLocal(); }
-function marcarTodoOk() { estadoMateriales.forEach(l => { l.ok = true; const pedida = parseFloat(l.qty_pedida)||0; if(pedida>0) l.qty_recibida=pedida; }); guardarEstadoLocal(); renderTabla(); }
-function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
-function guardarTipoHierro() {
-  const radios=document.getElementsByName("th");
-  let val="";
-  radios.forEach(r=>{ if(r.checked) val=r.value; });
-  metaActual.tipo_hierro = val;
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-
-  // Si el tipo de hierro cambia, al volver a renderizar
-  // el aliasKey incluye el tipo -> se usarán aliases correctos.
+function marcarTodoOk() {
+  estadoMateriales.forEach(l => {
+    l.ok = true;
+    const pedida = toNum(l.qty_pedida);
+    if(pedida > 0) l.qty_recibida = pedida;
+  });
+  guardarEstadoLocal();
   renderTabla();
+  cargarLista();
 }
+function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
 
-/* ===============================
-   === FABRICACIÓN (NO BORRAR) ===
-   =============================== */
+/* ========= MANDAR A FABRICACIÓN (NO ELIMINA PREPARACIÓN) ========= */
 function confirmarTodoRecepcion() {
-  const hayBarras = estadoMateriales.some(l => l.unit === 'barra');
+  const hayBarras = estadoMateriales.some(l => (String(l.unit||"").toLowerCase() === 'barra'));
   if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
 
   const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
   if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
 
-  if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido quedará EN FABRICACIÓN y no desaparecerá de Preparación.)`)) return;
+  // Permite mandar aunque no esté completo
+  if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido seguirá en Preparación hasta que todo el material esté recibido.)`)) return;
   mandarAFabricacion();
 }
 
@@ -1182,15 +1100,25 @@ function mandarAFabricacion() {
 
   const cantidadFinal = parseFloat(document.getElementById("inputUnidades").value) || 0;
 
+  // Guardar/actualizar en Fabricación (ldh_db) SIN romper tu estructura
   const rawDb = LS.getItem("ldh_db");
   let db = { deliveries: [] };
   if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
 
+  // Si ya existe, no duplicamos: actualizamos estado y notas
   const idx = db.deliveries.findIndex(d => d.ref === refActual);
-  if (idx < 0) {
-    const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
-    const notasFinales = notaHierro + (estadoMateriales.length > 0 ? "Procesado desde Preparación." : "");
 
+  const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
+  const notasFinales = notaHierro + "Enviado desde Preparación.";
+
+  if (idx >= 0) {
+    // Actualiza mínimamente sin destruir historial
+    db.deliveries[idx].total = cantidadFinal;
+    if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
+    if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
+      db.deliveries[idx].notes = (db.deliveries[idx].notes ? (db.deliveries[idx].notes + "\n") : "") + notasFinales;
+    }
+  } else {
     db.deliveries.push({
       id: "PED-" + Date.now(),
       client: "Taller / Interno",
@@ -1205,40 +1133,52 @@ function mandarAFabricacion() {
       history: [],
       notes: notasFinales
     });
-    LS.setItem("ldh_db", JSON.stringify(db));
   }
 
+  LS.setItem("ldh_db", JSON.stringify(db));
+
+  // Marcar en fabricación (pero NO eliminar preparación)
   metaActual.en_fabricacion = true;
+  metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 
-  alert(`✅ Enviado a Fabricación.\nUds: ${cantidadFinal}\n\nEl pedido sigue en Preparación como "En fabricación".`);
-  volverLista();
-}
-
-function eliminarPedido() { if (confirm("⛔ ¿Eliminar?")) { LS.removeItem(KP(refActual)); LS.removeItem(KM(refActual)); volverLista(); } }
-
-/* ===============================
-   === UTILS: escape HTML ===
-   =============================== */
-function escapeHtml(str){
-  return String(str ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-function escapeAttr(str){
-  return escapeHtml(str).replaceAll("`","&#096;");
-}
-
-/* ===============================
-   === ARRANQUE ===
-   =============================== */
-(async function boot(){
-  await fsLoadStockOnceToLocal();
+  document.getElementById("pillFab").classList.remove("hidden");
+  alert(`✅ Enviado a Fabricación.\nUds: ${cantidadFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
   cargarLista();
-})();
+}
+
+/* ========= ELIMINAR ========= */
+function eliminarPedido() {
+  if (confirm("⛔ ¿Eliminar?")) {
+    LS.removeItem(KP(refActual));
+    LS.removeItem(KM(refActual));
+    volverLista();
+  }
+}
+
+/* ========= INIT ========= */
+async function init(){
+  loadLinkMap();
+  loadStockLocal();
+
+  // Firestore stock sync (online)
+  if(USE_FIRESTORE_STOCK){
+    try{
+      fbEnsure();
+      await fsLoginHidden();
+      await fsLoadOnceToLocal(); // si existe remoto, actualiza local
+      fsReady = true;
+      fsStartRealtimeListener();
+    }catch(e){
+      console.warn("Firestore no disponible, seguimos con local stock:", e);
+      fsReady = false;
+    }
+  }
+
+  cargarLista();
+}
+init();
 </script>
+
 </body>
 </html>
