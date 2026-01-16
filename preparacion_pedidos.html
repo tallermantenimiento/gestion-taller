@@ -125,7 +125,6 @@
   .link-item .s { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
   .link-item.active { outline:2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
   .small { font-size:11px; opacity:.75; }
-
 </style>
 </head>
 <body>
@@ -201,7 +200,6 @@
 
   <div class="actions">
     <button class="btn-danger btn" onclick="eliminarPedido()">🗑 Eliminar pedido</button>
-    <button class="btn btn-success" onclick="marcarEnFabricacion()">🏭 Marcar en fabricación</button>
     <button class="btn" onclick="confirmarTodoRecepcion()">💾 Mandar a fabricación</button>
   </div>
 </div>
@@ -302,7 +300,7 @@
   </div>
 </div>
 
-<!-- Firebase (Compat, sin bundlers) PARA SINCRONIZAR STOCK ONLINE IGUAL QUE TU STOCK.html -->
+<!-- Firebase (Compat, sin bundlers) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -310,20 +308,14 @@
 <script>
 /* =======================================================================================
    PREPARACIÓN DE PEDIDOS (vNEXT)
-   - Arregla pill Pendiente/Parcial/Completo: se calcula por RECEPCIÓN (qty_recibida).
-   - Auto-cierra (desaparece de Preparación) cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
-   - Permite “Mandar a fabricación” aunque esté parcial, pero NO desaparece.
-   - Añade “En fabricación” (pill) en la ficha del pedido y en la lista.
-   - Muestra stock disponible por línea (del módulo Stock).
-   - Vinculación persistente: recuerda que “40x40” -> “40x40x1.5” etc (global, para futuros pedidos).
-   - Mantiene tu lógica de sumar a stock con movimientos "in".
-   - NUEVO: Permite CONSUMIR de stock (movimiento "out") con confirmación si queda negativo.
-   - Sin romper Stock online: usa Firestore doc igual que tu stock.html para leer/escribir stock.
+   - Pill Pendiente/Parcial/Completo: por RECEPCIÓN (qty_recibida).
+   - Auto-cierra cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
+   - En este ajuste: auto-cierre => auto-mandar a fabricación antes de eliminar de Preparación.
+   - “Marcar en fabricación” eliminado (ya existe “Mandar a fabricación”).
 ======================================================================================= */
 
 /* ========= CONSTANTES ========= */
 const LS = localStorage;
-let currentOrderId = null;
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
@@ -374,7 +366,6 @@ function normName(s){
     .replace(/×/g,"x");
 }
 function linkKeyFor(line){
-  // clave global por nombre+unidad, para recordar vínculos entre pedidos distintos
   const n = normName(line.mat);
   const u = normName(line.unit || "");
   return `${n}|${u}`;
@@ -438,7 +429,6 @@ function fsStartRealtimeListener(){
     stockMovements = data.movements || [];
     stockCategoryOrder = data.categoryOrder || [];
 
-    // Si estamos dentro de un pedido, refresca stocks mostrados
     if(refActual) renderTabla();
   }, (err)=>console.warn("Firestore onSnapshot error:", err));
 }
@@ -561,7 +551,6 @@ function cargarLista() {
     const lines = JSON.parse(LS.getItem(k) || "[]");
     const totalLines = lines.length;
 
-    // COMPLETO / PARCIAL por RECEPCIÓN
     const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
     const anyReceived = lines.some(l => (toNum(l.qty_recibida)) > 0);
 
@@ -623,16 +612,8 @@ function guardarTipoHierro(){
   metaActual.tipo_hierro=val;
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 }
-function marcarEnFabricacion(){
-  metaActual.en_fabricacion = true;
-  metaActual.fabricacion_ts = Date.now();
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-  document.getElementById("pillFab").classList.remove("hidden");
-  cargarLista();
-  alert("✅ Marcado como EN FABRICACIÓN (no se elimina hasta que esté todo recibido).");
-}
 
-/* ========= AUTOCIERRE POR RECEPCIÓN (lo que tú quieres) ========= */
+/* ========= AUTO-CIERRE POR RECEPCIÓN (AHORA: ENVÍA A FABRICACIÓN ANTES) ========= */
 function autoCerrarSiCompletoPorRecepcion(){
   const totalLines = estadoMateriales.length;
   if(totalLines === 0) return;
@@ -642,23 +623,23 @@ function autoCerrarSiCompletoPorRecepcion(){
   ).length;
 
   if(completeLines === totalLines){
+    // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
+    mandarAFabricacionAutoSiHaceFalta();
+
+    // 2) Retirar de Preparación
     LS.removeItem(KP(refActual));
     LS.removeItem(KM(refActual));
-    alert("✅ Pedido completo (material recibido): se ha retirado de Preparación.");
+    alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
     volverLista();
   }
 }
 
-/* ========= VINCULACIÓN: elegir matId de stock para una línea ========= */
+/* ========= VINCULACIÓN ========= */
 function getLinkedMatIdForLine(line){
-  // 1) si línea ya tiene link explícito, úsalo
   if(line.linked_matId && getMatById(line.linked_matId)) return line.linked_matId;
-
-  // 2) si existe mapeo global por nombre+unidad, úsalo
   const k = linkKeyFor(line);
   const rec = linkMap[k];
   if(rec && rec.matId && getMatById(rec.matId)) return rec.matId;
-
   return null;
 }
 function setLinkForLine(index, matId){
@@ -668,7 +649,6 @@ function setLinkForLine(index, matId){
 
   line.linked_matId = matId;
 
-  // guarda global
   const k = linkKeyFor(line);
   linkMap[k] = { matId: matId, name: mat.name, cat: mat.cat, grp: mat.grp, unit: mat.unit };
   saveLinkMap();
@@ -691,7 +671,6 @@ function abrirModalVincular(index){
   const line = estadoMateriales[index];
   document.getElementById("linkLineName").textContent = `${line.mat} (${line.unit || "ud"})`;
 
-  // construir lista
   const input = document.getElementById("linkSearch");
   input.value = "";
   input.oninput = () => renderLinkResults();
@@ -721,10 +700,8 @@ function renderLinkResults(){
   host.innerHTML = "";
 
   const q = normName(document.getElementById("linkSearch").value || "");
-  // const line = linkModalCtx ? estadoMateriales[linkModalCtx.lineIndex] : null;
 
   let arr = stockMaterials.slice();
-
   if(q){
     arr = arr.filter(m => {
       const t = normName(`${m.name} ${m.cat} ${m.grp}`);
@@ -732,7 +709,6 @@ function renderLinkResults(){
     });
   }
 
-  // orden simple: categoría > grupo > nombre
   arr.sort((a,b) => {
     const ac = normName(a.cat).localeCompare(normName(b.cat));
     if(ac!==0) return ac;
@@ -765,7 +741,7 @@ function renderLinkResults(){
   });
 }
 
-/* ========= RENDER TABLA (muestra stock y vínculo) ========= */
+/* ========= RENDER TABLA ========= */
 function renderTabla() {
   const tbodyBarras = document.getElementById("tbodyBarras");
   const tbodyUnidades = document.getElementById("tbodyUnidades");
@@ -775,7 +751,6 @@ function renderTabla() {
   let hasBarras = false;
   let hasUnidades = false;
 
-  // pill fabricación
   document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
 
   estadoMateriales.forEach((linea, index) => {
@@ -783,32 +758,25 @@ function renderTabla() {
     const recibida = toNum(linea.qty_recibida);
     const yaAplicada = toNum(linea.aplicado_qty);
 
-    // criterio de OK de línea = RECEPCIÓN (tu uso real)
     const isComplete = linea.ok || (pedida > 0 && recibida >= pedida);
     const rowClass = isComplete ? "ok" : "";
 
-    // link/stock info
     const linkedId = getLinkedMatIdForLine(linea);
     const linkedMat = linkedId ? getMatById(linkedId) : null;
     const stockQty = linkedId ? getStockQty(linkedId) : null;
 
     let stockPill = "";
     if(linkedMat){
-      // estado stock vs pedida (orientativo)
       const s = toNum(stockQty);
       let cls = "ok";
       if(s <= 0) cls = "danger";
       else if(pedida > 0 && s < pedida) cls = "warn";
-
       stockPill = `<span class="link-pill ${cls}">Stock: <b>${s}</b> ${linkedMat.unit || ""}</span>`;
     } else {
       stockPill = `<span class="link-pill">Sin vínculo</span>`;
     }
 
-    // botón añadir a stock (usa aplicado_qty para evitar duplicados)
     const diff = recibida - yaAplicada;
-
-    // NUEVO: botón consumir stock (lo que falta para completar la línea)
     const falta = Math.max(0, pedida - recibida);
 
     let btnHtml = "";
@@ -824,7 +792,6 @@ function renderTabla() {
       btnHtml += `<button class="btn-mini" onclick="consumirDeStock(${index})">Consumir stock (-${falta})</button>`;
     }
 
-    // botón vincular siempre disponible
     const btnVincular = `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
 
     const tr = document.createElement("tr");
@@ -854,20 +821,17 @@ function renderTabla() {
   document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
   document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
 
-  // AUTO-CIERRE por RECEPCIÓN
   autoCerrarSiCompletoPorRecepcion();
 }
 
-/* ========= LÓGICA DE STOCK: localizar material (vínculo o nombre) ========= */
+/* ========= LÓGICA DE STOCK: localizar material ========= */
 function _addToRealStock_byLinkedOrName(linea, ironType) {
-  // 0) si hay vínculo, usarlo
   const linkedId = getLinkedMatIdForLine(linea);
   if(linkedId){
     const mat = getMatById(linkedId);
     if(mat) return { success:true, mat, matId: linkedId };
   }
 
-  // 1) si no, intentar match por nombre con candidatos (incluye ironType en barras)
   const baseName = String(linea.mat||"");
   let candidates = [];
   if (ironType && (String(linea.unit||"").toLowerCase().includes('barra'))) {
@@ -888,7 +852,7 @@ function _addToRealStock_byLinkedOrName(linea, ironType) {
   return { success:true, mat, matId: mat.id };
 }
 
-/* ========= FUNCIÓN PRINCIPAL: AÑADIR A STOCK (movimiento "in") ========= */
+/* ========= AÑADIR A STOCK (movimiento "in") ========= */
 function guardarLinea(index) {
   const linea = estadoMateriales[index];
   const recibido = toNum(linea.qty_recibida);
@@ -897,7 +861,6 @@ function guardarLinea(index) {
 
   if (diff <= 0) return;
 
-  // Validación Hierro
   let tipoHierro = null;
   if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
@@ -910,7 +873,6 @@ function guardarLinea(index) {
     }
   }
 
-  // Intentar encontrar
   const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
 
   if (!check.success) {
@@ -923,36 +885,30 @@ function guardarLinea(index) {
     return;
   }
 
-  // Guardar movimiento IN
   stockMovements.push({ id: uuid(), matId: check.matId, type: 'in', qty: diff, date: new Date().toISOString() });
   saveStockLocal();
 
-  // Actualizar aplicado_qty incremental (para no duplicar)
   linea.aplicado_qty = yaAplicado + diff;
   guardarEstadoLocal();
 
   const newTotal = getStockQty(check.matId);
-  let msg = `✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`;
-
-  alert(msg);
+  alert(`✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`);
   renderTabla();
 }
 
-/* ========= NUEVO: CONSUMIR DE STOCK (movimiento "out") ========= */
+/* ========= CONSUMIR DE STOCK (movimiento "out") ========= */
 function consumirDeStock(index){
   const linea = estadoMateriales[index];
 
   const pedida = toNum(linea.qty_pedida);
   const recibida = toNum(linea.qty_recibida);
 
-  // Consumimos SOLO lo que falta para completar la línea
   const falta = Math.max(0, pedida - recibida);
   if(falta <= 0){
     alert("Esta línea ya está completa.");
     return;
   }
 
-  // Validación Hierro (mismo criterio que para guardar)
   let tipoHierro = null;
   if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
@@ -965,7 +921,6 @@ function consumirDeStock(index){
     }
   }
 
-  // Localiza material en stock (primero por vínculo, luego por nombre)
   const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
   if(!check.success){
     alert("Este material no está vinculado / no existe en Stock.\nPulsa “Vincular” y selecciona el material correcto antes de consumir.");
@@ -978,7 +933,6 @@ function consumirDeStock(index){
   const disponible = toNum(getStockQty(matId));
   const quedaria = disponible - falta;
 
-  // Permitir negativo con confirmación
   if(quedaria < 0){
     const deficit = Math.abs(quedaria);
     const ok = confirm(
@@ -992,7 +946,6 @@ function consumirDeStock(index){
     if(!ok) return;
   }
 
-  // Movimiento OUT
   stockMovements.push({
     id: uuid(),
     matId: matId,
@@ -1004,7 +957,6 @@ function consumirDeStock(index){
   });
   saveStockLocal();
 
-  // Marcar línea como cubierta por stock (equivalente a recibido para Preparación)
   linea.qty_recibida = recibida + falta;
   linea.ok = (toNum(linea.qty_recibida) >= pedida);
 
@@ -1020,9 +972,7 @@ function abrirModalCreacion(data) {
   pendingCreation = data;
   document.getElementById("modMatName").textContent = data.name;
 
-  // Cargar selects desde stock
   const cats = [...new Set(stockMaterials.map(m => m.cat).filter(Boolean))].sort();
-
   const selCat = document.getElementById("modCatSelect");
   selCat.innerHTML = `<option value="" disabled selected>-- Elige Categoría --</option>` +
                      cats.map(c => `<option value="${c}">${c}</option>`).join("");
@@ -1033,7 +983,6 @@ function abrirModalCreacion(data) {
   document.getElementById("modUnitInput").value = data.unit || "ud";
   document.getElementById("modMinInput").value = "";
 
-  // Reset
   document.getElementById("modCatInput").value = "";
   document.getElementById("modGrpInput").value = "";
   document.getElementById("modCatInput").classList.add("hidden");
@@ -1083,7 +1032,6 @@ function guardarNuevoMaterial() {
   if (!catVal || !grpVal) { alert("Por favor, indica Categoría y Grupo."); return; }
   if (qtyVal <= 0) { alert("La cantidad a sumar debe ser mayor que 0."); return; }
 
-  // Crear material en stock
   const newId = uuid();
   stockMaterials.push({
     id: newId,
@@ -1104,7 +1052,6 @@ function guardarNuevoMaterial() {
 
   saveStockLocal();
 
-  // Vincular esta línea automáticamente al nuevo material + marcar aplicado incremental
   const linea = estadoMateriales[pendingCreation.index];
   linea.linked_matId = newId;
 
@@ -1146,8 +1093,6 @@ function updateQty(index, inputEl) {
   if (val < 0) { val = 0; inputEl.value = 0; }
 
   linea.qty_recibida = val;
-
-  // OK por recepción
   linea.ok = (pedida > 0 && val >= pedida);
 
   guardarEstadoLocal();
@@ -1166,7 +1111,7 @@ function marcarTodoOk() {
 }
 function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
 
-/* ========= MANDAR A FABRICACIÓN (NO ELIMINA PREPARACIÓN) ========= */
+/* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
 function confirmarTodoRecepcion() {
   const hayBarras = estadoMateriales.some(l => (String(l.unit||"").toLowerCase() === 'barra'));
   if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
@@ -1174,30 +1119,25 @@ function confirmarTodoRecepcion() {
   const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
   if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
 
-  // Permite mandar aunque no esté completo
   if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido seguirá en Preparación hasta que todo el material esté recibido.)`)) return;
-  mandarAFabricacion();
+  mandarAFabricacion(val, true);
 }
 
-function mandarAFabricacion() {
+/* ========= MANDAR A FABRICACIÓN (CORE) ========= */
+function mandarAFabricacion(unidadesFinal, withAlert) {
   if (!refActual) return;
 
-  const cantidadFinal = parseFloat(document.getElementById("inputUnidades").value) || 0;
-
-  // Guardar/actualizar en Fabricación (ldh_db) SIN romper tu estructura
   const rawDb = LS.getItem("ldh_db");
   let db = { deliveries: [] };
   if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
 
-  // Si ya existe, no duplicamos: actualizamos estado y notas
   const idx = db.deliveries.findIndex(d => d.ref === refActual);
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
 
   if (idx >= 0) {
-    // Actualiza mínimamente sin destruir historial
-    db.deliveries[idx].total = cantidadFinal;
+    db.deliveries[idx].total = unidadesFinal;
     if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
     if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
       db.deliveries[idx].notes = (db.deliveries[idx].notes ? (db.deliveries[idx].notes + "\n") : "") + notasFinales;
@@ -1212,7 +1152,7 @@ function mandarAFabricacion() {
       datePrev: new Date().toISOString().split('T')[0],
       status: "pendiente",
       priority: "normal",
-      total: cantidadFinal,
+      total: unidadesFinal,
       delivered: 0,
       history: [],
       notes: notasFinales
@@ -1221,14 +1161,24 @@ function mandarAFabricacion() {
 
   LS.setItem("ldh_db", JSON.stringify(db));
 
-  // Marcar en fabricación (pero NO eliminar preparación)
   metaActual.en_fabricacion = true;
   metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 
   document.getElementById("pillFab").classList.remove("hidden");
-  alert(`✅ Enviado a Fabricación.\nUds: ${cantidadFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
+  if(withAlert){
+    alert(`✅ Enviado a Fabricación.\nUds: ${unidadesFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
+  }
   cargarLista();
+}
+
+/* ========= AUTO: ENVIAR A FABRICACIÓN SI HACE FALTA ========= */
+function mandarAFabricacionAutoSiHaceFalta(){
+  // si ya estaba marcado y probablemente ya existe en ldh_db, igualmente garantizamos que exista.
+  const unidadesFinal = (parseFloat(document.getElementById("inputUnidades")?.value) || metaActual.unidades || 1);
+
+  // Reutilizamos core sin alert y sin confirm
+  mandarAFabricacion(unidadesFinal, false);
 }
 
 /* ========= ELIMINAR ========= */
@@ -1245,12 +1195,11 @@ async function init(){
   loadLinkMap();
   loadStockLocal();
 
-  // Firestore stock sync (online)
   if(USE_FIRESTORE_STOCK){
     try{
       fbEnsure();
       await fsLoginHidden();
-      await fsLoadOnceToLocal(); // si existe remoto, actualiza local
+      await fsLoadOnceToLocal();
       fsReady = true;
       fsStartRealtimeListener();
     }catch(e){
