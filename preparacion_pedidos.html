@@ -506,11 +506,37 @@ function saveLinkMap(){
   if (snapRaw) {
     try {
       const snap = JSON.parse(snapRaw);
-      const ref = String(snap.referencia || "SIN_REF_" + Date.now());
+      const refBase = String(snap.referencia || ('SIN_REF_' + Date.now())).trim();
+      // UID de pedido para distinguir envíos distintos aunque compartan referencia
+      const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
+      const pedidoUid = incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+
+      // Si ya existe un pedido con la misma referencia pero es OTRO concepto/u otro UID, no lo pisamos:
+      // generamos una referencia única con sufijo.
+      let ref = refBase;
+      const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
+      if (existsAny) {
+        let metaExist = {};
+        try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
+        const existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
+        const existConcept = String(metaExist.concepto || '').trim();
+        const incConcept = String(snap.concepto || '').trim();
+        const sameOrder = (existUid && existUid === pedidoUid);
+        const conflict = !sameOrder && ((existConcept && incConcept && existConcept !== incConcept) || !existUid || existUid !== pedidoUid);
+        if (conflict) {
+          let i = 2;
+          while (LS.getItem(KP(refBase + ' #' + i)) || LS.getItem(KM(refBase + ' #' + i))) i++;
+          ref = refBase + ' #' + i;
+        }
+      }
+
       let qty = encontrarNumero(snap) || 1;
 
       let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
+      metaParaGuardar.pedido_uid = pedidoUid;
+      if(ref !== refBase) metaParaGuardar.original_ref = refBase;
+
       metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
       metaParaGuardar.unidades = qty;
       metaParaGuardar.fecha = Date.now();
@@ -519,15 +545,24 @@ function saveLinkMap(){
 
       LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
 
-      if (!LS.getItem(KP(ref))) {
-        const mats = Array.isArray(snap.materiales) ? snap.materiales : [];
-        // IMPORT FIX: si el cálculo envía stockMatId / linked_matId, lo aplicamos a la estructura de Preparación
-        mats.forEach(l => {
-          if(l && !l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
-          if(l && !l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
-        });
-        LS.setItem(KP(ref), JSON.stringify(mats));
-      }
+      // ADAPTADOR DE VÍNCULOS (desde Cálculo/Configuración de conceptos)
+      // Preparación trabaja con `linked_matId`. Sin este adaptador, si el cálculo
+      // envía el id como `stockMatId`/`matId`, la línea llega "sin vínculo".
+      const materialesImport = (snap.materiales || []).map(l => {
+        if(!l || typeof l !== 'object') return l;
+        // normaliza cantidades mínimas esperadas por Preparación
+        if(l.qty_pedida === undefined && l.qty !== undefined) l.qty_pedida = l.qty;
+        if(l.qty_recibida === undefined) l.qty_recibida = 0;
+        if(l.aplicado_qty === undefined) l.aplicado_qty = 0;
+
+        // normaliza el vínculo a stock
+        if(!l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
+        if(!l.linked_matId && l.matId)      l.linked_matId = l.matId;
+        if(!l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
+        return l;
+      });
+
+      LS.setItem(KP(ref), JSON.stringify(materialesImport));
 
       LS.removeItem("latest_materials_v1");
       LS.removeItem("pedido_en_preparacion");
