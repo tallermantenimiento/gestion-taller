@@ -519,24 +519,15 @@ function saveLinkMap(){
 
       LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
 
-      // ADAPTADOR DE VÍNCULOS (desde Cálculo/Configuración de conceptos)
-      // Preparación trabaja con `linked_matId`. Sin este adaptador, si el cálculo
-      // envía el id como `stockMatId`/`matId`, la línea llega "sin vínculo".
-      const materialesImport = (snap.materiales || []).map(l => {
-        if(!l || typeof l !== 'object') return l;
-        // normaliza cantidades mínimas esperadas por Preparación
-        if(l.qty_pedida === undefined && l.qty !== undefined) l.qty_pedida = l.qty;
-        if(l.qty_recibida === undefined) l.qty_recibida = 0;
-        if(l.aplicado_qty === undefined) l.aplicado_qty = 0;
-
-        // normaliza el vínculo a stock
-        if(!l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
-        if(!l.linked_matId && l.matId)      l.linked_matId = l.matId;
-        if(!l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
-        return l;
-      });
-
-      if (!LS.getItem(KP(ref))) LS.setItem(KP(ref), JSON.stringify(materialesImport));
+      if (!LS.getItem(KP(ref))) {
+        const mats = Array.isArray(snap.materiales) ? snap.materiales : [];
+        // IMPORT FIX: si el cálculo envía stockMatId / linked_matId, lo aplicamos a la estructura de Preparación
+        mats.forEach(l => {
+          if(l && !l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
+          if(l && !l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
+        });
+        LS.setItem(KP(ref), JSON.stringify(mats));
+      }
 
       LS.removeItem("latest_materials_v1");
       LS.removeItem("pedido_en_preparacion");
