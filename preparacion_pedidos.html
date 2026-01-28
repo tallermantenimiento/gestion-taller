@@ -43,6 +43,8 @@
   }
   .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
   .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
+  .btn-mini.unassigned { background: linear-gradient(180deg, #7f1d1d, #450a0a); border-color: rgba(239,68,68,.55); color: #fecaca; }
+
 
   /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
@@ -76,6 +78,8 @@
   .b-pa { background:#fb923c; color:#111; }
   .b-c { background:#22c55e; color:#111; }
   .b-fab { background:#16a34a; color:#06100a; border:1px solid rgba(255,255,255,.25); }
+  .b-na { background:#ef4444; color:#111; }
+
   .dot { width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block; }
 
   /* Control Panel */
@@ -125,6 +129,33 @@
   .link-item .s { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
   .link-item.active { outline:2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
   .small { font-size:11px; opacity:.75; }
+
+/* === FOCUS / AUTO-OPEN (devolver no asignado) === */
+.focus-banner{
+  margin:12px 0 0;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,90,90,0.16);
+  border:1px solid rgba(255,90,90,0.55);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.focus-banner .ref{
+  font-weight:900;
+  color:#ffd0d0;
+}
+.focus-target{
+  outline:3px solid rgba(255,90,90,0.85);
+  box-shadow:0 0 0 4px rgba(255,90,90,0.25), 0 0 18px rgba(255,90,90,0.35);
+  animation:focusPulse 1.1s ease-in-out infinite alternate;
+}
+@keyframes focusPulse{
+  from{ filter:brightness(1.0); transform:translateZ(0); }
+  to{ filter:brightness(1.18); }
+}
+
 </style>
 </head>
 <body>
@@ -135,6 +166,12 @@
     <button class="btn" onclick="volverLista()">← Volver a pedidos</button>
   </div>
   <h2 style="margin:0">Preparación</h2>
+
+<div id="focusBanner" class="focus-banner" style="display:none">
+  <div>⚠️ Pedido con <b>material no asignado</b>: <span class="ref"></span></div>
+  <button class="btn" id="btnAbrirFocus">Abrir ficha</button>
+</div>
+
 </div>
 
 <div id="vistaLista" class="card">
@@ -150,6 +187,7 @@
         <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
             <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
             <span id="pillFab" class="badge b-fab hidden"><span class="dot"></span> En fabricación</span>
+            <span id="pillNoAsig" class="badge b-na hidden" style="cursor:pointer" onclick="abrirModalNoAsignado()"><span class="dot"></span> No asignado</span>
             <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
                 <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
                 <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
@@ -300,6 +338,30 @@
   </div>
 </div>
 
+
+<!-- MODAL NO ASIGNADO (material prestado pendiente de devolver) -->
+<div id="modalNoAsignado" class="modal-backdrop">
+  <div class="modal-box" style="max-width:760px;">
+    <div class="modal-title">
+      <span>Material NO asignado · Pendiente de devolver</span>
+      <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalNoAsignado()">✕</button>
+    </div>
+
+    <div class="modal-info" style="margin-bottom:12px;">
+      Este pedido ha consumido material <strong>no asignado</strong>. Devuélvelo cuando llegue su stock asignado.
+    </div>
+
+    <div id="noAsigBody" style="max-height:420px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px; background: rgba(0,0,0,.15);">
+      <!-- contenido dinámico -->
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;">
+      <button class="btn" onclick="cerrarModalNoAsignado()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- Firebase (Compat, sin bundlers) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
@@ -316,11 +378,35 @@
 
 /* ========= CONSTANTES ========= */
 const LS = localStorage;
+
+function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
 const STOCK_DB_KEY = "taller_stock_v3_data";
 const LINK_MAP_KEY = "prep_stock_linkmap_v1";
+const UNASSIGNED_GLOBAL_KEY = "unassigned_borrow_global_v1";
+
+// === Sync local entre pestañas/ventanas (LocalStorage) ===
+// IMPORTANTE: si abres los HTML con file://, cada archivo tiene un origen distinto y NO comparte localStorage.
+// Para probar sincronización local, abre con un servidor (http://localhost) o en GitHub Pages.
+window.addEventListener('storage', (ev)=>{
+  try{
+    if(!ev) return;
+    if(ev.key===STOCK_DB_KEY || ev.key===UNASSIGNED_GLOBAL_KEY){
+      // Si hay un pedido abierto, refrescamos esa ficha; si no, refrescamos el listado.
+      if(typeof refActual==='string' && refActual){
+        if(typeof abrirPedido==='function') abrirPedido(refActual);
+        else if(typeof cargarLista==='function') cargarLista();
+      }else{
+        if(typeof cargarLista==='function') cargarLista();
+      }
+    }
+  }catch(e){}
+});
+
+const UNASSIGNED_KEY = r => "prep_unassigned_" + r; // respaldo opcional
+
 
 /* ========= FIRESTORE (igual que stock.html) ========= */
 const USE_FIRESTORE_STOCK = true;
@@ -371,6 +457,319 @@ function linkKeyFor(line){
   return `${n}|${u}`;
 }
 function toNum(x){ const n = Number(x); return isNaN(n)?0:n; }
+
+
+// Busca la referencia del pedido a partir de un PID (id interno) dentro de la base LDHDB / PREP.
+// Soporta diferentes nombres históricos de campos: pedido_uid, pedidoUid, pid, pedido_id, etc.
+function findRefByPid(pid){
+  try{
+    if(!pid) return null;
+    pid = String(pid).trim();
+
+    // 1) Lectura directa de LDH_DB (todas las bolsas posibles)
+    let db = {};
+    try{
+      const raw = LS.getItem("ldh_db");
+      if(raw) db = JSON.parse(raw);
+    }catch(e){ db = {}; }
+
+    const pools = []
+      .concat((db.deliveries||[]),(db.trabajos||[]))
+      .concat((db.fabricacion||[]),(db.pintura||[]),(db.almacen||[]),(db.archivo||[]))
+      .concat((db.fab||[]),(db.paint||[]),(db.store||[])); // por si existiera otra convención
+
+    for(const t of pools){
+      const meta = (t && (t.meta || t)) || null; // a veces anidado, a veces plano
+      if(!meta) continue;
+
+      const cands = [
+        meta.id, meta._id, meta.uid,
+        meta.pedido_uid, meta.pedidoUid, meta.pid,
+        meta.pedido_id, meta.pedidoId, meta.id_pedido
+      ].filter(Boolean).map(v => String(v).trim());
+
+      if(cands.includes(pid)){
+        const ref = String(meta.referencia || meta.ref || meta.nombre || meta.titulo || meta.referenciaTrabajo || "").trim();
+        return ref || null;
+      }
+    }
+
+    // 2) Mirar en metas locales de Preparación (prep_meta_*)
+    for(let i=0;i<LS.length;i++){
+      const key = LS.key(i);
+      if(!key || !key.startsWith("prep_meta_")) continue;
+      try{
+        const meta = JSON.parse(LS.getItem(key));
+        if(!meta) continue;
+        const cands = [
+          meta.pedido_uid, meta.pedidoUid, meta.pid,
+          meta.pedido_id, meta.pedidoId, meta.id_pedido
+        ].filter(Boolean).map(v => String(v).trim());
+        if(cands.includes(pid)){
+          const ref = String(meta.referencia || meta.ref || "").trim();
+          // Si la meta no trae referencia, la inferimos de la clave prep_meta_<REF>
+          const inferred = String(key).replace(/^prep_meta_/, "");
+          return (ref || inferred || null);
+        }
+      }catch(e){}
+    }
+
+    // 3) Intento final: si el PID parece una referencia textual simple, devolverlo
+    if(pid.length < 80 && !pid.includes("/") && !pid.includes("http")){
+      if(LS.getItem("prep_meta_" + pid)) return pid;
+    }
+
+    return null;
+  }catch(e){
+    console.warn("findRefByPid() error:", e);
+    return null;
+  }
+}
+/* ========= NO ASIGNADO (devolución desde Preparación) ========= */
+function _uaItems(){
+  const ua = metaActual && metaActual.unassignedBorrow;
+  if(!ua || !Array.isArray(ua.items)) return [];
+  return ua.items;
+}
+function _uaMatchKey(line){
+  const linked = getLinkedMatIdForLine(line) || line.linked_matId || '';
+  if(linked) return 'id:'+linked;
+  return 'n:'+normName(line.mat||'')+'|'+normName(line.unit||'');
+}
+function _uaFindForLine(line){
+  const items=_uaItems();
+  if(items.length===0) return null;
+  const key=_uaMatchKey(line);
+  for(let i=0;i<items.length;i++){
+    const it=items[i]||{};
+    const pending=toNum(it.qtyPending ?? it.pending ?? it.qty_pending);
+    if(pending<=0) continue;
+    const itKey = it.key || (it.matId ? ('id:'+it.matId) : ('n:'+normName(it.name||it.mat||'')+'|'+normName(it.unit||'')));
+    if(String(itKey)===String(key)) return { idx:i, item:it, pending:pending };
+  }
+  // fallback por nombre
+  const nkey='n:'+normName(line.mat||'')+'|'+normName(line.unit||'');
+  for(let i=0;i<items.length;i++){
+    const it=items[i]||{};
+    const pending=toNum(it.qtyPending ?? it.pending ?? it.qty_pending);
+    if(pending<=0) continue;
+    const itKey = it.key || (it.matId ? ('id:'+it.matId) : ('n:'+normName(it.name||it.mat||'')+'|'+normName(it.unit||'')));
+    if(String(itKey)===String(nkey)) return { idx:i, item:it, pending:pending };
+  }
+  return null;
+}
+function devolverNoAsignadoLinea(lineIndex){
+  const line = estadoMateriales[lineIndex];
+  const rec = _uaFindForLine(line);
+  if(!rec){ alert('No hay deuda no asignada para esta línea.'); return; }
+
+  // cantidad a devolver = pendiente completo (de momento)
+  const qty = rec.pending;
+  if(qty<=0) return;
+
+  // localizar material real para sumar a stock
+  const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
+  if(!check.success){
+    alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
+    return;
+  }
+  stockMovements.push({ id: uuid(), matId: check.matId, type:'in', qty: qty, date: new Date().toISOString(), ref: refActual, concept: metaActual.concepto||'', reason:'devolucion_no_asignado' });
+  saveStockLocal();
+
+  // limpiar deuda en meta
+  const items = _uaItems();
+  items[rec.idx].qtyPending = 0;
+  // eliminar items a 0
+  metaActual.unassignedBorrow.items = items.filter(it=>toNum(it.qtyPending ?? it.pending ?? it.qty_pending)>0);
+
+  if(metaActual.unassignedBorrow.items.length===0){
+    delete metaActual.unassignedBorrow;
+  }
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+
+  alert(`✅ Devuelto material no asignado.
+Material: ${check.mat.name}
+Cantidad: ${qty}
+Stock actual: ${getStockQty(check.matId)}`);
+  renderTabla();
+  cargarLista();
+}
+
+/* ========= NO ASIGNADO (material prestado) =========
+   - Persistente por pedido: metaActual.unassignedBorrow
+   - Se replica en ldh_db (si existe entrega) para que otros módulos puedan leerlo en el futuro.
+*/
+function ensureUnassigned(meta){
+  if(!meta) meta = {};
+  if(!meta.unassignedBorrow || typeof meta.unassignedBorrow !== 'object'){
+    meta.unassignedBorrow = { items: [], updatedAt: 0 };
+  }
+  if(!Array.isArray(meta.unassignedBorrow.items)) meta.unassignedBorrow.items = [];
+  return meta.unassignedBorrow;
+}
+function unassignedTotals(ub){
+  ub = ub || { items: [] };
+  const items = Array.isArray(ub.items) ? ub.items : [];
+  const lines = items.filter(it => toNum(it.qtyPending) > 0);
+  const totalQty = lines.reduce((a,it)=>a + toNum(it.qtyPending), 0);
+  return { lines: lines.length, totalQty };
+}
+
+function _loadUnassignedGlobalMap(){
+  try { return JSON.parse(LS.getItem(UNASSIGNED_GLOBAL_KEY) || "{}") || {}; }
+  catch(e){ return {}; }
+}
+function _saveUnassignedGlobalMap(map){
+  LS.setItem(UNASSIGNED_GLOBAL_KEY, JSON.stringify(map || {}));
+}
+function getGlobalBorrow(ref){
+  const map = _loadUnassignedGlobalMap();
+  return map[ref] || null;
+}
+function setGlobalBorrow(ref, ub){
+  const map = _loadUnassignedGlobalMap();
+  map[ref] = ub || { items: [], updatedAt: Date.now() };
+  _saveUnassignedGlobalMap(map);
+}
+function clearGlobalBorrow(ref){
+  const map = _loadUnassignedGlobalMap();
+  if(ref in map){
+    delete map[ref];
+    _saveUnassignedGlobalMap(map);
+  }
+}
+function saveMetaActual(){
+  if(!refActual) return;
+  metaActual.unassignedBorrow = ensureUnassigned(metaActual);
+  metaActual.unassignedBorrow.updatedAt = Date.now();
+
+  // Persistencia global (independiente del módulo) para que no desaparezca aunque el pedido cambie de fase
+  const t = unassignedTotals(metaActual.unassignedBorrow);
+  if(t.lines > 0){
+    setGlobalBorrow(refActual, metaActual.unassignedBorrow);
+  } else {
+    clearGlobalBorrow(refActual);
+  }
+
+  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  mirrorUnassignedToLdhDb();
+}
+function mirrorUnassignedToLdhDb(){
+  try{
+    const rawDb = LS.getItem("ldh_db");
+    if(!rawDb) return;
+    const db = JSON.parse(rawDb) || {};
+    if(!Array.isArray(db.deliveries)) return;
+    const idx = db.deliveries.findIndex(d => d && d.ref === refActual);
+    if(idx < 0) return;
+    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+    LS.setItem("ldh_db", JSON.stringify(db));
+  }catch(e){ /* silent */ }
+}
+
+function ldhHasDelivery(ref){
+  try{
+    const rawDb = LS.getItem("ldh_db");
+    if(!rawDb) return false;
+    const db = JSON.parse(rawDb) || {};
+    if(!Array.isArray(db.deliveries)) return false;
+    return db.deliveries.some(d => d && d.ref === ref);
+  }catch(e){ return false; }
+}
+
+function updateNoAsigPill(){
+  const ub = ensureUnassigned(metaActual);
+  const t = unassignedTotals(ub);
+  const pill = document.getElementById("pillNoAsig");
+  if(!pill) return;
+  if(t.lines > 0){
+    pill.classList.remove("hidden");
+    pill.innerHTML = `<span class="dot"></span> No asignado: <b>${t.lines}</b> · <b>${t.totalQty}</b>`;
+  }else{
+    pill.classList.add("hidden");
+  }
+}
+function abrirModalNoAsignado(){
+  if(!refActual) return;
+  renderModalNoAsignado();
+  document.getElementById("modalNoAsignado").classList.add("active");
+}
+function cerrarModalNoAsignado(){
+  document.getElementById("modalNoAsignado").classList.remove("active");
+}
+function renderModalNoAsignado(){
+  const host = document.getElementById("noAsigBody");
+  const ub = ensureUnassigned(metaActual);
+  const lines = (ub.items || []).filter(it => toNum(it.qtyPending) > 0);
+
+  if(lines.length === 0){
+    host.innerHTML = `<div style="padding:14px; opacity:.75;">No hay material pendiente de devolver.</div>`;
+    return;
+  }
+
+  const rows = lines.map((it, i) => {
+    const qty = toNum(it.qtyPending);
+    const unit = it.unit ? ` <span style="opacity:.7">${it.unit}</span>` : "";
+    const matName = (it.name || it.matName || it.matId || "Material");
+    return `
+      <div style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06);">
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${matName}</div>
+          <div style="font-size:12px; color:#9fb0c8; margin-top:2px;">
+            Pendiente: <b style="color:#fecaca">${qty}</b>${unit}
+          </div>
+        </div>
+        <button class="btn btn-success" onclick="devolverNoAsignado('${it.matId}', ${qty})">Devolver</button>
+      </div>
+    `;
+  }).join("");
+
+  host.innerHTML = rows;
+}
+function devolverNoAsignado(matId, maxQty){
+  if(!refActual) return;
+  const ub = ensureUnassigned(metaActual);
+  const it = (ub.items || []).find(x => x && x.matId === matId);
+  if(!it) return;
+
+  const qtyPend = toNum(it.qtyPending);
+  const max = Math.max(0, qtyPend);
+  if(max <= 0) return;
+
+  const ask = prompt(`Cantidad a DEVOLVER (máx. ${max})`, String(max));
+  if(ask === null) return;
+  let q = parseFloat(String(ask).replace(",", "."));
+  if(isNaN(q) || q <= 0) return;
+  if(q > max) q = max;
+
+  // movimiento IN (devolución)
+  stockMovements.push({
+    id: uuid(),
+    matId: matId,
+    type: 'in',
+    qty: q,
+    date: new Date().toISOString(),
+    ref: refActual,
+    concept: metaActual.concepto || "",
+    reason: "unassigned_return"
+  });
+  saveStockLocal();
+
+  it.qtyPending = Math.max(0, qtyPend - q);
+  it.lastActionAt = Date.now();
+  // limpia líneas a 0
+  ub.items = (ub.items || []).filter(x => toNum(x.qtyPending) > 0);
+  metaActual.unassignedBorrow = ub;
+  saveMetaActual();
+
+  alert(`✅ Devuelto material NO asignado.\nCantidad: ${q}\nStock actual: ${getStockQty(matId)}`);
+  updateNoAsigPill();
+  renderModalNoAsignado();
+  renderTabla();
+  cargarLista();
+}
+
+
 
 /* ========= FIRESTORE helpers ========= */
 function fbEnsure(){
@@ -535,6 +934,10 @@ function saveLinkMap(){
       let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
       metaParaGuardar.pedido_uid = pedidoUid;
+      // Pedido ID inmutable (para abrir ficha aunque cambie el nombre/ref)
+      if(!metaParaGuardar.pedido_id){
+        metaParaGuardar.pedido_id = 'pid_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
+      }
       if(ref !== refBase) metaParaGuardar.original_ref = refBase;
 
       metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
@@ -579,6 +982,76 @@ function volverLista(){
   cargarLista();
 }
 
+/* ========= AUTO-ABRIR DESDE INDEX (openRef=...) ========= */
+function _getQueryParam(name){
+  try{
+    const u = new URL(location.href);
+    return u.searchParams.get(name);
+  }catch(e){ return null; }
+}
+function getFocusRef(){
+  try{
+    const u = new URLSearchParams(window.location.search || '');
+    let ref = (u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
+
+    if(!ref){
+      const h = (window.location.hash || '').replace(/^#/, '');
+      if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
+      else if(h.startsWith('openRef=')) ref = decodeURIComponent(h.slice(8));
+    }
+
+    if(!ref) ref = (LS.getItem('prep_focus_ref') || LS.getItem('prep_focus_hash_ref') || '').trim();
+
+    // limpiar para no bloquear futuros clicks
+    LS.removeItem('prep_focus_ref');
+    LS.removeItem('prep_focus_hash_ref');
+
+    return ref || '';
+  }catch(e){ return ''; }
+}
+
+function marcarYabrirRef(ref){
+  ref = (ref || '').trim();
+  if(!ref) return;
+
+  // Banner superior (si existe)
+  try{
+    const b = document.getElementById('focusBanner');
+    if(b){
+      b.style.display = 'flex';
+      const s = b.querySelector('.ref');
+      if(s) s.textContent = ref;
+      const btn = document.getElementById('btnAbrirFocus');
+      if(btn) btn.onclick = () => abrirPedido(ref);
+    }
+  }catch(e){}
+
+  const refNorm = normRef(ref);
+
+  const tryClick = (attempt) => {
+    const list = document.getElementById('listaPedidos');
+    if(list){
+      const items = Array.from(list.querySelectorAll('.item'));
+      const el = items.find(n => (n.dataset && (n.dataset.refNorm || normRef(n.dataset.ref))) === refNorm)
+              || items.find(n => normRef(n.textContent).includes(refNorm));
+      if(el){
+        try{ el.classList.add('focus-target'); }catch(e){}
+        try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+        // Marcar visualmente y centrar en lista (sin auto-abrir)
+        return;
+      }
+    }
+    if(attempt < 12) setTimeout(()=>tryClick(attempt+1), 180);
+  };
+
+  tryClick(0);
+}
+
+function autoAbrirDesdeQuery(){
+  const ref = getFocusRef();
+  if(ref) marcarYabrirRef(ref);
+}
+
 /* ========= LISTA DE PEDIDOS (pill por RECEPCIÓN) ========= */
 function cargarLista() {
   const lista = document.getElementById("lista");
@@ -604,13 +1077,28 @@ function cargarLista() {
 
     const fab = !!meta.en_fabricacion;
 
+    // NO ASIGNADO pendiente (pill persistente)
+    // Primero en meta; si no existe (p.ej. el pedido ya no está en Preparación), se toma del registro global.
+    const ubLocal = (meta && meta.unassignedBorrow) ? meta.unassignedBorrow : null;
+    const ubGlobal = getGlobalBorrow(ref);
+    const ub = (ubLocal && Array.isArray(ubLocal.items) && ubLocal.items.length) ? ubLocal : ubGlobal;
+    const ut = unassignedTotals(ub);
+    const hasNoAsig = (ut.lines > 0);
+
+
     const item = document.createElement("div");
     item.className = "item";
+    // dataset para auto-abrir / marcar desde Fabricación/Almacén
+    try{
+      item.dataset.ref = ref;
+      item.dataset.refNorm = normRef(ref);
+    }catch(e){}
     item.innerHTML = `
       <div style="display:flex;justify-content:space-between;margin-bottom:6px; gap:10px; align-items:flex-start;">
         <span style="font-weight:bold; color:#fff">${ref}</span>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
           ${fab ? `<span class="badge b-fab"><span class="dot"></span> En fabricación</span>` : ``}
+          ${hasNoAsig ? `<span class="badge b-na">No asignado: <b>${ut.lines}</b></span>` : ``}
           <span class="badge ${badgeClass}">${badgeText}</span>
         </div>
       </div>
@@ -629,7 +1117,20 @@ function abrirPedido(ref) {
   document.getElementById("vistaDetalle").classList.remove("hidden");
 
   metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
-  if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
+if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
+
+  // Hidratación de "No asignado" desde registro global (por si el pedido viene de otro módulo)
+  const gb = getGlobalBorrow(ref);
+  if(gb && (!metaActual.unassignedBorrow || !Array.isArray((metaActual.unassignedBorrow||{}).items) || metaActual.unassignedBorrow.items.length===0)){
+    metaActual.unassignedBorrow = gb;
+    // no forzamos guardado aquí; se guardará al primer cambio
+  }
+
+// Si el pedido tiene deuda de "no asignado" guardada globalmente, la re-hidratamos aquí
+const gBorrow = getGlobalBorrow(ref);
+if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBorrow.items.length){
+  metaActual.unassignedBorrow = gBorrow;
+}
 
   estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
 
@@ -670,7 +1171,22 @@ function autoCerrarSiCompletoPorRecepcion(){
     // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
     mandarAFabricacionAutoSiHaceFalta();
 
-    // 2) Retirar de Preparación
+    // 2) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
+    //    Así la alerta no desaparece y queda "bloqueado" hasta devolverlo.
+    const ub = (metaActual && metaActual.unassignedBorrow) ? metaActual.unassignedBorrow : (getGlobalBorrow(refActual) || { items: [] });
+    const t = unassignedTotals(ub);
+    if(t.lines > 0){
+      metaActual.recepcion_completa = true;
+      metaActual.unassignedBorrow = ensureUnassigned(metaActual);
+      // nos aseguramos de persistirlo también en global
+      saveMetaActual();
+      alert("⚠️ Pedido completo (material recibido), pero hay MATERIAL NO ASIGNADO pendiente de devolver.\n\nEl pedido se mantiene en Preparación hasta que lo devuelvas desde la pill roja.");
+      updateNoAsigPill();
+      cargarLista();
+      return;
+    }
+
+    // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
     LS.removeItem(KP(refActual));
     LS.removeItem(KM(refActual));
     alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
@@ -834,6 +1350,13 @@ function renderTabla() {
 
     if (falta > 0) {
       btnHtml += `<button class="btn-mini" onclick="consumirDeStock(${index})">Consumir stock (-${falta})</button>`;
+      btnHtml += `<button class="btn-mini unassigned" onclick="consumirNoAsignado(${index})">Consumir NO asignado</button>`;
+    }
+
+    // Si existe deuda no asignada para esta línea, ofrecer devolución desde Preparación
+    const uaRec = _uaFindForLine(linea);
+    if(uaRec && uaRec.pending>0){
+      btnHtml += `<button class="btn-mini btn-danger" onclick="devolverNoAsignadoLinea(${index})">Devolver no asignado (+${uaRec.pending})</button>`;
     }
 
     const btnVincular = `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
@@ -866,7 +1389,9 @@ function renderTabla() {
   document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
 
   autoCerrarSiCompletoPorRecepcion();
+  updateNoAsigPill();
 }
+
 
 /* ========= LÓGICA DE STOCK: localizar material ========= */
 function _addToRealStock_byLinkedOrName(linea, ironType) {
@@ -1010,6 +1535,108 @@ function consumirDeStock(index){
   renderTabla();
   cargarLista();
 }
+
+
+/* ========= CONSUMIR NO ASIGNADO (movimiento "out" + alerta) ========= */
+function consumirNoAsignado(index){
+  const linea = estadoMateriales[index];
+
+  const pedida = toNum(linea.qty_pedida);
+  const recibida = toNum(linea.qty_recibida);
+
+  const falta = Math.max(0, pedida - recibida);
+  if(falta <= 0){
+    alert("Esta línea ya está completa.");
+    return;
+  }
+
+  let tipoHierro = null;
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
+    tipoHierro = metaActual.tipo_hierro;
+    if (!tipoHierro) {
+      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
+      const p = document.getElementById("panelHierro");
+      p.style.boxShadow = "0 0 0 2px #ef4444";
+      setTimeout(()=>p.style.boxShadow="none", 2000);
+      return;
+    }
+  }
+
+  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
+  if(!check.success){
+    alert("Este material no está vinculado / no existe en Stock.\nPulsa “Vincular” y selecciona el material correcto antes de consumir NO asignado.");
+    return;
+  }
+
+  const matId = check.matId;
+  const mat = check.mat;
+
+  // Cantidad a consumir (máx falta)
+  const ask = prompt(`Cantidad a CONSUMIR como NO asignado (máx. ${falta})`, String(falta));
+  if(ask === null) return;
+  let q = parseFloat(String(ask).replace(",", "."));
+  if(isNaN(q) || q <= 0) return;
+  if(q > falta) q = falta;
+
+  const disponible = toNum(getStockQty(matId));
+  const quedaria = disponible - q;
+
+  if(quedaria < 0){
+    const deficit = Math.abs(quedaria);
+    const ok = confirm(
+      `Stock insuficiente para consumir NO asignado.\n\n` +
+      `Material: ${mat.name}\n` +
+      `Disponible: ${disponible}\n` +
+      `Necesario: ${q}\n\n` +
+      `Esto dejará el stock en NEGATIVO: -${deficit}\n\n` +
+      `¿Confirmas consumir igualmente?`
+    );
+    if(!ok) return;
+  }
+
+  stockMovements.push({
+    id: uuid(),
+    matId: matId,
+    type: 'out',
+    qty: q,
+    date: new Date().toISOString(),
+    ref: refActual,
+    concept: metaActual.concepto || "",
+    reason: "unassigned_borrow"
+  });
+  saveStockLocal();
+
+  // Cumple la recepción de la línea (igual que consumir normal)
+  linea.qty_recibida = recibida + q;
+  linea.ok = (toNum(linea.qty_recibida) >= pedida);
+
+  // Registrar deuda por pedido (multi-material)
+  const ub = ensureUnassigned(metaActual);
+  const found = (ub.items || []).find(it => it && it.matId === matId);
+  if(found){
+    found.qtyPending = toNum(found.qtyPending) + q;
+    found.lastActionAt = Date.now();
+  }else{
+    (ub.items || (ub.items=[])).push({
+      matId: matId,
+      name: mat.name,
+      unit: mat.unit || (linea.unit || ""),
+      qtyPending: q,
+      createdAt: Date.now(),
+      lastActionAt: Date.now()
+    });
+  }
+  metaActual.unassignedBorrow = ub;
+  saveMetaActual();
+
+  guardarEstadoLocal();
+
+  alert(`⚠️ Consumido material NO asignado.\nMaterial: ${mat.name}\nCantidad: ${q}\n\nQueda pendiente devolverlo.`);
+  updateNoAsigPill();
+  renderTabla();
+  cargarLista();
+}
+
 
 /* ========= MODAL CREACIÓN ========= */
 function abrirModalCreacion(data) {
@@ -1182,12 +1809,14 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
   if (idx >= 0) {
     db.deliveries[idx].total = unidadesFinal;
+    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
     if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
     if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
       db.deliveries[idx].notes = (db.deliveries[idx].notes ? (db.deliveries[idx].notes + "\n") : "") + notasFinales;
     }
   } else {
     db.deliveries.push({
+      unassignedBorrow: ((metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() })),
       id: "PED-" + Date.now(),
       client: "Taller / Interno",
       ref: refActual,
@@ -1218,18 +1847,34 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
 /* ========= AUTO: ENVIAR A FABRICACIÓN SI HACE FALTA ========= */
 function mandarAFabricacionAutoSiHaceFalta(){
-  // si ya estaba marcado y probablemente ya existe en ldh_db, igualmente garantizamos que exista.
-  const unidadesFinal = (parseFloat(document.getElementById("inputUnidades")?.value) || metaActual.unidades || 1);
+  // Evitar re-enviar (y duplicar notas/acciones) cuando ya existe en Fabricación.
+  // Esto es importante porque al devolver NO-ASIGNADO puede dispararse el auto-cierre de recepción.
+  if(!refActual) return;
 
-  // Reutilizamos core sin alert y sin confirm
+  if(metaActual && metaActual.en_fabricacion && ldhHasDelivery(refActual)){
+    // Aseguramos mirror de no-asignado por si cambió
+    mirrorUnassignedToLdhDb();
+    return;
+  }
+  if(ldhHasDelivery(refActual)){
+    metaActual.en_fabricacion = true;
+    metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
+    LS.setItem(KM(refActual), JSON.stringify(metaActual));
+    mirrorUnassignedToLdhDb();
+    return;
+  }
+
+  const unidadesFinal = (parseFloat(document.getElementById("inputUnidades")?.value) || metaActual.unidades || 1);
   mandarAFabricacion(unidadesFinal, false);
 }
+
 
 /* ========= ELIMINAR ========= */
 function eliminarPedido() {
   if (confirm("⛔ ¿Eliminar?")) {
     LS.removeItem(KP(refActual));
     LS.removeItem(KM(refActual));
+    clearGlobalBorrow(refActual);
     volverLista();
   }
 }
@@ -1253,6 +1898,8 @@ async function init(){
   }
 
   cargarLista();
+  // si venimos desde el index con ?openRef=...
+  autoAbrirDesdeQuery();
 }
 init();
 </script>
