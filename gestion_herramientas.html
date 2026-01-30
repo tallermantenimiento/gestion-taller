@@ -99,9 +99,15 @@
   .loan.dang{border-color:rgba(239,68,68,.6)}
   
   /* Floating bar */
-  #floating{position:fixed;left:16px;right:16px;bottom:16px;z-index:30;display:none}
+  #floating{position:fixed;left:16px;top:auto;right:auto;bottom:16px;z-index:30;display:none}
   #floating .inner{max-width:1180px;margin:0 auto;border:1px solid var(--line);border-radius:16px;background:rgba(15,23,42,.92);backdrop-filter:blur(10px);box-shadow:0 18px 40px rgba(0,0,0,.4);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   #floating input{background:#0b1326;border:1px solid var(--line);border-radius:10px;padding:9px 10px;color:var(--txt);min-width:220px}
+
+  /* Floating draggable */
+  #floating.dragging { user-select:none; }
+  #fbDragHandle{display:inline-flex;align-items:center;gap:6px;cursor:move;user-select:none}
+  #fbDragHandle:hover{filter:brightness(1.08)}
+  #fbDragHandle .grip{font-size:14px;color:var(--mut)}
   
   /* Modal System */
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
@@ -182,13 +188,21 @@
         <div id="useList"></div>
       </div>
     </section>
+    <section class="card" style="grid-column:1/-1">
+      <h2>En reparación</h2>
+      <div class="content">
+        <div id="repEmpty" class="small" style="display:none">No hay herramientas en reparación.</div>
+        <div id="repList"></div>
+      </div>
+    </section>
   </div>
 </main>
 
 <div id="floating">
   <div class="inner">
-    <span class="badge">Selección: <b id="selCount">0</b></span>
-    <input id="fbOperario" list="dlOps" placeholder="Operario (obligatorio)" autocomplete="off"/>
+    <span id="fbDragHandle" class="pill" title="Arrastra para mover. Doble click para reset."><span class="grip">⠿</span> Selección: <b id="selCount">0</b></span>
+    <input id="fbOperario" list="dlOps" placeholder="Para (operario destino) *" autocomplete="off"/>
+    <input id="fbRecoge" list="dlOps" placeholder="Recoge (opcional: si lo recoge otro)" autocomplete="off"/>
     <datalist id="dlOps"></datalist>
     <button class="btn primary" id="btnPrestarSel">Prestar</button>
     <button class="btn danger" id="btnCancelSel">Cancelar</button>
@@ -270,7 +284,7 @@ function processImage(file, callback) {
 }
 
 let db = { tools: [], history: [], library: null, familyOrder: [], operators: [] }; 
-let cfg = { warnDays: 7, dangerDays: 30  , familyOpen: {} };
+let cfg = { warnDays: 7, dangerDays: 30, familyOpen: {}, floatingPos: null };
 let selected = new Set();
 // Variables globales Drag & Drop
 let dragSrcIndex = null; 
@@ -284,8 +298,100 @@ const invTools = $("invTools");
 const useList = $("useList");
 const floating = $("floating");
 const fbOperario = $("fbOperario");
+const fbRecoge = $("fbRecoge");
 const dlOps = $("dlOps");
 const statusPill = $("statusPill");
+
+/* ========= Floating bar draggable ========= */
+function applyFloatingPos(){
+  const el = $("floating");
+  if(!el) return;
+  if(cfg && cfg.floatingPos && typeof cfg.floatingPos.x==="number" && typeof cfg.floatingPos.y==="number"){
+    el.style.left = cfg.floatingPos.x + "px";
+    el.style.top = cfg.floatingPos.y + "px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+  } else {
+    el.style.left = "16px";
+    el.style.top = "auto";
+    el.style.right = "auto";
+    el.style.bottom = "16px";
+  }
+}
+
+function setupFloatingDrag(){
+  const el = $("floating");
+  const handle = $("fbDragHandle");
+  if(!el || !handle) return;
+
+  applyFloatingPos();
+
+  let dragging = false;
+  let sx=0, sy=0, ox=0, oy=0;
+
+  const onMove = (e) => {
+    if(!dragging) return;
+    e.preventDefault();
+    const dx = e.clientX - sx;
+    const dy = e.clientY - sy;
+    let nx = ox + dx;
+    let ny = oy + dy;
+
+    // Clamp inside viewport
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    nx = Math.max(6, Math.min(vw - rect.width - 6, nx));
+    ny = Math.max(6, Math.min(vh - rect.height - 6, ny));
+
+    el.style.left = nx + "px";
+    el.style.top = ny + "px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+  };
+
+  const onUp = (e) => {
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    document.removeEventListener("pointermove", onMove, true);
+    document.removeEventListener("pointerup", onUp, true);
+    // Persist
+    const left = parseFloat(el.style.left);
+    const top = parseFloat(el.style.top);
+    if(!Number.isNaN(left) && !Number.isNaN(top)){
+      cfg.floatingPos = {x: left, y: top};
+      saveAll();
+    }
+  };
+
+  handle.addEventListener("pointerdown", (e)=>{
+    // Only start drag if selection bar is visible
+    if(el.style.display === "none") return;
+    dragging = true;
+    el.classList.add("dragging");
+    sx = e.clientX;
+    sy = e.clientY;
+    const r = el.getBoundingClientRect();
+    ox = r.left;
+    oy = r.top;
+    el.style.left = ox + "px";
+    el.style.top = oy + "px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+    document.addEventListener("pointermove", onMove, true);
+    document.addEventListener("pointerup", onUp, true);
+  });
+
+  handle.addEventListener("dblclick", ()=>{
+    cfg.floatingPos = null;
+    saveAll();
+    applyFloatingPos();
+  });
+
+  window.addEventListener("resize", ()=>{ applyFloatingPos(); });
+}
+
 
 /* ========= Modal System ========= */
 function showModal(title, bodyHtml, footButtons){
@@ -356,6 +462,12 @@ function loadAll(){
     if(!Array.isArray(t.maintSerials)) t.maintSerials = [];
     if(typeof t.maintQty !== 'number') t.maintQty = 0;
     if(typeof t.stock !== 'number') t.stock = 0;
+
+    // Backward-compat: loans antiguos solo tenían operator (destino).
+    for(const l of (t.loans||[])){
+      if(!l.operator) l.operator = "";
+      if(!l.pickupBy) l.pickupBy = l.operator; // quién la recoge
+    }
   }
   
   // Ensure familyOrder exists and is synced
@@ -596,44 +708,122 @@ function render(){
     invTools.appendChild(wrap);
   }
 
-  /* ================== EN USO (AGRUPADO POR FAMILIAS) ================== */
-  
-  // 1. Recopilar prestamos y agrupar
-  const useBuckets = {};
+  /* ================== EN USO (AGRUPADO POR OPERARIO) ================== */
+  const opBuckets = {};
   let totalLoans = 0;
-  
+
   db.tools.forEach(t => {
-      t.loans.forEach(l => {
-         const fam = familyOfTool(t);
-         if(!useBuckets[fam]) useBuckets[fam] = [];
-         useBuckets[fam].push({tool: t, loan: l});
-         totalLoans++;
-      });
+    (t.loans||[]).forEach(l => {
+      const op = normOp(l.operator) || "—";
+      if(!opBuckets[op]) opBuckets[op] = [];
+      opBuckets[op].push({tool:t, loan:l});
+      totalLoans++;
+    });
   });
 
-  // Ordenar cada bucket por fecha (como estaba antes)
-  for(const k in useBuckets){
-      useBuckets[k].sort((a,b)=> new Date(a.loan.outAt)-new Date(b.loan.outAt));
+  // Ordenar cada operario por fecha de salida
+  for(const op in opBuckets){
+    opBuckets[op].sort((a,b)=> new Date(a.loan.outAt)-new Date(b.loan.outAt));
   }
 
   $("useEmpty").style.display = totalLoans ? "none" : "block";
   useList.innerHTML = "";
 
-  // 2. Usar orden de familias (mismo que inventario)
-  let useFams = [...db.familyOrder];
-  if(useBuckets["Sin familia"] && !useFams.includes("Sin familia")) useFams.push("Sin familia");
-  useFams = useFams.filter(f => useBuckets[f] && useBuckets[f].length > 0);
+  const opNames = Object.keys(opBuckets).sort((a,b)=>a.localeCompare(b));
 
-  // 3. Renderizar Grupos En Uso
-  for(const fam of useFams){
+  for(const op of opNames){
+    const wrap = document.createElement("div");
+    wrap.className = "fam-wrap";
+    wrap.style.border="1px solid var(--line)";
+    wrap.style.borderRadius="14px";
+    wrap.style.marginBottom="10px";
+    wrap.style.overflow="hidden";
+    wrap.style.background="rgba(255,255,255,0.03)";
+
+    const head = document.createElement("div");
+    head.className = "fam-head";
+    head.style.display="flex";
+    head.style.justifyContent="space-between";
+    head.style.alignItems="center";
+    head.style.padding="10px 12px";
+    head.style.background="rgba(255,100,0,0.05)";
+    head.style.cursor="pointer";
+    head.innerHTML = `<div><b>${esc(op)}</b> <span style="color:var(--mut);font-size:12px">(${opBuckets[op].length})</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
+
+    const body = document.createElement("div");
+    body.style.padding="10px";
+
+    const openKey = 'use_op_' + op;
+    const isOpen = cfg.familyOpen && cfg.familyOpen[openKey] === true;
+    body.style.display = isOpen ? "block" : "none";
+
+    head.addEventListener("click", ()=>{
+      const isHidden = body.style.display === "none";
+      body.style.display = isHidden ? "block" : "none";
+      if(!cfg.familyOpen) cfg.familyOpen = {};
+      cfg.familyOpen[openKey] = isHidden;
+    });
+
+    for(const {tool, loan} of opBuckets[op]){
+      const d = daysSince(loan.outAt);
+      const st = (d >= cfg.dangerDays) ? "dang" : (d >= cfg.warnDays ? "warn" : "ok");
+      const titleEx = loan.variant ? `(${esc(loan.variant)})` : "";
+      const pickup = normOp(loan.pickupBy || loan.operator);
+      const pickupLine = pickup && pickup !== op ? ` · Recoge: <b>${esc(pickup)}</b>` : "";
+
+      const card = document.createElement("div");
+      card.className = `loan ${st}`;
+      card.innerHTML = `
+        <div class="top">
+          <div class="sp">
+            <div class="title">${renderIcon(tool.icon)} ${esc(tool.name)} ${titleEx} · <span class="mono">x${loan.qty}</span></div>
+            <p class="sub">Para: <b>${esc(op)}</b>${pickupLine} · Zona: ${esc(loan.zone||"—")}</p>
+            <p class="sub">Salida: ${new Date(loan.outAt).toLocaleDateString()} · Antigüedad: ${d.toFixed(1)} días</p>
+            ${loan.mode==="serial" ? `<p class="sub mono">Series: ${(loan.serials||[]).join(", ")}</p>` : ""}
+            ${loan.notes ? `<p class="sub">📝 ${esc(loan.notes)}</p>` : ""}
+          </div>
+          <div class="row" style="gap:8px; justify-content:flex-end">
+            <button class="btn" data-act="xfer">Cambiar operario</button>
+            <button class="btn primary" data-act="return">Devolver</button>
+          </div>
+        </div>
+      `;
+      card.querySelector('[data-act="return"]').addEventListener("click", ()=>openReturn(tool.id, loan.id));
+      card.querySelector('[data-act="xfer"]').addEventListener("click", ()=>openTransfer(tool.id, loan.id));
+      body.appendChild(card);
+    }
+
+    wrap.appendChild(head);
+    wrap.appendChild(body);
+    useList.appendChild(wrap);
+  }
+
+  /* ================== EN REPARACIÓN (RESUMEN) ================== */
+  const repListEl = document.getElementById("repList");
+  const repEmptyEl = document.getElementById("repEmpty");
+  if(repListEl && repEmptyEl){
+    repListEl.innerHTML = "";
+    const repBuckets = {};
+    let repCount = 0;
+    for(const tool of db.tools){
+      const m = toolsInMaintCount(tool);
+      if(m>0){
+        const fam = familyOfTool(tool);
+        if(!repBuckets[fam]) repBuckets[fam] = [];
+        repBuckets[fam].push({tool, m});
+        repCount += m;
+      }
+    }
+    repEmptyEl.style.display = repCount ? "none" : "block";
+
+    const fams = Object.keys(repBuckets).sort((a,b)=>a.localeCompare(b));
+    for(const fam of fams){
       const wrap = document.createElement("div");
-      wrap.className = "fam-wrap";
       wrap.style.border="1px solid var(--line)";
       wrap.style.borderRadius="14px";
       wrap.style.marginBottom="10px";
       wrap.style.overflow="hidden";
       wrap.style.background="rgba(255,255,255,0.03)";
-      // NOTA: No añadimos draggable aquí porque no se reordena lo prestado
 
       const head = document.createElement("div");
       head.className = "fam-head";
@@ -641,57 +831,52 @@ function render(){
       head.style.justifyContent="space-between";
       head.style.alignItems="center";
       head.style.padding="10px 12px";
-      head.style.background="rgba(255,100,0,0.05)"; // Tinte muy ligero diferente para diferenciar de inventario
+      head.style.background="rgba(245,158,11,0.08)";
       head.style.cursor="pointer";
-      head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${useBuckets[fam].length})</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
+      head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${repBuckets[fam].length})</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
 
       const body = document.createElement("div");
       body.style.padding="10px";
-      
-      // Lógica de colapsado para "En Uso" (Prefijo 'use_' para diferenciar del inventario)
-      const openKey = 'use_' + fam;
+      const openKey = 'rep_' + fam;
       const isOpen = cfg.familyOpen && cfg.familyOpen[openKey] === true;
       body.style.display = isOpen ? "block" : "none";
-
       head.addEventListener("click", ()=>{
-          const isHidden = body.style.display === "none";
-          body.style.display = isHidden ? "block" : "none";
-          if(!cfg.familyOpen) cfg.familyOpen = {};
-          cfg.familyOpen[openKey] = isHidden;
-          // No guardamos saveAll() aquí explícitamente para no spammear, pero el estado en memoria persiste
+        const isHidden = body.style.display === "none";
+        body.style.display = isHidden ? "block" : "none";
+        if(!cfg.familyOpen) cfg.familyOpen = {};
+        cfg.familyOpen[openKey] = isHidden;
       });
 
-      // Renderizar tarjetas de prestamo
-      for(const {tool, loan} of useBuckets[fam]){
-          const d = daysSince(loan.outAt);
-          const st = (d >= cfg.dangerDays) ? "dang" : (d >= cfg.warnDays ? "warn" : "ok");
-          const titleEx = loan.variant ? `(${esc(loan.variant)})` : "";
+      repBuckets[fam].sort((a,b)=>a.tool.name.localeCompare(b.tool.name));
 
-          const card = document.createElement("div");
-          card.className = `loan ${st}`;
-          card.innerHTML = `
-            <div class="top">
-              <div class="sp">
-                <div class="title">${renderIcon(tool.icon)} ${esc(tool.name)} ${titleEx} · <span class="mono">x${loan.qty}</span></div>
-                <p class="sub">Operario: <b>${esc(loan.operator)}</b> · Zona: ${esc(loan.zone||"—")}</p>
-                <p class="sub">Salida: ${new Date(loan.outAt).toLocaleDateString()} · Antigüedad: ${d.toFixed(1)} días</p>
-                ${loan.mode==="serial" ? `<p class="sub mono">Series: ${(loan.serials||[]).join(", ")}</p>` : ""}
-                ${loan.notes ? `<p class="sub">📝 ${esc(loan.notes)}</p>` : ""}
-              </div>
-              <div><button class="btn primary" data-act="return">Devolver</button></div>
+      for(const {tool, m} of repBuckets[fam]){
+        const row = document.createElement("div");
+        row.className = "loan warn";
+        const serialLine = (tool.mode==="serial" && (tool.maintSerials||[]).length) ? `<p class="sub mono">Series: ${(tool.maintSerials||[]).join(", ")}</p>` : "";
+        row.innerHTML = `
+          <div class="top">
+            <div class="sp">
+              <div class="title">${renderIcon(tool.icon)} ${esc(tool.name)} · <span class="mono">${tool.mode==="serial" ? ("x"+(tool.maintSerials||[]).length) : ("x"+(tool.maintQty||0))}</span></div>
+              <p class="sub">En reparación: <b>${m}</b> · Libres: <b>${toolsFreeQty(tool)}</b> · Stock: <b>${tool.stock||0}</b></p>
+              ${serialLine}
             </div>
-          `;
-          card.querySelector('[data-act="return"]').addEventListener("click", ()=>openReturn(tool.id, loan.id));
-          body.appendChild(card);
+            <div><button class="btn" data-act="mng">Gestionar</button></div>
+          </div>
+        `;
+        row.querySelector('[data-act="mng"]').addEventListener("click", ()=>openMaintManager(tool.id));
+        body.appendChild(row);
       }
 
       wrap.appendChild(head);
       wrap.appendChild(body);
-      useList.appendChild(wrap);
+      repListEl.appendChild(wrap);
+    }
   }
+
 
   $("selCount").textContent = String(selected.size);
   $("selHint").textContent = selected.size ? "Listo para prestar." : "";
+  applyFloatingPos();
   floating.style.display = selected.size ? "block" : "none";
 }
 
@@ -942,9 +1127,11 @@ function doReturnMaint(t){
 
 /* ========= Loans ========= */
 function openBatchLoan(){
-  const op = normOp(fbOperario.value);
-  if(!op) {
-      if(selected.size > 0) alert("Escribe un operario abajo en la barra flotante");
+  const para = normOp(fbOperario.value); // destinatario
+  const recoge0 = normOp((fbRecoge && fbRecoge.value) || "");
+  const recoge = recoge0 || para; // quien recoge (si no se indica, mismo)
+  if(!para) {
+      if(selected.size > 0) alert("Escribe 'Para' (operario destino) en la barra flotante");
       return;
   }
   const list = db.tools.filter(t=>selected.has(t.id));
@@ -964,11 +1151,19 @@ function openBatchLoan(){
     return `<tr><td>${renderIcon(t.icon)} ${t.name}</td><td>${free}</td><td><input data-id="${t.id}" data-type="variant" placeholder="Ej: 13, Pared 12..." style="font-size:12px"/></td><td>${inputHtml}</td></tr>`;
   }).join("");
   showModal("Confirmar Préstamo", `
-    <div class="form"><div><label>Operario</label><input id="lOp" value="${esc(op)}" readonly/></div><div><label>Zona / Obra</label><input id="lZone"/></div><div style="grid-column:1/-1"><label>Notas generales</label><textarea id="lNotes"></textarea></div></div>
+    <div class="form">
+      <div><label>Para (operario destino)</label><input id="lPara" value="${esc(para)}"/></div>
+      <div><label>Recoge (quién lo retira)</label><input id="lRecoge" value="${esc(recoge)}" placeholder="Si lo recoge el mismo, deja igual"/></div>
+      <div><label>Zona / Obra</label><input id="lZone"/></div>
+      <div style="grid-column:1/-1"><label>Notas generales</label><textarea id="lNotes"></textarea></div>
+    </div>
     <table style="margin-top:10px"><thead><tr><th>Item</th><th>Libre</th><th>Detalle/Medida</th><th>Selección</th></tr></thead><tbody>${rows}</tbody></table>
   `, [
     {text:"Cancelar", className:"btn", onClick: closeModal},
     {text:"Prestar", className:"btn primary", onClick: ()=>{
+      const para2 = normOp($("lPara").value);
+      if(!para2) return alert("Falta 'Para' (operario destino)");
+      const recoge2 = normOp($("lRecoge").value) || para2;
       const zone = normName($("lZone").value);
       const notes = normName($("lNotes").value);
       const items = [];
@@ -990,11 +1185,11 @@ function openBatchLoan(){
       if(!items.length) return alert("No has seleccionado cantidades");
       const outAt = nowIso();
       items.forEach(({t, qty, serials, mode, variant}) => {
-          const l = {id:uid(), operator:op, zone, qty, mode, serials, outAt, notes, variant};
+          const l = {id:uid(), operator:para2, pickupBy:recoge2, zone, qty, mode, serials, outAt, notes, variant};
           t.loans.push(l);
-          db.history.push({id:uid(), type:"OUT", toolId:t.id, toolName:t.name, operator:op, zone, qty, serials, outAt, notes, variant});
+          db.history.push({id:uid(), type:"OUT", toolId:t.id, toolName:t.name, operator:para2, pickupBy:recoge2, zone, qty, serials, outAt, notes, variant});
       });
-      fbOperario.value = ""; selected.clear(); saveAll(); closeModal(); render();
+      fbOperario.value = ""; if(fbRecoge) fbRecoge.value = ""; selected.clear(); saveAll(); closeModal(); render();
     }}
   ]);
 }
@@ -1023,6 +1218,60 @@ function openReturn(tid, lid){
     }}
   ]);
 }
+
+
+function openTransfer(tid, lid){
+  const t = db.tools.find(x=>x.id===tid);
+  if(!t) return;
+  const l = (t.loans||[]).find(x=>x.id===lid);
+  if(!l) return;
+
+  const curPara = normOp(l.operator);
+  const curRecoge = normOp(l.pickupBy || l.operator);
+
+  showModal("Cambiar operario (traspaso)", `
+    <div class="form">
+      <div style="grid-column:1/-1"><label>Herramienta</label><input value="${esc(t.name)} ${l.variant?`(${esc(l.variant)})`:''}" disabled/></div>
+      <div><label>Para (nuevo destinatario)</label><input id="xPara" list="dlOps" value="${esc(curPara)}"/></div>
+      <div><label>Recoge (quién la entrega/retira)</label><input id="xRecoge" list="dlOps" value="${esc(curRecoge)}"/></div>
+      <div style="grid-column:1/-1"><label>Nota (opcional)</label><input id="xNote" placeholder="Ej. Se la cede Juan a Pedro"/></div>
+    </div>
+    <div class="small" style="margin-top:8px;color:var(--mut)">No pasa por almacén: se mantiene el préstamo activo y solo cambia el operario asignado.</div>
+  `, [
+    {text:"Cancelar", className:"btn", onClick: closeModal},
+    {text:"Guardar cambio", className:"btn primary", onClick: ()=>{
+      const newPara = normOp($("xPara").value);
+      if(!newPara) return alert("Falta 'Para'");
+      const newRecoge = normOp($("xRecoge").value) || newPara;
+      const note = normName($("xNote").value);
+
+      const prevPara = l.operator;
+      const prevRecoge = l.pickupBy || l.operator;
+
+      l.operator = newPara;
+      l.pickupBy = newRecoge;
+
+      db.history.push({
+        id: uid(),
+        type: "XFER",
+        toolId: t.id,
+        toolName: t.name,
+        fromOperator: prevPara,
+        toOperator: newPara,
+        pickupBy: newRecoge,
+        qty: l.qty,
+        serials: (l.serials||[]).slice(),
+        outAt: l.outAt,
+        at: nowIso(),
+        notes: note,
+        variant: l.variant || ""
+      });
+
+      saveAll(); closeModal(); render();
+    }}
+  ]);
+}
+
 
 function openHistory(){
   showModal("Historial", `<div style="margin-bottom:10px;display:flex;gap:10px"><input id="hSearch" placeholder="Filtrar..." style="flex:1"/><button class="btn danger" id="hClear">Limpiar</button></div><div style="max-height:60vh;overflow:auto"><table id="hTable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Nota</th></tr></thead><tbody id="hBody"></tbody></table></div>`, [{text:"Cerrar", className:"btn", onClick:closeModal}]);
@@ -1508,7 +1757,9 @@ function boot(){
   cfg.familyOpen = {};
   saveAll();
   render();
+  setupFloatingDrag();
 }
+
 </script>
 </body>
 </html>
