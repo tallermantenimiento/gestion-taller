@@ -169,6 +169,8 @@
     .p-f-col:last-child { flex: 0 0 15%; border:none; padding: 5px; font-size: 10px; font-weight: bold; text-transform: uppercase; text-align: center; display: flex; flex-direction: column; justify-content: flex-end; }
   }
 </style>
+
+<script type="module" src="cloud_sync.js"></script>
 </head>
 <body>
 <div style="position:fixed; top:16px; left:16px; z-index:9999;"><button onclick="window.location.href='index.html'" style="padding:8px 14px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">⬅ Volver al menú</button></div>
@@ -286,6 +288,30 @@ const firebaseConfig = {
 
 // ====== DB LOCAL (TU MISMO SISTEMA) ======
 const DB_KEY="taller_stock_v3_data", SNOOZE_KEY="taller_stock_snooze_until";
+
+// === Sync local entre pestañas/ventanas (LocalStorage) ===
+// IMPORTANTE: si abres los HTML con file://, cada archivo tiene un origen distinto y NO comparte localStorage.
+// Para probar sincronización local, abre con un servidor (http://localhost) o en GitHub Pages.
+function __reloadStockFromLS(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && typeof parsed==='object'){
+        materials = Array.isArray(parsed.materials) ? parsed.materials : (materials||[]);
+        movements = Array.isArray(parsed.movements) ? parsed.movements : (movements||[]);
+      }
+    }
+  }catch(e){}
+  try{ if(typeof renderTree==='function') renderTree(); }catch(e){}
+  try{ if(typeof renderMovements==='function') renderMovements(); }catch(e){}
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
+}
+window.addEventListener('storage', (ev)=>{
+  if(ev && ev.key===DB_KEY){
+    __reloadStockFromLS();
+  }
+});
 let materials=[], movements=[], currentFilter={cat:null,grp:null,status:null};
 let categoryOrder = [];
 
