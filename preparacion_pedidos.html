@@ -157,6 +157,8 @@
 }
 
 </style>
+
+<script type="module" src="cloud_sync.js"></script>
 </head>
 <body>
 
@@ -186,6 +188,7 @@
         <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
         <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
             <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
+            <div style="font-size:13px; color:#9fb0c8;" id="empresaPrep"></div>
             <span id="pillFab" class="badge b-fab hidden"><span class="dot"></span> En fabricación</span>
             <span id="pillNoAsig" class="badge b-na hidden" style="cursor:pointer" onclick="abrirModalNoAsignado()"><span class="dot"></span> No asignado</span>
             <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
@@ -901,11 +904,29 @@ function saveLinkMap(){
     return null;
   };
 
-  const snapRaw = LS.getItem("latest_materials_v1");
-  if (snapRaw) {
+  // === Entrada de pedido (compatible con file://) ===
+  // 1) window.name (paso directo desde Cálculo/Index)
+  let snap = null;
+  try{
+    const nm = String(window.name || "").trim();
+    if(nm.startsWith("LDH_PREP|")){
+      snap = JSON.parse(nm.slice("LDH_PREP|".length));
+      // limpiar para evitar reimportar al refrescar
+      try{ window.name = ""; }catch(_){}
+    }
+  }catch(e){ snap = null; }
+
+  // 2) localStorage (misma origin)
+  if(!snap){
+    const snapRaw = LS.getItem("latest_materials_v1") || LS.getItem("pedido_en_preparacion") || LS.getItem("prep_pedido_payload");
+    if(snapRaw){
+      try{ snap = JSON.parse(snapRaw); }catch(e){ snap = null; }
+    }
+  }
+
+  if (snap) {
     try {
-      const snap = JSON.parse(snapRaw);
-      const refBase = String(snap.referencia || ('SIN_REF_' + Date.now())).trim();
+      const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
       // UID de pedido para distinguir envíos distintos aunque compartan referencia
       const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
       const pedidoUid = incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
@@ -941,6 +962,16 @@ function saveLinkMap(){
       if(ref !== refBase) metaParaGuardar.original_ref = refBase;
 
       metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
+      // Empresa por PEDIDO (no por concepto)
+      const empresaIncoming = String(snap.empresa || snap.company || "").trim();
+      if(empresaIncoming){
+        metaParaGuardar.empresa = empresaIncoming;
+        metaParaGuardar.company = empresaIncoming;
+      } else {
+        // normalizar nombres históricos si ya existían
+        if(!metaParaGuardar.empresa && metaParaGuardar.company) metaParaGuardar.empresa = metaParaGuardar.company;
+        if(!metaParaGuardar.company && metaParaGuardar.empresa) metaParaGuardar.company = metaParaGuardar.empresa;
+      }
       metaParaGuardar.unidades = qty;
       metaParaGuardar.fecha = Date.now();
       if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
@@ -951,7 +982,8 @@ function saveLinkMap(){
       // ADAPTADOR DE VÍNCULOS (desde Cálculo/Configuración de conceptos)
       // Preparación trabaja con `linked_matId`. Sin este adaptador, si el cálculo
       // envía el id como `stockMatId`/`matId`, la línea llega "sin vínculo".
-      const materialesImport = (snap.materiales || []).map(l => {
+      const materialesSrc = (snap.materiales || snap.materials || snap.lineas || snap.items || []);
+      const materialesImport = (materialesSrc || []).map(l => {
         if(!l || typeof l !== 'object') return l;
         // normaliza cantidades mínimas esperadas por Preparación
         if(l.qty_pedida === undefined && l.qty !== undefined) l.qty_pedida = l.qty;
@@ -969,6 +1001,7 @@ function saveLinkMap(){
 
       LS.removeItem("latest_materials_v1");
       LS.removeItem("pedido_en_preparacion");
+      LS.removeItem("prep_pedido_payload");
     } catch (e) { console.error("Error importando:", e); }
   }
 })();
@@ -1103,7 +1136,7 @@ function cargarLista() {
         </div>
       </div>
       <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)
+        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)${(meta.empresa || meta.company) ? (" · " + (meta.empresa || meta.company)) : ""}
       </div>`;
     item.onclick = () => abrirPedido(ref);
     lista.appendChild(item);
@@ -1136,6 +1169,28 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
 
   document.getElementById("ref").textContent = ref;
   document.getElementById("concepto").textContent = metaActual.concepto || "";
+  // Empresa (por pedido)
+  if(!metaActual.empresa && metaActual.company) metaActual.empresa = metaActual.company;
+  if(!metaActual.company && metaActual.empresa) metaActual.company = metaActual.empresa;
+
+  // Fallback: si el pedido ya existe en ldh_db, re-hidratar empresa (sin ligar a concepto)
+  if(!(metaActual.empresa || "").trim()){
+    try{
+      const rawDb = LS.getItem("ldh_db");
+      if(rawDb){
+        const db = JSON.parse(rawDb) || {};
+        const d = (db.deliveries||[]).find(x=>x && x.ref === ref);
+        const emp = String((d && (d.company || d.empresa)) || "").trim();
+        if(emp){
+          metaActual.empresa = emp;
+          metaActual.company = emp;
+          LS.setItem(KM(refActual), JSON.stringify(metaActual));
+        }
+      }
+    }catch(e){}
+  }
+
+  document.getElementById("empresaPrep").textContent = (metaActual.empresa || metaActual.company) ? ("· " + (metaActual.empresa || metaActual.company)) : "";
   document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
   document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
 
@@ -1806,9 +1861,18 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
+  const empresaFinal = String(metaActual.empresa || metaActual.company || "").trim();
 
   if (idx >= 0) {
     db.deliveries[idx].total = unidadesFinal;
+    // Mantener empresa por pedido en ldh_db
+    if(empresaFinal){
+      db.deliveries[idx].company = empresaFinal;
+      db.deliveries[idx].empresa  = empresaFinal;
+    } else {
+      if(!db.deliveries[idx].company && db.deliveries[idx].empresa) db.deliveries[idx].company = db.deliveries[idx].empresa;
+      if(!db.deliveries[idx].empresa && db.deliveries[idx].company) db.deliveries[idx].empresa = db.deliveries[idx].company;
+    }
     db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
     if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
     if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
@@ -1820,6 +1884,8 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
       id: "PED-" + Date.now(),
       client: "Taller / Interno",
       ref: refActual,
+      company: empresaFinal || "",
+      empresa: empresaFinal || "",
       concept: metaActual.concepto || "Sin concepto",
       datePed: new Date().toISOString().split('T')[0],
       datePrev: new Date().toISOString().split('T')[0],
