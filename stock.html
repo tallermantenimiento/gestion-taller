@@ -2,368 +2,263 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>Preparación de pedidos</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stock Taller v7.2 - Acciones Rápidas</title>
 <style>
-  /* === ESTILOS BASE === */
-  body { margin:0; font-family:Segoe UI,Arial; background:#0b1220; color:#e6edf7; padding:24px; }
-  .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-
-  /* === BOTONES CORPORATIVOS === */
-  .btn {
-    background:linear-gradient(180deg,#0f3c55,#0b2a3d);
-    border:1px solid rgba(255,255,255,.15);
-    color:#6dd6ff;
-    padding:8px 14px;
-    border-radius:10px;
-    cursor:pointer;
-    font-weight:600;
-    transition: filter 0.2s;
+  /* --- ESTILOS PANTALLA --- */
+  :root{
+    --bg:#0b1220; --panel:#0f172a; --card:#111c33;
+    --text:#e6edf7; --muted:#9fb0c8; --border:rgba(255,255,255,.08);
+    --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+    --shadow: 0 10px 30px rgba(0,0,0,.35); --radius:16px;
   }
-  .btn:hover { filter:brightness(1.15); }
-
-  .btn-danger { background:linear-gradient(180deg,#7f1d1d,#450a0a); border-color:#b91c1c; color:#fecaca; }
-  .btn-success { background:linear-gradient(180deg,#14532d,#052e16); border-color:#16a34a; color:#86efac; }
-
-  /* === BOTÓN MINI === */
-  .btn-mini {
-    background: linear-gradient(180deg, #0f3c55, #0b2a3d);
-    border: 1px solid rgba(255,255,255,.15);
-    color: #6dd6ff;
-    padding: 5px 12px;
-    font-size: 11px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: filter 0.2s, box-shadow 0.2s;
-    white-space: nowrap;
-    margin-right: 6px;
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family: system-ui, -apple-system, sans-serif;
+    background: radial-gradient(1200px 600px at 20% 0%, rgba(56,189,248,.10), transparent 60%),
+                radial-gradient(900px 500px at 80% 20%, rgba(34,197,94,.08), transparent 55%), var(--bg);
+    color:var(--text); min-height:100vh; display: flex; flex-direction: column;
   }
-  .btn-mini:hover { filter: brightness(1.2); box-shadow: 0 0 8px rgba(109, 214, 255, 0.2); }
-  .btn-mini.disabled { background: transparent; border: 1px solid rgba(74, 222, 128, 0.2); color: #4ade80; cursor: default; box-shadow: none; filter: none; }
-  .btn-mini.unassigned { background: linear-gradient(180deg, #7f1d1d, #450a0a); border-color: rgba(239,68,68,.55); color: #fecaca; }
+  .wrap{ max-width:1400px; margin:0 auto; padding:20px; flex: 1; width: 100%; }
+  
+  /* UI Components */
+  header{ display:flex; justify-content:space-between; gap:16px; padding:18px; border:1px solid var(--border); border-radius:var(--radius); background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)); box-shadow: var(--shadow); margin-bottom: 20px; }
+  .brand h1{ margin:0; font-size:22px; letter-spacing:.5px; } .brand p{ margin:6px 0 0; color:var(--muted); font-size:13px; }
+  .btn{ border:1px solid var(--border); background: rgba(255,255,255,.04); color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:700; font-size:13px; display:inline-flex; gap:8px; align-items:center; transition: .15s ease; user-select:none; }
+  .btn:hover{ transform: translateY(-1px); border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
+  .btn.primary{ background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.35); color: #7dd3fc; }
+  .btn.danger{ background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.35); color: #fca5a5; }
+  .btn.ghost{ background: transparent; border-color:transparent; } .btn.ghost:hover{ background: rgba(255,255,255,.05); border-color: var(--border); }
+  .btn.icon{ width: 36px; height: 36px; justify-content:center; padding:0; }
 
+  .summary{ display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom: 20px; }
+  .pill{ border:1px solid var(--border); background: rgba(255,255,255,.02); border-radius:14px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; cursor: pointer; transition: transform .15s, background .15s; }
+  .pill:hover{ background: rgba(255,255,255,.06); transform: translateY(-2px); }
+  .pill.active-filter{ border-color: var(--accent); background: rgba(56,189,248,.1); }
+  .pill .val{ font-size:20px; font-weight:800; } .pill .lbl{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .dot{ width:8px; height:8px; border-radius:50%; background:currentColor; }
 
-  /* LAYOUT */
-  .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
-  .hidden { display:none !important; }
-  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
+  .layout{ display:grid; grid-template-columns: 280px 1fr; gap:20px; align-items: start; }
+  @media (max-width: 900px){ .layout{ grid-template-columns: 1fr; } }
 
-  /* TABLAS E INPUTS */
-  table { width:100%; border-collapse:collapse; margin-top:6px; }
-  th, td { border-bottom:1px solid rgba(255,255,255,.08); padding:8px; vertical-align: middle; }
-  th { color:#9fb0c8; font-size:12px; text-align:left; }
-  input { background:#020617; border:1px solid rgba(255,255,255,.12); color:#e6edf7; border-radius:8px; padding:6px; }
-  input[type=number] { width:70px; text-align: center; }
-  input:focus { outline: none; border-color: #6dd6ff; }
+  .sidebar{ background: rgba(15,23,42,.6); border:1px solid var(--border); border-radius:18px; padding:16px; position:sticky; top:20px; max-height: calc(100vh - 40px); overflow-y:auto; }
+  .sb-head{ font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:12px; font-weight:800; }
+  
+  /* Tree & Drag */
+  .tree-cat{ margin-bottom:4px; transition: transform 0.2s, opacity 0.2s; }
+  .tree-cat.dragging-cat { opacity: 0.3; }
+  .tree-cat.drag-over-cat { border-top: 2px solid var(--accent); }
 
-  /* Input especial Unidades */
-  .input-unidades { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 14px; font-weight: bold; width: 60px; text-align: center; border-radius: 6px; padding: 4px; transition: all 0.3s; }
-  .input-unidades:focus { border-color: #6dd6ff; background: rgba(0,0,0,0.3); }
+  .tree-cat-row{ width:100%; text-align:left; background:transparent; border:1px solid transparent; color:var(--text); padding:8px 10px; font-weight:700; font-size:14px; cursor:grab; border-radius:10px; display:flex; justify-content:space-between; align-items:center; transition: background .15s; }
+  .tree-cat-row:active{ cursor: grabbing; }
+  .tree-cat-row:hover{ background:rgba(255,255,255,.03); border-color:rgba(255,255,255,.05); }
+  .tree-cat-row.open-state{ background:rgba(255,255,255,.02); } 
+  .tree-cat-content{ display:flex; align-items:center; gap:8px; flex:1; pointer-events: none; }
+  .tree-arrow{ display:inline-block; font-size:16px; opacity:.5; transition: transform .2s ease; }
+  .tree-cat.open .tree-arrow{ transform: rotate(90deg); opacity:1; color:var(--accent); }
 
-  /* Estado Filas */
-  tr.ok { background: linear-gradient(180deg, rgba(24,130,72,.28), rgba(12,78,44,.18)); box-shadow: inset 0 0 0 1px rgba(110,255,170,.18); }
-  tr.ok td { color: #e9fff1; }
-  .flash-limit { animation: clampFlash .5s ease-in-out 1; border-color: #ef4444 !important; }
-  @keyframes clampFlash { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 0 4px rgba(239,68,68,0.25); } }
+  .row-actions{ display:flex; gap:6px; opacity:0; transition:.2s; align-items:center; pointer-events: auto; }
+  .tree-cat-row:hover .row-actions, .tree-group-row:hover .row-actions { opacity:1; }
+  .act-icon{ font-size:14px; padding:4px; border-radius:4px; transition:.2s; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; cursor:pointer; }
+  .act-icon:hover{ transform:scale(1.2); }
+  .act-icon.edit{ color:var(--accent); } .act-icon.edit:hover{ background:rgba(56,189,248,.15); }
+  .act-icon.del{ color:var(--danger); } .act-icon.del:hover{ background:rgba(239,68,68,.15); }
+  .act-icon.print{ color: #fff; opacity:0.8; margin-left: 8px; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 8px; width: 32px; }
+  .act-icon.print:hover{ opacity:1; color:#4ade80; text-shadow: 0 0 10px rgba(74,222,128,0.5); }
 
-  /* Listado */
-  .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
-  .item { padding:12px; border-radius:12px; background:#020617; border:1px solid rgba(255,255,255,.08); cursor:pointer; transition: border-color 0.2s; }
-  .item:hover { border-color:rgba(109,214,255,.35); background: rgba(255,255,255,0.02); }
-  .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight: bold; text-transform: uppercase; display:inline-flex; align-items:center; gap:6px; }
-  .b-p { background:#f59e0b; color:#111; }
-  .b-pa { background:#fb923c; color:#111; }
-  .b-c { background:#22c55e; color:#111; }
-  .b-fab { background:#16a34a; color:#06100a; border:1px solid rgba(255,255,255,.25); }
-  .b-na { background:#ef4444; color:#111; }
+  .tree-group-list{ padding-left:14px; margin-top:4px; margin-bottom:8px; display:none; border-left: 1px solid rgba(255,255,255,.08); margin-left: 14px; }
+  .tree-cat.open .tree-group-list{ display:block; animation: slideDown .15s ease-out; }
+  @keyframes slideDown{ from{opacity:0; transform:translateY(-5px);} to{opacity:1; transform:translateY(0);} }
 
-  .dot { width:8px; height:8px; border-radius:50%; background:currentColor; display:inline-block; }
+  .tree-group-row{ width:100%; text-align:left; background:transparent; border:none; color:var(--muted); padding:6px 10px; font-size:13px; cursor:pointer; border-radius:6px; margin-bottom: 2px; display:flex; justify-content:space-between; align-items:center; }
+  .tree-group-row:hover{ color:var(--text); background:rgba(255,255,255,.02); }
+  .tree-group-row.active{ color:var(--accent); background:rgba(56,189,248,.08); font-weight:700; }
+  .tree-sub-all{ font-style: italic; border-bottom: 1px solid rgba(255,255,255,.03); margin-bottom: 4px; padding-bottom: 8px; opacity:.9; }
 
-  /* Control Panel */
-  .control-panel { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:12px; margin: 15px 0; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; }
-  .radio-group { display:flex; gap:10px; }
-  .radio-btn { display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.3); cursor:pointer; user-select: none; }
-  .radio-btn input { margin:0; }
-  .actions { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.1); }
+  /* Grid */
+  .toolbar{ display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .search-box{ flex:1; display:flex; align-items:center; gap:10px; background: rgba(0,0,0,.2); border:1px solid var(--border); padding:0 14px; border-radius:12px; height:42px; }
+  .search-box input{ background:transparent; border:none; color:var(--text); width:100%; outline:none; font-size:14px; }
+  .grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px; }
 
-  /* ======= VINCULACIÓN ======= */
-  .link-pill { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:800; border:1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.25); color:#9fb0c8; margin-right:6px; }
-  .link-pill.ok { color:#86efac; border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.12); }
-  .link-pill.warn { color:#fbbf24; border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.12); }
-  .link-pill.danger { color:#fca5a5; border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.12); }
+  .card{ background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01)); border:1px solid var(--border); border-radius:16px; padding:16px; display:flex; flex-direction:column; justify-content:space-between; transition: transform .2s ease, border-color .2s; cursor: grab; }
+  .card:active{ cursor: grabbing; } .card:hover{ border-color: rgba(255,255,255,.15); transform:translateY(-2px); }
+  .card.dragging { opacity: 0.4; border: 2px dashed var(--accent); transform: scale(0.95); }
+  .card.drag-over { border-top: 3px solid var(--accent); transform: translateY(4px); }
+  
+  .card-top{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; pointer-events:none; }
+  .card-titles h3{ margin:0 0 4px; font-size:16px; line-height:1.3; } .card-titles span{ font-size:11px; color:var(--muted); background:rgba(255,255,255,.05); padding:2px 6px; border-radius:6px; }
+  .stock-badge{ font-size:11px; font-weight:800; padding:4px 8px; border-radius:20px; border:1px solid transparent; }
+  .st-ok{ color:#4ade80; background:rgba(34,197,94,.1); border-color:rgba(34,197,94,.2); }
+  .st-warn{ color:#fbbf24; background:rgba(245,158,11,.1); border-color:rgba(245,158,11,.2); }
+  .st-danger{ color:#f87171; background:rgba(239,68,68,.1); border-color:rgba(239,68,68,.2); }
+  
+  /* CAMBIO: qty-box ahora es interactiva para abrir el modal si se quiere */
+  .qty-box{ background: rgba(0,0,0,.3); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:12px; border:1px solid rgba(255,255,255,.05); cursor: pointer; transition: background .2s; pointer-events: auto; }
+  .qty-box:hover{ background: rgba(0,0,0,.5); border-color: var(--accent); }
 
-  .stock-mini { font-size:11px; opacity:.75; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; }
-  .stock-mini b { opacity:1; }
+  .qty-val{ font-size:28px; font-weight:900; line-height:1; } .qty-unit{ font-size:13px; color:var(--muted); font-weight:600; margin-left:4px; } .qty-min{ text-align:right; font-size:11px; color:var(--muted); opacity:.7; }
+  .actions{ display:flex; gap:8px; pointer-events:auto; }
+  .btn-act{ flex:1; height:34px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,.03); color:var(--text); cursor:pointer; font-weight:700; transition:.1s; display:flex; align-items:center; justify-content:center; }
+  
+  /* CAMBIO: Colores más vivos en hover para botones de acción rápida */
+  .btn-act:active { transform: scale(0.95); }
+  .btn-act:hover{ background:rgba(255,255,255,.08); } 
+  .btn-act.add:hover{ border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.1); color:#4ade80; } 
+  .btn-act.sub:hover{ border-color:rgba(239,68,68,.4); background:rgba(239,68,68,.1); color:#f87171; }
+  
+  .clean-slate{ grid-column: 1 / -1; text-align:center; padding: 60px 20px; color: var(--muted); border: 1px dashed var(--border); border-radius: 20px; background: rgba(255,255,255,.01); } .clean-slate h2{ color:var(--text); margin-top:0; }
 
-  /* === MODALES === */
-  .modal-backdrop { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
-  .modal-backdrop.active { opacity:1; pointer-events:auto; }
+  /* Panels & Modals */
+  #alertPanel{ position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-150%); background: rgba(15,23,42,0.95); border: 1px solid var(--warn); box-shadow: 0 10px 40px rgba(0,0,0,0.5); backdrop-filter: blur(10px); border-radius: 16px; padding: 16px 20px; width: min(450px, 90vw); z-index: 500; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); display:flex; flex-direction:column; gap:12px; }
+  #alertPanel.show{ transform:translateX(-50%) translateY(0); }
+  .ap-header{ display:flex; align-items:center; gap:12px; color: #fbbf24; font-weight:bold; font-size:15px; } .ap-icon{ font-size:24px; }
+  .ap-body{ background: rgba(255,255,255,0.05); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:10px; justify-content:space-between; }
+  .ap-label{ font-size:12px; color:var(--muted); font-weight:600; } .ap-input{ width:60px; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:#fff; padding:6px; border-radius:6px; text-align:center; font-weight:bold; outline:none; }
+  .ap-footer{ display:flex; gap:10px; margin-top:4px; }
+  .ap-btn{ flex:1; padding:8px; border-radius:8px; border:none; cursor:pointer; font-weight:700; font-size:12px; }
+  .ap-btn.snooze{ background:rgba(255,255,255,0.1); color:var(--text); border:1px solid var(--border); } .ap-btn.snooze:hover{ background:rgba(255,255,255,0.15); }
+  .ap-btn.dismiss{ background:var(--warn); color:#000; } .ap-btn.dismiss:hover{ filter:brightness(1.1); }
 
-  .modal-box { width:92%; max-width:760px; background:#0f172a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,0.5); transform:translateY(20px); transition:transform 0.2s; }
-  .modal-backdrop.active .modal-box { transform:translateY(0); }
+  .backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; z-index:100; } .backdrop.show{ display:flex; }
+  .modal{ width:min(500px, 90%); background:#0f172a; border:1px solid var(--border); border-radius:20px; padding:20px; box-shadow:var(--shadow); animation: slideUp .2s ease-out; }
+  @keyframes slideUp{ from{transform:translateY(20px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .form-group{ margin-bottom:16px; } .form-group label{ display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px; }
+  .input-row{ display:flex; gap:8px; } .form-control{ width:100%; background:rgba(0,0,0,.3); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:10px; outline:none; font-family:inherit; } .form-control:focus{ border-color:var(--accent); }
+  select.form-control{ appearance:none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fb0c8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 10px center; background-size:16px; }
 
-  .modal-title { font-size:16px; font-weight:bold; color:#fff; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px; display:flex; justify-content:space-between; gap:12px; align-items:center; }
-  .modal-field { margin-bottom:14px; }
-  .modal-label { display:block; font-size:12px; color:#9fb0c8; margin-bottom:5px; font-weight:600; }
+  /* SYMBOL MENU */
+  .sym-menu { position: absolute; right: 0; top: 45px; z-index: 200; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px; display: none; grid-template-columns: repeat(4, 1fr); gap: 4px; box-shadow: var(--shadow); width: 180px; }
+  .sym-menu.show { display: grid; animation: fadeIn .1s; }
+  .sym-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 0; text-align: center; cursor: pointer; font-size: 14px; font-weight: bold; user-select: none; transition: .1s; }
+  .sym-btn:hover { background: var(--accent); color: #000; border-color:var(--accent); }
 
-  .input-group { display:flex; gap:8px; }
-  .modal-select { flex:1; background:#020617; border:1px solid rgba(255,255,255,0.15); color:#fff; padding:8px; border-radius:8px; outline:none; font-family:inherit; }
-  .modal-input { flex:1; background:#020617; border:1px solid #38bdf8; color:#fff; padding:8px; border-radius:8px; outline:none; }
-  .btn-icon { width:36px; padding:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  #toast{ position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(50px); background:#1e293b; border:1px solid var(--accent); color:#fff; padding:10px 20px; border-radius:30px; font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition: all .3s; z-index:200; } #toast.visible{ opacity:1; transform:translateX(-50%) translateY(0); }
 
-  .modal-info { background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2); color:#38bdf8; padding:10px; border-radius:8px; font-size:12px; margin-bottom:16px; }
-
-  /* Modal Vincular */
-  .link-grid { display:grid; grid-template-columns: 260px 1fr; gap:14px; }
-  @media(max-width: 820px){ .link-grid{ grid-template-columns:1fr; } }
-  .link-panel { background: rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:12px; }
-  .link-search { display:flex; gap:8px; align-items:center; background: rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:8px 10px; margin-bottom:10px; }
-  .link-search input { width:100%; background:transparent; border:none; color:#e6edf7; outline:none; padding:0; }
-  .link-list { max-height: 420px; overflow:auto; border-radius:10px; border:1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.15); }
-  .link-item { padding:10px; border-bottom:1px solid rgba(255,255,255,.06); cursor:pointer; }
-  .link-item:hover { background: rgba(255,255,255,.04); }
-  .link-item .t { font-weight:800; color:#fff; }
-  .link-item .s { font-size:11px; color:#9fb0c8; margin-top:2px; display:flex; justify-content:space-between; gap:10px; }
-  .link-item.active { outline:2px solid rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
-  .small { font-size:11px; opacity:.75; }
-
-/* === FOCUS / AUTO-OPEN (devolver no asignado) === */
-.focus-banner{
-  margin:12px 0 0;
-  padding:10px 12px;
-  border-radius:14px;
-  background:rgba(255,90,90,0.16);
-  border:1px solid rgba(255,90,90,0.55);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-.focus-banner .ref{
-  font-weight:900;
-  color:#ffd0d0;
-}
-.focus-target{
-  outline:3px solid rgba(255,90,90,0.85);
-  box-shadow:0 0 0 4px rgba(255,90,90,0.25), 0 0 18px rgba(255,90,90,0.35);
-  animation:focusPulse 1.1s ease-in-out infinite alternate;
-}
-@keyframes focusPulse{
-  from{ filter:brightness(1.0); transform:translateZ(0); }
-  to{ filter:brightness(1.18); }
-}
-
+  /* --- ESTILOS DE IMPRESIÓN --- */
+  #printArea { display: none; }
+  @media print {
+    .wrap, #alertPanel, .backdrop, #toast { display: none !important; }
+    body { background: white; margin: 0; padding: 0; color: #000; }
+    #printArea { display: block; width: 100%; padding: 8mm 12mm; font-family: 'Courier New', Courier, monospace; }
+    .p-header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+    .p-title h1 { font-size: 26px; font-weight: 900; margin:0; text-transform: uppercase; letter-spacing: -1px; }
+    .p-title h2 { font-size: 14px; color: #444; margin:0; text-transform: uppercase; font-weight:bold; }
+    .p-checks { display:flex; gap: 20px; margin-top: 5px; }
+    .p-chk { display:flex; align-items:center; gap: 6px; font-size: 12px; font-weight: bold; border:1px solid #666; padding: 2px 8px; }
+    .p-box { width: 12px; height: 12px; border: 1px solid #000; display:inline-block; }
+    .p-subtitle { font-size: 10px; color: #666; margin-top:5px; font-style: italic; }
+    .p-meta { text-align: right; font-size: 12px; line-height: 1.6; }
+    .p-line { border-bottom: 1px solid #000; display: inline-block; width: 120px; }
+    .p-section-title { background: #000; color: #fff; padding: 4px 8px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-top: 20px; margin-bottom: 5px; page-break-after: avoid; }
+    .p-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    .p-row { border-bottom: 1px solid #999; page-break-inside: avoid; height: auto; min-height: 36px; }
+    .p-row:nth-child(even) { background-color: #f2f2f2 !important; -webkit-print-color-adjust: exact; }
+    .p-cell-name { padding: 2px 4px; font-weight: bold; font-size: 12px; width: 12%; vertical-align: middle; border-right: 1px solid #999; white-space: normal; overflow: visible; word-break: break-word; line-height: 1.1; }
+    .p-cell-name span { display: block; font-weight: normal; font-size: 9px; color: #555; margin-top: 2px; font-style: italic; }
+    .p-cell-grid { padding: 2px 4px; display: flex; flex-wrap: nowrap; gap: 1px; width: 100%; height: 100%; align-items: center; }
+    .p-cb { flex: 1; height: 26px; min-width: 15px; border: 1px solid #555; display: flex; align-items: flex-start; justify-content: center; padding-top: 2px; font-size: 10px; font-weight: 700; color: #555; background: #fff; }
+    .p-cb:nth-child(5n) { margin-right: 6px; border-right: 2px solid #333; }
+    .p-cb:last-child { margin-right: 0; }
+    .p-cell-tot { width: 50px; border-left: 2px solid #000; vertical-align: top; text-align: center; padding-top: 4px; }
+    .tot-label { display:block; font-size: 8px; color: #555; margin-bottom: 12px; font-weight:bold; letter-spacing:1px; }
+    .tot-line { display:block; border-bottom: 1px solid #ccc; width: 80%; margin:0 auto; }
+    .p-footer { margin-top: 30px; border: 2px solid #000; height: 80px; display: flex; page-break-inside: avoid; }
+    .p-f-col:first-child { flex: 1; border-right: 1px solid #000; padding: 5px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+    .p-f-col:last-child { flex: 0 0 15%; border:none; padding: 5px; font-size: 10px; font-weight: bold; text-transform: uppercase; text-align: center; display: flex; flex-direction: column; justify-content: flex-end; }
+  }
 </style>
 
 <script type="module" src="cloud_sync.js"></script>
 </head>
 <body>
+<div style="position:fixed; top:16px; left:16px; z-index:9999;"><button onclick="window.location.href='index.html'" style="padding:8px 14px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;">⬅ Volver al menú</button></div>
 
-<div class="top">
-  <div style="display:flex;gap:10px">
-    <button class="btn" onclick="volverIndex()">← Volver al index</button>
-    <button class="btn" onclick="volverLista()">← Volver a pedidos</button>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Gestión Stock Taller</h1>
+      <p>Control de materiales</p>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="openMaterialModal()"><span>＋</span> Nuevo Material</button>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="pill" onclick="filterByStatus(null)" id="pillTotal" title="Ver todos"><div class="lbl"><span class="dot" style="color:var(--accent)"></span> Inventario</div><div class="val" id="sumTotal">0</div></div>
+    <div class="pill" onclick="filterByStatus('ok')" id="pillOk" title="Ver stock correcto"><div class="lbl"><span class="dot" style="color:var(--ok)"></span> OK</div><div class="val" id="sumOk">0</div></div>
+    <div class="pill" onclick="filterByStatus('warn')" id="pillWarn" title="Ver stock bajo"><div class="lbl"><span class="dot" style="color:var(--warn)"></span> Bajo</div><div class="val" id="sumLow">0</div></div>
+    <div class="pill" onclick="filterByStatus('danger')" id="pillZero" title="Ver agotados"><div class="lbl"><span class="dot" style="color:var(--danger)"></span> Agotado</div><div class="val" id="sumZero">0</div></div>
   </div>
-  <h2 style="margin:0">Preparación</h2>
 
-<div id="focusBanner" class="focus-banner" style="display:none">
-  <div>⚠️ Pedido con <b>material no asignado</b>: <span class="ref"></span></div>
-  <button class="btn" id="btnAbrirFocus">Abrir ficha</button>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sb-head">Categorías</div>
+      <div id="categoryTree"></div>
+    </aside>
+
+    <main>
+      <div class="toolbar">
+        <div class="search-box"><span>🔎</span><input type="text" id="searchInput" placeholder="Buscar material..." autocomplete="off"></div>
+      </div>
+      <div id="grid" class="grid"></div>
+    </main>
+  </div>
 </div>
 
+<div id="printArea"></div>
+
+<div id="alertPanel">
+  <div class="ap-header"><span class="ap-icon">⚠</span><span id="alertMsg">Problemas de stock</span></div>
+  <div class="ap-body"><span class="ap-label">Recordar aviso en:</span><div style="display:flex;align-items:center;gap:8px;"><input type="number" id="snoozeDays" class="ap-input" value="1" min="1"><span class="ap-label">días</span></div></div>
+  <div class="ap-footer"><button class="ap-btn snooze" onclick="snoozeAlert()">⏰ Posponer</button><button class="ap-btn dismiss" onclick="dismissAlert()">OK, Cerrar</button></div>
 </div>
 
-<div id="vistaLista" class="card">
-  <h3 style="margin:0 0 10px 0;">Pedidos en curso</h3>
-  <div id="lista" class="list"></div>
-</div>
-
-<div id="vistaDetalle" class="card hidden">
-  <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:14px;">
-      <div>
-        <div style="font-size:12px; color:#9fb0c8;">REFERENCIA</div>
-        <div style="font-size:18px; font-weight:bold; color:#fff;" id="ref"></div>
-        <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
-            <div style="font-size:14px; color:#6dd6ff;" id="concepto"></div>
-            <div style="font-size:13px; color:#9fb0c8;" id="empresaPrep"></div>
-            <span id="pillFab" class="badge b-fab hidden"><span class="dot"></span> En fabricación</span>
-            <span id="pillNoAsig" class="badge b-na hidden" style="cursor:pointer" onclick="abrirModalNoAsignado()"><span class="dot"></span> No asignado</span>
-            <div style="display:flex; align-items:center; gap:5px; background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-                <span style="font-size:11px; color:#9fb0c8; text-transform:uppercase; font-weight:bold;">Uds:</span>
-                <input type="number" id="inputUnidades" class="input-unidades" min="0" onchange="guardarUnidadesManual()">
-            </div>
+<div class="backdrop" id="modalMaterial">
+  <div class="modal">
+    <h2 id="modalTitle" style="margin-top:0">Nuevo Material</h2>
+    <div class="form-group">
+      <label>Categoría</label>
+      <div class="input-row"><select id="inpCatSelect" class="form-control" onchange="syncCat(this)"></select><button class="btn icon" onclick="promptNew('cat')">＋</button></div>
+    </div>
+    <div class="form-group">
+      <label>Grupo</label>
+      <div class="input-row"><select id="inpGrpSelect" class="form-control"></select><button class="btn icon" onclick="promptNew('grp')">＋</button></div>
+    </div>
+    
+    <div class="form-group">
+      <label>Nombre</label>
+      <div class="input-row" style="position:relative">
+        <input id="inpName" class="form-control" placeholder="Ej: Tubo 40x40" />
+        <button class="btn icon" onclick="toggleSym()" title="Símbolos">Ω</button>
+        <div id="symGrid" class="sym-menu">
+          <div class="sym-btn" onclick="ins('ø')">ø</div><div class="sym-btn" onclick="ins('x')">x</div><div class="sym-btn" onclick="ins('mm')">mm</div><div class="sym-btn" onclick="ins('cm')">cm</div>
+          <div class="sym-btn" onclick="ins('m')">m</div><div class="sym-btn" onclick="ins('kg')">kg</div><div class="sym-btn" onclick="ins('°')">°</div><div class="sym-btn" onclick="ins('&quot;')">"</div>
+          <div class="sym-btn" onclick="ins('½')">½</div><div class="sym-btn" onclick="ins('¼')">¼</div><div class="sym-btn" onclick="ins('¾')">¾</div><div class="sym-btn" onclick="ins('#')">#</div>
         </div>
       </div>
-      <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
-  </div>
-
-  <div id="panelHierro" class="hidden control-panel">
-      <span style="font-weight:700; color:#cbd5e1;">Tipo de Perfilería:</span>
-      <div class="radio-group">
-          <label class="radio-btn"><input type="radio" name="th" value="galvanizado" onchange="guardarTipoHierro()"> Galvanizado</label>
-          <label class="radio-btn"><input type="radio" name="th" value="negro" onchange="guardarTipoHierro()"> Negro</label>
-      </div>
-      <span style="font-size:11px; opacity:0.6; margin-left:auto;">(Requerido para guardar barras)</span>
-  </div>
-
-  <div id="bloqueBarras" class="hidden">
-    <div class="section-title">PERFILERÍA · BARRAS</div>
-    <table>
-      <thead><tr>
-        <th width="30">OK</th>
-        <th>Material</th>
-        <th>Pedida</th>
-        <th>Recibida</th>
-        <th width="220">Acción</th>
-        <th>Obs</th>
-      </tr></thead>
-      <tbody id="tbodyBarras"></tbody>
-    </table>
-  </div>
-
-  <div id="bloqueUnidades" class="hidden">
-    <div class="section-title">ACCESORIOS · UNIDADES</div>
-    <table>
-      <thead><tr>
-        <th width="30">OK</th>
-        <th>Material</th>
-        <th>Pedida</th>
-        <th>Recibida</th>
-        <th width="220">Acción</th>
-        <th>Obs</th>
-      </tr></thead>
-      <tbody id="tbodyUnidades"></tbody>
-    </table>
-  </div>
-
-  <div class="actions">
-    <button class="btn-danger btn" onclick="eliminarPedido()">🗑 Eliminar pedido</button>
-    <button class="btn" onclick="confirmarTodoRecepcion()">💾 Mandar a fabricación</button>
-  </div>
-</div>
-
-<!-- MODAL CREACIÓN MATERIAL (si no existe en Stock) -->
-<div id="modalCrear" class="modal-backdrop">
-  <div class="modal-box" style="max-width:540px;">
-      <div class="modal-title">
-        <span>Crear Ficha de Stock</span>
-        <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalCreacion()">✕</button>
-      </div>
-
-      <div class="modal-info">
-          El material <strong><span id="modMatName"></span></strong> no existe.<br>
-          Defínelo para añadirlo al stock.
-      </div>
-
-      <div class="modal-field">
-          <span class="modal-label">CATEGORÍA</span>
-          <div class="input-group">
-              <select id="modCatSelect" class="modal-select" onchange="cargarGruposModal()"></select>
-              <input id="modCatInput" class="modal-input hidden" placeholder="Nueva Categoría...">
-              <button class="btn btn-icon" onclick="toggleInput('cat')">＋</button>
-          </div>
-      </div>
-
-      <div class="modal-field">
-          <span class="modal-label">GRUPO / FAMILIA</span>
-          <div class="input-group">
-              <select id="modGrpSelect" class="modal-select"></select>
-              <input id="modGrpInput" class="modal-input hidden" placeholder="Nuevo Grupo...">
-              <button class="btn btn-icon" onclick="toggleInput('grp')">＋</button>
-          </div>
-      </div>
-
-      <div style="display:flex; gap:12px;">
-          <div class="modal-field" style="flex:1;">
-              <span class="modal-label">CANTIDAD A SUMAR</span>
-              <input id="modQtyInput" type="number" class="modal-select" style="width:100%; box-sizing:border-box; border-color:#38bdf8; color:#38bdf8; font-weight:bold; text-align:center;">
-          </div>
-
-          <div class="modal-field" style="flex:1;">
-              <span class="modal-label">UNIDAD (Ej: Caja)</span>
-              <input id="modUnitInput" class="modal-select" placeholder="ud" style="width:100%; box-sizing:border-box;">
-          </div>
-
-          <div class="modal-field" style="width:80px;">
-              <span class="modal-label">MÍNIMO</span>
-              <input id="modMinInput" type="number" class="modal-select" placeholder="0" style="width:100%; box-sizing:border-box; text-align:center;">
-          </div>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-          <button class="btn" style="background:transparent; border:none; color:#9fb0c8;" onclick="cerrarModalCreacion()">Cancelar</button>
-          <button class="btn btn-success" onclick="guardarNuevoMaterial()">Guardar y Añadir</button>
-      </div>
-  </div>
-</div>
-
-<!-- MODAL VINCULAR -->
-<div id="modalVincular" class="modal-backdrop">
-  <div class="modal-box">
-    <div class="modal-title">
-      <span>Vincular material de Stock</span>
-      <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalVincular()">✕</button>
     </div>
 
-    <div class="modal-info" style="margin-bottom:12px;">
-      Línea de pedido: <strong id="linkLineName"></strong>
-      <div class="small" style="margin-top:6px;">
-        Consejo: vincula una vez y el sistema lo recordará para próximos pedidos con el mismo nombre.
-      </div>
-    </div>
-
-    <div class="link-grid">
-      <div class="link-panel">
-        <div class="modal-label" style="margin-bottom:6px;">Buscar</div>
-        <div class="link-search">
-          <span style="opacity:.75">🔎</span>
-          <input id="linkSearch" placeholder="Escribe para filtrar..." autocomplete="off" />
-        </div>
-        <div class="small">Se muestran materiales del Stock (con categoría y grupo).</div>
-      </div>
-
-      <div class="link-panel">
-        <div class="modal-label" style="margin-bottom:6px;">Resultados</div>
-        <div id="linkResults" class="link-list"></div>
-      </div>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;">
-      <button class="btn btn-danger" onclick="desvincularActual()">Desvincular</button>
-      <div style="display:flex; gap:10px; margin-left:auto;">
-        <button class="btn" onclick="cerrarModalVincular()">Cancelar</button>
-        <button class="btn btn-success" onclick="confirmarVinculo()">Vincular</button>
-      </div>
+    <div class="input-row"><div class="form-group" style="flex:1"><label>Unidad</label><input id="inpUnit" class="form-control" placeholder="ud" /></div><div class="form-group" style="flex:1"><label>Mínimo</label><input id="inpMin" type="number" class="form-control" placeholder="5" /></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;">
+      <button class="btn danger" id="btnDeleteMat" style="display:none" onclick="deleteMaterial()">🗑 Eliminar</button>
+      <div style="display:flex;gap:10px;margin-left:auto;"><button class="btn ghost" onclick="closeModal('modalMaterial')">Cancelar</button><button class="btn primary" id="btnSaveMat" onclick="saveMaterial()">Guardar</button></div>
     </div>
   </div>
 </div>
 
-
-<!-- MODAL NO ASIGNADO (material prestado pendiente de devolver) -->
-<div id="modalNoAsignado" class="modal-backdrop">
-  <div class="modal-box" style="max-width:760px;">
-    <div class="modal-title">
-      <span>Material NO asignado · Pendiente de devolver</span>
-      <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalNoAsignado()">✕</button>
-    </div>
-
-    <div class="modal-info" style="margin-bottom:12px;">
-      Este pedido ha consumido material <strong>no asignado</strong>. Devuélvelo cuando llegue su stock asignado.
-    </div>
-
-    <div id="noAsigBody" style="max-height:420px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px; background: rgba(0,0,0,.15);">
-      <!-- contenido dinámico -->
-    </div>
-
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;">
-      <button class="btn" onclick="cerrarModalNoAsignado()">Cerrar</button>
-    </div>
+<div class="backdrop" id="modalMove">
+  <div class="modal" style="width:350px">
+    <h2 id="moveTitle" style="margin-top:0">Ajuste Manual</h2>
+    <p id="moveSub" style="color:var(--muted); font-size:13px; margin-top:-10px; margin-bottom:20px;"></p>
+    <div class="form-group"><label>Cantidad a sumar/restar</label><input id="moveQty" type="number" class="form-control" style="font-size:24px;font-weight:bold;text-align:center;" autofocus /></div>
+    <div style="display:flex;justify-content:space-between;margin-top:20px;"><button class="btn ghost" onclick="closeModal('modalMove')">Cancelar</button><button class="btn primary" id="btnConfirmMove">Confirmar</button></div>
   </div>
 </div>
 
+<div id="toast"></div>
 
 <!-- Firebase (Compat, sin bundlers) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -371,49 +266,16 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 
 <script>
-/* =======================================================================================
-   PREPARACIÓN DE PEDIDOS (vNEXT)
-   - Pill Pendiente/Parcial/Completo: por RECEPCIÓN (qty_recibida).
-   - Auto-cierra cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
-   - En este ajuste: auto-cierre => auto-mandar a fabricación antes de eliminar de Preparación.
-   - “Marcar en fabricación” eliminado (ya existe “Mandar a fabricación”).
-======================================================================================= */
+/** GESTIÓN STOCK TALLER V7.2 + AUTOSYNC FIRESTORE (sin cambiar tu UI)
+ *  - localStorage sigue siendo la cache local (DB_KEY)
+ *  - al abrir: intenta descargar Firestore -> localStorage
+ *  - escucha cambios remotos (onSnapshot) y repinta sin romper filtros/busqueda
+ *  - cada cambio local hace auto-guardado (debounce) a Firestore
+ */
 
-/* ========= CONSTANTES ========= */
-const LS = localStorage;
-
-function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
-const KP = r => "prep_recepcion_" + r;
-const KM = r => "prep_meta_" + r;
-
-const STOCK_DB_KEY = "taller_stock_v3_data";
-const LINK_MAP_KEY = "prep_stock_linkmap_v1";
-const UNASSIGNED_GLOBAL_KEY = "unassigned_borrow_global_v1";
-
-// === Sync local entre pestañas/ventanas (LocalStorage) ===
-// IMPORTANTE: si abres los HTML con file://, cada archivo tiene un origen distinto y NO comparte localStorage.
-// Para probar sincronización local, abre con un servidor (http://localhost) o en GitHub Pages.
-window.addEventListener('storage', (ev)=>{
-  try{
-    if(!ev) return;
-    if(ev.key===STOCK_DB_KEY || ev.key===UNASSIGNED_GLOBAL_KEY){
-      // Si hay un pedido abierto, refrescamos esa ficha; si no, refrescamos el listado.
-      if(typeof refActual==='string' && refActual){
-        if(typeof abrirPedido==='function') abrirPedido(refActual);
-        else if(typeof cargarLista==='function') cargarLista();
-      }else{
-        if(typeof cargarLista==='function') cargarLista();
-      }
-    }
-  }catch(e){}
-});
-
-const UNASSIGNED_KEY = r => "prep_unassigned_" + r; // respaldo opcional
-
-
-/* ========= FIRESTORE (igual que stock.html) ========= */
-const USE_FIRESTORE_STOCK = true;
-const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" };
+// ====== CONFIG FIRESTORE ======
+const USE_FIRESTORE = true;
+const FIRESTORE_DOC_PATH = { col: "taller_stock", doc: "main" }; // puedes cambiarlo si quieres
 
 const firebaseConfig = {
   apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
@@ -424,375 +286,66 @@ const firebaseConfig = {
   appId: "1:498579673950:web:eb626781a5b509957db5cf"
 };
 
+// ====== DB LOCAL (TU MISMO SISTEMA) ======
+const DB_KEY="taller_stock_v3_data", SNOOZE_KEY="taller_stock_snooze_until";
+
+// === Sync local entre pestañas/ventanas (LocalStorage) ===
+// IMPORTANTE: si abres los HTML con file://, cada archivo tiene un origen distinto y NO comparte localStorage.
+// Para probar sincronización local, abre con un servidor (http://localhost) o en GitHub Pages.
+function __reloadStockFromLS(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && typeof parsed==='object'){
+        materials = Array.isArray(parsed.materials) ? parsed.materials : (materials||[]);
+        movements = Array.isArray(parsed.movements) ? parsed.movements : (movements||[]);
+      }
+    }
+  }catch(e){}
+  try{ if(typeof renderTree==='function') renderTree(); }catch(e){}
+  try{ if(typeof renderMovements==='function') renderMovements(); }catch(e){}
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
+}
+window.addEventListener('storage', (ev)=>{
+  if(ev && ev.key===DB_KEY){
+    __reloadStockFromLS();
+  }
+});
+let materials=[], movements=[], currentFilter={cat:null,grp:null,status:null};
+let categoryOrder = [];
+
+// ====== FIRESTORE HELPERS ======
 let fbApp=null, fbAuth=null, fbDb=null;
 let fsUnsub=null;
 let fsReady=false;
 let ignoreNextLocalSave=false;
 let pendingSaveTimer=null;
 
-/* ========= STATE ========= */
-let refActual = "";
-let estadoMateriales = [];
-let metaActual = {};
-let pendingCreation = null;
-
-let stockMaterials = [];
-let stockMovements = [];
-let stockCategoryOrder = [];
-
-let linkMap = {}; // { "keyNorm|unit": { matId, name, cat, grp, unit } }
-let linkModalCtx = null; // { lineIndex, chosenMatId }
-
-/* ========= HELPERS ========= */
-const uuid = () => Math.random().toString(36).substr(2,9);
-
-function normName(s){
-  return String(s||"")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g," ")
-    .replace(/[’'"]/g,"")
-    .replace(/×/g,"x");
-}
-function linkKeyFor(line){
-  const n = normName(line.mat);
-  const u = normName(line.unit || "");
-  return `${n}|${u}`;
-}
-function toNum(x){ const n = Number(x); return isNaN(n)?0:n; }
-
-
-// Busca la referencia del pedido a partir de un PID (id interno) dentro de la base LDHDB / PREP.
-// Soporta diferentes nombres históricos de campos: pedido_uid, pedidoUid, pid, pedido_id, etc.
-function findRefByPid(pid){
-  try{
-    if(!pid) return null;
-    pid = String(pid).trim();
-
-    // 1) Lectura directa de LDH_DB (todas las bolsas posibles)
-    let db = {};
-    try{
-      const raw = LS.getItem("ldh_db");
-      if(raw) db = JSON.parse(raw);
-    }catch(e){ db = {}; }
-
-    const pools = []
-      .concat((db.deliveries||[]),(db.trabajos||[]))
-      .concat((db.fabricacion||[]),(db.pintura||[]),(db.almacen||[]),(db.archivo||[]))
-      .concat((db.fab||[]),(db.paint||[]),(db.store||[])); // por si existiera otra convención
-
-    for(const t of pools){
-      const meta = (t && (t.meta || t)) || null; // a veces anidado, a veces plano
-      if(!meta) continue;
-
-      const cands = [
-        meta.id, meta._id, meta.uid,
-        meta.pedido_uid, meta.pedidoUid, meta.pid,
-        meta.pedido_id, meta.pedidoId, meta.id_pedido
-      ].filter(Boolean).map(v => String(v).trim());
-
-      if(cands.includes(pid)){
-        const ref = String(meta.referencia || meta.ref || meta.nombre || meta.titulo || meta.referenciaTrabajo || "").trim();
-        return ref || null;
-      }
-    }
-
-    // 2) Mirar en metas locales de Preparación (prep_meta_*)
-    for(let i=0;i<LS.length;i++){
-      const key = LS.key(i);
-      if(!key || !key.startsWith("prep_meta_")) continue;
-      try{
-        const meta = JSON.parse(LS.getItem(key));
-        if(!meta) continue;
-        const cands = [
-          meta.pedido_uid, meta.pedidoUid, meta.pid,
-          meta.pedido_id, meta.pedidoId, meta.id_pedido
-        ].filter(Boolean).map(v => String(v).trim());
-        if(cands.includes(pid)){
-          const ref = String(meta.referencia || meta.ref || "").trim();
-          // Si la meta no trae referencia, la inferimos de la clave prep_meta_<REF>
-          const inferred = String(key).replace(/^prep_meta_/, "");
-          return (ref || inferred || null);
-        }
-      }catch(e){}
-    }
-
-    // 3) Intento final: si el PID parece una referencia textual simple, devolverlo
-    if(pid.length < 80 && !pid.includes("/") && !pid.includes("http")){
-      if(LS.getItem("prep_meta_" + pid)) return pid;
-    }
-
-    return null;
-  }catch(e){
-    console.warn("findRefByPid() error:", e);
-    return null;
-  }
-}
-/* ========= NO ASIGNADO (devolución desde Preparación) ========= */
-function _uaItems(){
-  const ua = metaActual && metaActual.unassignedBorrow;
-  if(!ua || !Array.isArray(ua.items)) return [];
-  return ua.items;
-}
-function _uaMatchKey(line){
-  const linked = getLinkedMatIdForLine(line) || line.linked_matId || '';
-  if(linked) return 'id:'+linked;
-  return 'n:'+normName(line.mat||'')+'|'+normName(line.unit||'');
-}
-function _uaFindForLine(line){
-  const items=_uaItems();
-  if(items.length===0) return null;
-  const key=_uaMatchKey(line);
-  for(let i=0;i<items.length;i++){
-    const it=items[i]||{};
-    const pending=toNum(it.qtyPending ?? it.pending ?? it.qty_pending);
-    if(pending<=0) continue;
-    const itKey = it.key || (it.matId ? ('id:'+it.matId) : ('n:'+normName(it.name||it.mat||'')+'|'+normName(it.unit||'')));
-    if(String(itKey)===String(key)) return { idx:i, item:it, pending:pending };
-  }
-  // fallback por nombre
-  const nkey='n:'+normName(line.mat||'')+'|'+normName(line.unit||'');
-  for(let i=0;i<items.length;i++){
-    const it=items[i]||{};
-    const pending=toNum(it.qtyPending ?? it.pending ?? it.qty_pending);
-    if(pending<=0) continue;
-    const itKey = it.key || (it.matId ? ('id:'+it.matId) : ('n:'+normName(it.name||it.mat||'')+'|'+normName(it.unit||'')));
-    if(String(itKey)===String(nkey)) return { idx:i, item:it, pending:pending };
-  }
-  return null;
-}
-function devolverNoAsignadoLinea(lineIndex){
-  const line = estadoMateriales[lineIndex];
-  const rec = _uaFindForLine(line);
-  if(!rec){ alert('No hay deuda no asignada para esta línea.'); return; }
-
-  // cantidad a devolver = pendiente completo (de momento)
-  const qty = rec.pending;
-  if(qty<=0) return;
-
-  // localizar material real para sumar a stock
-  const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
-  if(!check.success){
-    alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
-    return;
-  }
-  stockMovements.push({ id: uuid(), matId: check.matId, type:'in', qty: qty, date: new Date().toISOString(), ref: refActual, concept: metaActual.concepto||'', reason:'devolucion_no_asignado' });
-  saveStockLocal();
-
-  // limpiar deuda en meta
-  const items = _uaItems();
-  items[rec.idx].qtyPending = 0;
-  // eliminar items a 0
-  metaActual.unassignedBorrow.items = items.filter(it=>toNum(it.qtyPending ?? it.pending ?? it.qty_pending)>0);
-
-  if(metaActual.unassignedBorrow.items.length===0){
-    delete metaActual.unassignedBorrow;
-  }
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-
-  alert(`✅ Devuelto material no asignado.
-Material: ${check.mat.name}
-Cantidad: ${qty}
-Stock actual: ${getStockQty(check.matId)}`);
-  renderTabla();
-  cargarLista();
-}
-
-/* ========= NO ASIGNADO (material prestado) =========
-   - Persistente por pedido: metaActual.unassignedBorrow
-   - Se replica en ldh_db (si existe entrega) para que otros módulos puedan leerlo en el futuro.
-*/
-function ensureUnassigned(meta){
-  if(!meta) meta = {};
-  if(!meta.unassignedBorrow || typeof meta.unassignedBorrow !== 'object'){
-    meta.unassignedBorrow = { items: [], updatedAt: 0 };
-  }
-  if(!Array.isArray(meta.unassignedBorrow.items)) meta.unassignedBorrow.items = [];
-  return meta.unassignedBorrow;
-}
-function unassignedTotals(ub){
-  ub = ub || { items: [] };
-  const items = Array.isArray(ub.items) ? ub.items : [];
-  const lines = items.filter(it => toNum(it.qtyPending) > 0);
-  const totalQty = lines.reduce((a,it)=>a + toNum(it.qtyPending), 0);
-  return { lines: lines.length, totalQty };
-}
-
-function _loadUnassignedGlobalMap(){
-  try { return JSON.parse(LS.getItem(UNASSIGNED_GLOBAL_KEY) || "{}") || {}; }
-  catch(e){ return {}; }
-}
-function _saveUnassignedGlobalMap(map){
-  LS.setItem(UNASSIGNED_GLOBAL_KEY, JSON.stringify(map || {}));
-}
-function getGlobalBorrow(ref){
-  const map = _loadUnassignedGlobalMap();
-  return map[ref] || null;
-}
-function setGlobalBorrow(ref, ub){
-  const map = _loadUnassignedGlobalMap();
-  map[ref] = ub || { items: [], updatedAt: Date.now() };
-  _saveUnassignedGlobalMap(map);
-}
-function clearGlobalBorrow(ref){
-  const map = _loadUnassignedGlobalMap();
-  if(ref in map){
-    delete map[ref];
-    _saveUnassignedGlobalMap(map);
-  }
-}
-function saveMetaActual(){
-  if(!refActual) return;
-  metaActual.unassignedBorrow = ensureUnassigned(metaActual);
-  metaActual.unassignedBorrow.updatedAt = Date.now();
-
-  // Persistencia global (independiente del módulo) para que no desaparezca aunque el pedido cambie de fase
-  const t = unassignedTotals(metaActual.unassignedBorrow);
-  if(t.lines > 0){
-    setGlobalBorrow(refActual, metaActual.unassignedBorrow);
-  } else {
-    clearGlobalBorrow(refActual);
-  }
-
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-  mirrorUnassignedToLdhDb();
-}
-function mirrorUnassignedToLdhDb(){
-  try{
-    const rawDb = LS.getItem("ldh_db");
-    if(!rawDb) return;
-    const db = JSON.parse(rawDb) || {};
-    if(!Array.isArray(db.deliveries)) return;
-    const idx = db.deliveries.findIndex(d => d && d.ref === refActual);
-    if(idx < 0) return;
-    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-    LS.setItem("ldh_db", JSON.stringify(db));
-  }catch(e){ /* silent */ }
-}
-
-function ldhHasDelivery(ref){
-  try{
-    const rawDb = LS.getItem("ldh_db");
-    if(!rawDb) return false;
-    const db = JSON.parse(rawDb) || {};
-    if(!Array.isArray(db.deliveries)) return false;
-    return db.deliveries.some(d => d && d.ref === ref);
-  }catch(e){ return false; }
-}
-
-function updateNoAsigPill(){
-  const ub = ensureUnassigned(metaActual);
-  const t = unassignedTotals(ub);
-  const pill = document.getElementById("pillNoAsig");
-  if(!pill) return;
-  if(t.lines > 0){
-    pill.classList.remove("hidden");
-    pill.innerHTML = `<span class="dot"></span> No asignado: <b>${t.lines}</b> · <b>${t.totalQty}</b>`;
-  }else{
-    pill.classList.add("hidden");
-  }
-}
-function abrirModalNoAsignado(){
-  if(!refActual) return;
-  renderModalNoAsignado();
-  document.getElementById("modalNoAsignado").classList.add("active");
-}
-function cerrarModalNoAsignado(){
-  document.getElementById("modalNoAsignado").classList.remove("active");
-}
-function renderModalNoAsignado(){
-  const host = document.getElementById("noAsigBody");
-  const ub = ensureUnassigned(metaActual);
-  const lines = (ub.items || []).filter(it => toNum(it.qtyPending) > 0);
-
-  if(lines.length === 0){
-    host.innerHTML = `<div style="padding:14px; opacity:.75;">No hay material pendiente de devolver.</div>`;
-    return;
-  }
-
-  const rows = lines.map((it, i) => {
-    const qty = toNum(it.qtyPending);
-    const unit = it.unit ? ` <span style="opacity:.7">${it.unit}</span>` : "";
-    const matName = (it.name || it.matName || it.matId || "Material");
-    return `
-      <div style="display:flex; gap:10px; align-items:center; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,.06);">
-        <div style="flex:1; min-width:0;">
-          <div style="font-weight:800; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${matName}</div>
-          <div style="font-size:12px; color:#9fb0c8; margin-top:2px;">
-            Pendiente: <b style="color:#fecaca">${qty}</b>${unit}
-          </div>
-        </div>
-        <button class="btn btn-success" onclick="devolverNoAsignado('${it.matId}', ${qty})">Devolver</button>
-      </div>
-    `;
-  }).join("");
-
-  host.innerHTML = rows;
-}
-function devolverNoAsignado(matId, maxQty){
-  if(!refActual) return;
-  const ub = ensureUnassigned(metaActual);
-  const it = (ub.items || []).find(x => x && x.matId === matId);
-  if(!it) return;
-
-  const qtyPend = toNum(it.qtyPending);
-  const max = Math.max(0, qtyPend);
-  if(max <= 0) return;
-
-  const ask = prompt(`Cantidad a DEVOLVER (máx. ${max})`, String(max));
-  if(ask === null) return;
-  let q = parseFloat(String(ask).replace(",", "."));
-  if(isNaN(q) || q <= 0) return;
-  if(q > max) q = max;
-
-  // movimiento IN (devolución)
-  stockMovements.push({
-    id: uuid(),
-    matId: matId,
-    type: 'in',
-    qty: q,
-    date: new Date().toISOString(),
-    ref: refActual,
-    concept: metaActual.concepto || "",
-    reason: "unassigned_return"
-  });
-  saveStockLocal();
-
-  it.qtyPending = Math.max(0, qtyPend - q);
-  it.lastActionAt = Date.now();
-  // limpia líneas a 0
-  ub.items = (ub.items || []).filter(x => toNum(x.qtyPending) > 0);
-  metaActual.unassignedBorrow = ub;
-  saveMetaActual();
-
-  alert(`✅ Devuelto material NO asignado.\nCantidad: ${q}\nStock actual: ${getStockQty(matId)}`);
-  updateNoAsigPill();
-  renderModalNoAsignado();
-  renderTabla();
-  cargarLista();
-}
-
-
-
-/* ========= FIRESTORE helpers ========= */
 function fbEnsure(){
   if(fbApp) return;
   fbApp = firebase.initializeApp(firebaseConfig);
   fbAuth = firebase.auth();
   fbDb   = firebase.firestore();
 }
+
 async function fsLoginHidden(){
+  // Intento con login anónimo (si reglas lo permiten)
+  // Si tu regla permite lectura sin auth, igualmente funciona.
   try{
     if(!fbAuth.currentUser){
       await fbAuth.signInAnonymously();
     }
   }catch(e){
+    // No bloqueamos el stock si auth falla; Firestore igual puede permitir lectura pública.
     console.warn("Auth anónimo no disponible:", e);
   }
 }
+
 function fsDocRef(){
   return fbDb.collection(FIRESTORE_DOC_PATH.col).doc(FIRESTORE_DOC_PATH.doc);
 }
+
 async function fsLoadOnceToLocal(){
   const snap = await fsDocRef().get();
   if(!snap.exists) return false;
@@ -800,18 +353,19 @@ async function fsLoadOnceToLocal(){
   if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
 
   ignoreNextLocalSave = true;
-  LS.setItem(STOCK_DB_KEY, JSON.stringify({
+  localStorage.setItem(DB_KEY, JSON.stringify({
     materials: data.materials || [],
     movements: data.movements || [],
     categoryOrder: data.categoryOrder || []
   }));
   ignoreNextLocalSave = false;
 
-  stockMaterials = data.materials || [];
-  stockMovements = data.movements || [];
-  stockCategoryOrder = data.categoryOrder || [];
+  materials = data.materials || [];
+  movements = data.movements || [];
+  categoryOrder = data.categoryOrder || [];
   return true;
 }
+
 function fsStartRealtimeListener(){
   if(fsUnsub) fsUnsub();
   fsUnsub = fsDocRef().onSnapshot((snap)=>{
@@ -820,31 +374,38 @@ function fsStartRealtimeListener(){
     if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
 
     ignoreNextLocalSave = true;
-    LS.setItem(STOCK_DB_KEY, JSON.stringify({
+    localStorage.setItem(DB_KEY, JSON.stringify({
       materials: data.materials || [],
       movements: data.movements || [],
       categoryOrder: data.categoryOrder || []
     }));
     ignoreNextLocalSave = false;
 
-    stockMaterials = data.materials || [];
-    stockMovements = data.movements || [];
-    stockCategoryOrder = data.categoryOrder || [];
+    materials = data.materials || [];
+    movements = data.movements || [];
+    categoryOrder = data.categoryOrder || [];
 
-    if(refActual) renderTabla();
-  }, (err)=>console.warn("Firestore onSnapshot error:", err));
+    // Repintado sin cambiar tu UI/flujo
+    renderTree();
+    updateSummary();
+    renderGrid();
+    checkAlerts();
+  }, (err)=>{
+    console.warn("Firestore onSnapshot error:", err);
+  });
 }
-function scheduleFsSaveStock(){
-  if(!USE_FIRESTORE_STOCK || !fsReady) return;
+
+function scheduleFsSave(){
+  if(!USE_FIRESTORE || !fsReady) return;
   if(ignoreNextLocalSave) return;
 
   clearTimeout(pendingSaveTimer);
   pendingSaveTimer = setTimeout(async ()=>{
     try{
       const payload = {
-        materials: stockMaterials,
-        movements: stockMovements,
-        categoryOrder: stockCategoryOrder,
+        materials,
+        movements,
+        categoryOrder,
         updatedAt: new Date().toISOString()
       };
       await fsDocRef().set(payload, { merge: true });
@@ -854,1122 +415,304 @@ function scheduleFsSaveStock(){
   }, 450);
 }
 
-/* ========= STOCK local ========= */
-function loadStockLocal(){
-  const raw = LS.getItem(STOCK_DB_KEY);
-  const db = raw ? JSON.parse(raw) : { materials:[], movements:[], categoryOrder:[] };
-  stockMaterials = Array.isArray(db.materials) ? db.materials : [];
-  stockMovements = Array.isArray(db.movements) ? db.movements : [];
-  stockCategoryOrder = Array.isArray(db.categoryOrder) ? db.categoryOrder : [];
-}
-function saveStockLocal(){
-  LS.setItem(STOCK_DB_KEY, JSON.stringify({
-    materials: stockMaterials,
-    movements: stockMovements,
-    categoryOrder: stockCategoryOrder
-  }));
-  scheduleFsSaveStock();
-}
-function getStockQty(matId){
-  return stockMovements
-    .filter(m => m.matId === matId)
-    .reduce((acc, m) => m.type === 'in' ? acc + toNum(m.qty) : acc - toNum(m.qty), 0);
-}
-function getMatById(id){
-  return stockMaterials.find(m => m.id === id) || null;
-}
-
-/* ========= LINKMAP ========= */
-function loadLinkMap(){
-  try { linkMap = JSON.parse(LS.getItem(LINK_MAP_KEY) || "{}") || {}; }
-  catch(e){ linkMap = {}; }
-}
-function saveLinkMap(){
-  LS.setItem(LINK_MAP_KEY, JSON.stringify(linkMap || {}));
-}
-
-/* ========= IMPORTACIÓN DE DATOS DESDE CALCULO/OTROS ========= */
-(function verificarImports() {
-  const encontrarNumero = (obj) => {
-    if (!obj) return null;
-    const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
-    for (let key of posiblesKeys) {
-      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]);
-    }
-    if (obj.vars) {
-      for (let key of posiblesKeys) {
-        if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]);
-      }
-    }
-    return null;
-  };
-
-  // === Entrada de pedido (compatible con file://) ===
-  // 1) window.name (paso directo desde Cálculo/Index)
-  let snap = null;
-  try{
-    const nm = String(window.name || "").trim();
-    if(nm.startsWith("LDH_PREP|")){
-      snap = JSON.parse(nm.slice("LDH_PREP|".length));
-      // limpiar para evitar reimportar al refrescar
-      try{ window.name = ""; }catch(_){}
-    }
-  }catch(e){ snap = null; }
-
-  // 2) localStorage (misma origin)
-  if(!snap){
-    const snapRaw = LS.getItem("latest_materials_v1") || LS.getItem("pedido_en_preparacion") || LS.getItem("prep_pedido_payload");
-    if(snapRaw){
-      try{ snap = JSON.parse(snapRaw); }catch(e){ snap = null; }
-    }
-  }
-
-  if (snap) {
-    try {
-      const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
-      // UID de pedido para distinguir envíos distintos aunque compartan referencia
-      const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
-      const pedidoUid = incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
-
-      // Si ya existe un pedido con la misma referencia pero es OTRO concepto/u otro UID, no lo pisamos:
-      // generamos una referencia única con sufijo.
-      let ref = refBase;
-      const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
-      if (existsAny) {
-        let metaExist = {};
-        try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
-        const existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
-        const existConcept = String(metaExist.concepto || '').trim();
-        const incConcept = String(snap.concepto || '').trim();
-        const sameOrder = (existUid && existUid === pedidoUid);
-        const conflict = !sameOrder && ((existConcept && incConcept && existConcept !== incConcept) || !existUid || existUid !== pedidoUid);
-        if (conflict) {
-          let i = 2;
-          while (LS.getItem(KP(refBase + ' #' + i)) || LS.getItem(KM(refBase + ' #' + i))) i++;
-          ref = refBase + ' #' + i;
-        }
-      }
-
-      let qty = encontrarNumero(snap) || 1;
-
-      let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
-      metaParaGuardar.referencia = ref;
-      metaParaGuardar.pedido_uid = pedidoUid;
-      // Pedido ID inmutable (para abrir ficha aunque cambie el nombre/ref)
-      if(!metaParaGuardar.pedido_id){
-        metaParaGuardar.pedido_id = 'pid_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
-      }
-      if(ref !== refBase) metaParaGuardar.original_ref = refBase;
-
-      metaParaGuardar.concepto = snap.concepto || metaParaGuardar.concepto || "";
-      // Empresa por PEDIDO (no por concepto)
-      const empresaIncoming = String(snap.empresa || snap.company || "").trim();
-      if(empresaIncoming){
-        metaParaGuardar.empresa = empresaIncoming;
-        metaParaGuardar.company = empresaIncoming;
-      } else {
-        // normalizar nombres históricos si ya existían
-        if(!metaParaGuardar.empresa && metaParaGuardar.company) metaParaGuardar.empresa = metaParaGuardar.company;
-        if(!metaParaGuardar.company && metaParaGuardar.empresa) metaParaGuardar.company = metaParaGuardar.empresa;
-      }
-      metaParaGuardar.unidades = qty;
-      metaParaGuardar.fecha = Date.now();
-      if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
-      if (metaParaGuardar.en_fabricacion === undefined) metaParaGuardar.en_fabricacion = false;
-
-      LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
-
-      // ADAPTADOR DE VÍNCULOS (desde Cálculo/Configuración de conceptos)
-      // Preparación trabaja con `linked_matId`. Sin este adaptador, si el cálculo
-      // envía el id como `stockMatId`/`matId`, la línea llega "sin vínculo".
-      const materialesSrc = (snap.materiales || snap.materials || snap.lineas || snap.items || []);
-      const materialesImport = (materialesSrc || []).map(l => {
-        if(!l || typeof l !== 'object') return l;
-        // normaliza cantidades mínimas esperadas por Preparación
-        if(l.qty_pedida === undefined && l.qty !== undefined) l.qty_pedida = l.qty;
-        if(l.qty_recibida === undefined) l.qty_recibida = 0;
-        if(l.aplicado_qty === undefined) l.aplicado_qty = 0;
-
-        // normaliza el vínculo a stock
-        if(!l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
-        if(!l.linked_matId && l.matId)      l.linked_matId = l.matId;
-        if(!l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
-        return l;
-      });
-
-      LS.setItem(KP(ref), JSON.stringify(materialesImport));
-
-      LS.removeItem("latest_materials_v1");
-      LS.removeItem("pedido_en_preparacion");
-      LS.removeItem("prep_pedido_payload");
-    } catch (e) { console.error("Error importando:", e); }
-  }
-})();
-
-/* ========= NAVEGACIÓN ========= */
-function volverIndex(){ location.href = "index.html"; }
-function volverLista(){
-  document.getElementById("vistaDetalle").classList.add("hidden");
-  document.getElementById("vistaLista").classList.remove("hidden");
-  refActual = "";
-  cargarLista();
-}
-
-/* ========= AUTO-ABRIR DESDE INDEX (openRef=...) ========= */
-function _getQueryParam(name){
-  try{
-    const u = new URL(location.href);
-    return u.searchParams.get(name);
-  }catch(e){ return null; }
-}
-function getFocusRef(){
-  try{
-    const u = new URLSearchParams(window.location.search || '');
-    let ref = (u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
-
-    if(!ref){
-      const h = (window.location.hash || '').replace(/^#/, '');
-      if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
-      else if(h.startsWith('openRef=')) ref = decodeURIComponent(h.slice(8));
-    }
-
-    if(!ref) ref = (LS.getItem('prep_focus_ref') || LS.getItem('prep_focus_hash_ref') || '').trim();
-
-    // limpiar para no bloquear futuros clicks
-    LS.removeItem('prep_focus_ref');
-    LS.removeItem('prep_focus_hash_ref');
-
-    return ref || '';
-  }catch(e){ return ''; }
-}
-
-function marcarYabrirRef(ref){
-  ref = (ref || '').trim();
-  if(!ref) return;
-
-  // Banner superior (si existe)
-  try{
-    const b = document.getElementById('focusBanner');
-    if(b){
-      b.style.display = 'flex';
-      const s = b.querySelector('.ref');
-      if(s) s.textContent = ref;
-      const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = () => abrirPedido(ref);
-    }
-  }catch(e){}
-
-  const refNorm = normRef(ref);
-
-  const tryClick = (attempt) => {
-    const list = document.getElementById('listaPedidos');
-    if(list){
-      const items = Array.from(list.querySelectorAll('.item'));
-      const el = items.find(n => (n.dataset && (n.dataset.refNorm || normRef(n.dataset.ref))) === refNorm)
-              || items.find(n => normRef(n.textContent).includes(refNorm));
-      if(el){
-        try{ el.classList.add('focus-target'); }catch(e){}
-        try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
-        // Marcar visualmente y centrar en lista (sin auto-abrir)
-        return;
-      }
-    }
-    if(attempt < 12) setTimeout(()=>tryClick(attempt+1), 180);
-  };
-
-  tryClick(0);
-}
-
-function autoAbrirDesdeQuery(){
-  const ref = getFocusRef();
-  if(ref) marcarYabrirRef(ref);
-}
-
-/* ========= LISTA DE PEDIDOS (pill por RECEPCIÓN) ========= */
-function cargarLista() {
-  const lista = document.getElementById("lista");
-  lista.innerHTML = "";
-  const keys = Object.keys(LS).filter(k => k.startsWith("prep_recepcion_"));
-  if(keys.length === 0) {
-    lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>";
-    return;
-  }
-
-  keys.reverse().forEach(k => {
-    const ref = k.replace("prep_recepcion_", "");
-    const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
-    const lines = JSON.parse(LS.getItem(k) || "[]");
-    const totalLines = lines.length;
-
-    const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
-    const anyReceived = lines.some(l => (toNum(l.qty_recibida)) > 0);
-
-    let badgeClass = "b-p"; let badgeText = "Pendiente";
-    if (totalLines > 0 && completeLines === totalLines) { badgeClass = "b-c"; badgeText = "Completo"; }
-    else if (totalLines > 0 && anyReceived) { badgeClass = "b-pa"; badgeText = "Parcial"; }
-
-    const fab = !!meta.en_fabricacion;
-
-    // NO ASIGNADO pendiente (pill persistente)
-    // Primero en meta; si no existe (p.ej. el pedido ya no está en Preparación), se toma del registro global.
-    const ubLocal = (meta && meta.unassignedBorrow) ? meta.unassignedBorrow : null;
-    const ubGlobal = getGlobalBorrow(ref);
-    const ub = (ubLocal && Array.isArray(ubLocal.items) && ubLocal.items.length) ? ubLocal : ubGlobal;
-    const ut = unassignedTotals(ub);
-    const hasNoAsig = (ut.lines > 0);
-
-
-    const item = document.createElement("div");
-    item.className = "item";
-    // dataset para auto-abrir / marcar desde Fabricación/Almacén
+// ====== INIT (mantiene tu init, pero con sync) ======
+async function initWithSync(){
+  // 1) cargar local (igual que antes)
+  const d=localStorage.getItem(DB_KEY);
+  if(d){
     try{
-      item.dataset.ref = ref;
-      item.dataset.refNorm = normRef(ref);
-    }catch(e){}
-    item.innerHTML = `
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px; gap:10px; align-items:flex-start;">
-        <span style="font-weight:bold; color:#fff">${ref}</span>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-          ${fab ? `<span class="badge b-fab"><span class="dot"></span> En fabricación</span>` : ``}
-          ${hasNoAsig ? `<span class="badge b-na">No asignado: <b>${ut.lines}</b></span>` : ``}
-          <span class="badge ${badgeClass}">${badgeText}</span>
-        </div>
-      </div>
-      <div style="font-size:12px; color:#9fb0c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-        ${meta.concepto || "Sin concepto"} (${meta.unidades || 1} uds)${(meta.empresa || meta.company) ? (" · " + (meta.empresa || meta.company)) : ""}
-      </div>`;
-    item.onclick = () => abrirPedido(ref);
-    lista.appendChild(item);
-  });
-}
-
-/* ========= ABRIR PEDIDO ========= */
-function abrirPedido(ref) {
-  refActual = ref;
-  document.getElementById("vistaLista").classList.add("hidden");
-  document.getElementById("vistaDetalle").classList.remove("hidden");
-
-  metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
-if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
-
-  // Hidratación de "No asignado" desde registro global (por si el pedido viene de otro módulo)
-  const gb = getGlobalBorrow(ref);
-  if(gb && (!metaActual.unassignedBorrow || !Array.isArray((metaActual.unassignedBorrow||{}).items) || metaActual.unassignedBorrow.items.length===0)){
-    metaActual.unassignedBorrow = gb;
-    // no forzamos guardado aquí; se guardará al primer cambio
-  }
-
-// Si el pedido tiene deuda de "no asignado" guardada globalmente, la re-hidratamos aquí
-const gBorrow = getGlobalBorrow(ref);
-if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBorrow.items.length){
-  metaActual.unassignedBorrow = gBorrow;
-}
-
-  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
-
-  document.getElementById("ref").textContent = ref;
-  document.getElementById("concepto").textContent = metaActual.concepto || "";
-  // Empresa (por pedido)
-  if(!metaActual.empresa && metaActual.company) metaActual.empresa = metaActual.company;
-  if(!metaActual.company && metaActual.empresa) metaActual.company = metaActual.empresa;
-
-  // Fallback: si el pedido ya existe en ldh_db, re-hidratar empresa (sin ligar a concepto)
-  if(!(metaActual.empresa || "").trim()){
-    try{
-      const rawDb = LS.getItem("ldh_db");
-      if(rawDb){
-        const db = JSON.parse(rawDb) || {};
-        const d = (db.deliveries||[]).find(x=>x && x.ref === ref);
-        const emp = String((d && (d.company || d.empresa)) || "").trim();
-        if(emp){
-          metaActual.empresa = emp;
-          metaActual.company = emp;
-          LS.setItem(KM(refActual), JSON.stringify(metaActual));
-        }
-      }
-    }catch(e){}
-  }
-
-  document.getElementById("empresaPrep").textContent = (metaActual.empresa || metaActual.company) ? ("· " + (metaActual.empresa || metaActual.company)) : "";
-  document.getElementById("inputUnidades").value = (metaActual.unidades || 1);
-  document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
-
-  const radios = document.getElementsByName("th");
-  radios.forEach(r => r.checked = (r.value === metaActual.tipo_hierro));
-
-  renderTabla();
-}
-
-/* ========= GUARDADOS META ========= */
-function guardarUnidadesManual() {
-  const val = parseFloat(document.getElementById("inputUnidades").value) || 1;
-  metaActual.unidades = val;
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-}
-function guardarTipoHierro(){
-  const radios=document.getElementsByName("th");
-  let val=""; radios.forEach(r=>{if(r.checked)val=r.value});
-  metaActual.tipo_hierro=val;
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-}
-
-/* ========= AUTO-CIERRE POR RECEPCIÓN (AHORA: ENVÍA A FABRICACIÓN ANTES) ========= */
-function autoCerrarSiCompletoPorRecepcion(){
-  const totalLines = estadoMateriales.length;
-  if(totalLines === 0) return;
-
-  const completeLines = estadoMateriales.filter(l =>
-    toNum(l.qty_recibida) >= toNum(l.qty_pedida)
-  ).length;
-
-  if(completeLines === totalLines){
-    // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
-    mandarAFabricacionAutoSiHaceFalta();
-
-    // 2) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
-    //    Así la alerta no desaparece y queda "bloqueado" hasta devolverlo.
-    const ub = (metaActual && metaActual.unassignedBorrow) ? metaActual.unassignedBorrow : (getGlobalBorrow(refActual) || { items: [] });
-    const t = unassignedTotals(ub);
-    if(t.lines > 0){
-      metaActual.recepcion_completa = true;
-      metaActual.unassignedBorrow = ensureUnassigned(metaActual);
-      // nos aseguramos de persistirlo también en global
-      saveMetaActual();
-      alert("⚠️ Pedido completo (material recibido), pero hay MATERIAL NO ASIGNADO pendiente de devolver.\n\nEl pedido se mantiene en Preparación hasta que lo devuelvas desde la pill roja.");
-      updateNoAsigPill();
-      cargarLista();
-      return;
-    }
-
-    // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
-    LS.removeItem(KP(refActual));
-    LS.removeItem(KM(refActual));
-    alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
-    volverLista();
-  }
-}
-
-/* ========= VINCULACIÓN ========= */
-function getLinkedMatIdForLine(line){
-  if(line.linked_matId && getMatById(line.linked_matId)) return line.linked_matId;
-  const k = linkKeyFor(line);
-  const rec = linkMap[k];
-  if(rec && rec.matId && getMatById(rec.matId)) return rec.matId;
-  return null;
-}
-function setLinkForLine(index, matId){
-  const line = estadoMateriales[index];
-  const mat = getMatById(matId);
-  if(!mat) return;
-
-  line.linked_matId = matId;
-
-  const k = linkKeyFor(line);
-  linkMap[k] = { matId: matId, name: mat.name, cat: mat.cat, grp: mat.grp, unit: mat.unit };
-  saveLinkMap();
-
-  guardarEstadoLocal();
-  renderTabla();
-  cargarLista();
-}
-function clearLinkForLine(index){
-  const line = estadoMateriales[index];
-  line.linked_matId = null;
-  guardarEstadoLocal();
-  renderTabla();
-}
-
-/* ========= MODAL VINCULAR ========= */
-function abrirModalVincular(index){
-  linkModalCtx = { lineIndex: index, chosenMatId: null };
-
-  const line = estadoMateriales[index];
-  document.getElementById("linkLineName").textContent = `${line.mat} (${line.unit || "ud"})`;
-
-  const input = document.getElementById("linkSearch");
-  input.value = "";
-  input.oninput = () => renderLinkResults();
-
-  renderLinkResults();
-  document.getElementById("modalVincular").classList.add("active");
-}
-function cerrarModalVincular(){
-  document.getElementById("modalVincular").classList.remove("active");
-  linkModalCtx = null;
-}
-function desvincularActual(){
-  if(!linkModalCtx) return;
-  clearLinkForLine(linkModalCtx.lineIndex);
-  cerrarModalVincular();
-}
-function confirmarVinculo(){
-  if(!linkModalCtx || !linkModalCtx.chosenMatId){
-    alert("Selecciona un material del listado.");
-    return;
-  }
-  setLinkForLine(linkModalCtx.lineIndex, linkModalCtx.chosenMatId);
-  cerrarModalVincular();
-}
-function renderLinkResults(){
-  const host = document.getElementById("linkResults");
-  host.innerHTML = "";
-
-  const q = normName(document.getElementById("linkSearch").value || "");
-
-  let arr = stockMaterials.slice();
-  if(q){
-    arr = arr.filter(m => {
-      const t = normName(`${m.name} ${m.cat} ${m.grp}`);
-      return t.includes(q);
-    });
-  }
-
-  arr.sort((a,b) => {
-    const ac = normName(a.cat).localeCompare(normName(b.cat));
-    if(ac!==0) return ac;
-    const ag = normName(a.grp).localeCompare(normName(b.grp));
-    if(ag!==0) return ag;
-    return normName(a.name).localeCompare(normName(b.name));
-  });
-
-  if(arr.length===0){
-    host.innerHTML = `<div style="padding:12px; opacity:.7;">Sin resultados.</div>`;
-    return;
-  }
-
-  arr.forEach(m => {
-    const qty = getStockQty(m.id);
-    const el = document.createElement("div");
-    el.className = "link-item" + (linkModalCtx && linkModalCtx.chosenMatId===m.id ? " active" : "");
-    el.innerHTML = `
-      <div class="t">${m.name}</div>
-      <div class="s">
-        <span>${m.cat} › ${m.grp}</span>
-        <span><b>${qty}</b> ${m.unit || ""}</span>
-      </div>
-    `;
-    el.onclick = () => {
-      linkModalCtx.chosenMatId = m.id;
-      renderLinkResults();
-    };
-    host.appendChild(el);
-  });
-}
-
-/* ========= RENDER TABLA ========= */
-function renderTabla() {
-  const tbodyBarras = document.getElementById("tbodyBarras");
-  const tbodyUnidades = document.getElementById("tbodyUnidades");
-  tbodyBarras.innerHTML = "";
-  tbodyUnidades.innerHTML = "";
-
-  let hasBarras = false;
-  let hasUnidades = false;
-
-  document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
-
-  estadoMateriales.forEach((linea, index) => {
-    const pedida = toNum(linea.qty_pedida);
-    const recibida = toNum(linea.qty_recibida);
-    const yaAplicada = toNum(linea.aplicado_qty);
-
-    const isComplete = linea.ok || (pedida > 0 && recibida >= pedida);
-    const rowClass = isComplete ? "ok" : "";
-
-    const linkedId = getLinkedMatIdForLine(linea);
-    const linkedMat = linkedId ? getMatById(linkedId) : null;
-    const stockQty = linkedId ? getStockQty(linkedId) : null;
-
-    let stockPill = "";
-    if(linkedMat){
-      const s = toNum(stockQty);
-      let cls = "ok";
-      if(s <= 0) cls = "danger";
-      else if(pedida > 0 && s < pedida) cls = "warn";
-      stockPill = `<span class="link-pill ${cls}">Stock: <b>${s}</b> ${linkedMat.unit || ""}</span>`;
-    } else {
-      stockPill = `<span class="link-pill">Sin vínculo</span>`;
-    }
-
-    const diff = recibida - yaAplicada;
-    const falta = Math.max(0, pedida - recibida);
-
-    let btnHtml = "";
-    if (diff > 0) {
-      btnHtml += `<button class="btn-mini" onclick="guardarLinea(${index})">Añadir a stock (+${diff})</button>`;
-    } else if (yaAplicada > 0) {
-      btnHtml += `<button class="btn-mini disabled">✅ OK</button>`;
-    } else {
-      btnHtml += `<span style="opacity:0.2">-</span>`;
-    }
-
-    if (falta > 0) {
-      btnHtml += `<button class="btn-mini" onclick="consumirDeStock(${index})">Consumir stock (-${falta})</button>`;
-      btnHtml += `<button class="btn-mini unassigned" onclick="consumirNoAsignado(${index})">Consumir NO asignado</button>`;
-    }
-
-    // Si existe deuda no asignada para esta línea, ofrecer devolución desde Preparación
-    const uaRec = _uaFindForLine(linea);
-    if(uaRec && uaRec.pending>0){
-      btnHtml += `<button class="btn-mini btn-danger" onclick="devolverNoAsignadoLinea(${index})">Devolver no asignado (+${uaRec.pending})</button>`;
-    }
-
-    const btnVincular = `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
-
-    const tr = document.createElement("tr");
-    tr.className = rowClass;
-
-    tr.innerHTML = `
-      <td><input type="checkbox" ${linea.ok ? "checked" : ""} onchange="toggleOk(${index}, this.checked)"></td>
-      <td>
-        <div style="font-weight:700; color:#fff;">${linea.mat}</div>
-        <div class="stock-mini">
-          ${stockPill}
-          ${linkedMat ? `<span class="small">Vinculado a: <b>${linkedMat.name}</b></span>` : `<span class="small">Pulsa “Vincular” para emparejar con Stock</span>`}
-          ${yaAplicada > 0 ? `<span class="small">Sumado a stock: <b>${yaAplicada}</b></span>` : ``}
-        </div>
-      </td>
-      <td>${pedida} <span style="font-size:10px;opacity:0.5">${linea.unit || 'ud'}</span></td>
-      <td><input type="number" value="${recibida}" oninput="updateQty(${index}, this)"></td>
-      <td>${btnHtml}${btnVincular}</td>
-      <td><input type="text" value="${linea.note || ''}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
-    `;
-
-    if ((linea.unit || "").toLowerCase() === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
-    else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
-  });
-
-  document.getElementById("bloqueBarras").classList.toggle("hidden", !hasBarras);
-  document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
-  document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
-
-  autoCerrarSiCompletoPorRecepcion();
-  updateNoAsigPill();
-}
-
-
-/* ========= LÓGICA DE STOCK: localizar material ========= */
-function _addToRealStock_byLinkedOrName(linea, ironType) {
-  const linkedId = getLinkedMatIdForLine(linea);
-  if(linkedId){
-    const mat = getMatById(linkedId);
-    if(mat) return { success:true, mat, matId: linkedId };
-  }
-
-  const baseName = String(linea.mat||"");
-  let candidates = [];
-  if (ironType && (String(linea.unit||"").toLowerCase().includes('barra'))) {
-    candidates.push(baseName + " " + ironType.charAt(0).toUpperCase() + ironType.slice(1));
-    candidates.push(baseName + " " + ironType.toLowerCase());
-  }
-  candidates.push(baseName);
-
-  let mat = null;
-  for (let candidate of candidates) {
-    const cn = normName(candidate);
-    mat = stockMaterials.find(m => normName(m.name) === cn);
-    if (mat) break;
-  }
-  const searchedName = candidates.length > 0 ? candidates[0] : baseName;
-  if (!mat) return { success:false, searchedName };
-
-  return { success:true, mat, matId: mat.id };
-}
-
-/* ========= AÑADIR A STOCK (movimiento "in") ========= */
-function guardarLinea(index) {
-  const linea = estadoMateriales[index];
-  const recibido = toNum(linea.qty_recibida);
-  const yaAplicado = toNum(linea.aplicado_qty);
-  const diff = recibido - yaAplicado;
-
-  if (diff <= 0) return;
-
-  let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
-    tipoHierro = metaActual.tipo_hierro;
-    if (!tipoHierro) {
-      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
-      const p = document.getElementById("panelHierro");
-      p.style.boxShadow = "0 0 0 2px #ef4444";
-      setTimeout(()=>p.style.boxShadow="none", 2000);
-      return;
-    }
-  }
-
-  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
-
-  if (!check.success) {
-    abrirModalCreacion({
-      name: check.searchedName,
-      unit: linea.unit,
-      diff: diff,
-      index: index
-    });
-    return;
-  }
-
-  stockMovements.push({ id: uuid(), matId: check.matId, type: 'in', qty: diff, date: new Date().toISOString() });
-  saveStockLocal();
-
-  linea.aplicado_qty = yaAplicado + diff;
-  guardarEstadoLocal();
-
-  const newTotal = getStockQty(check.matId);
-  alert(`✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`);
-  renderTabla();
-}
-
-/* ========= CONSUMIR DE STOCK (movimiento "out") ========= */
-function consumirDeStock(index){
-  const linea = estadoMateriales[index];
-
-  const pedida = toNum(linea.qty_pedida);
-  const recibida = toNum(linea.qty_recibida);
-
-  const falta = Math.max(0, pedida - recibida);
-  if(falta <= 0){
-    alert("Esta línea ya está completa.");
-    return;
-  }
-
-  let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
-    tipoHierro = metaActual.tipo_hierro;
-    if (!tipoHierro) {
-      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
-      const p = document.getElementById("panelHierro");
-      p.style.boxShadow = "0 0 0 2px #ef4444";
-      setTimeout(()=>p.style.boxShadow="none", 2000);
-      return;
-    }
-  }
-
-  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
-  if(!check.success){
-    alert("Este material no está vinculado / no existe en Stock.\nPulsa “Vincular” y selecciona el material correcto antes de consumir.");
-    return;
-  }
-
-  const matId = check.matId;
-  const mat = check.mat;
-
-  const disponible = toNum(getStockQty(matId));
-  const quedaria = disponible - falta;
-
-  if(quedaria < 0){
-    const deficit = Math.abs(quedaria);
-    const ok = confirm(
-      `Stock insuficiente para consumir.\n\n` +
-      `Material: ${mat.name}\n` +
-      `Disponible: ${disponible}\n` +
-      `Necesario: ${falta}\n\n` +
-      `Esto dejará el stock en NEGATIVO: -${deficit}\n\n` +
-      `¿Confirmas consumir igualmente?`
-    );
-    if(!ok) return;
-  }
-
-  stockMovements.push({
-    id: uuid(),
-    matId: matId,
-    type: 'out',
-    qty: falta,
-    date: new Date().toISOString(),
-    ref: refActual,
-    concept: metaActual.concepto || ""
-  });
-  saveStockLocal();
-
-  linea.qty_recibida = recibida + falta;
-  linea.ok = (toNum(linea.qty_recibida) >= pedida);
-
-  guardarEstadoLocal();
-
-  alert(`✅ Consumido de stock.\nMaterial: ${mat.name}\nCantidad: ${falta}\nStock actual: ${getStockQty(matId)}`);
-  renderTabla();
-  cargarLista();
-}
-
-
-/* ========= CONSUMIR NO ASIGNADO (movimiento "out" + alerta) ========= */
-function consumirNoAsignado(index){
-  const linea = estadoMateriales[index];
-
-  const pedida = toNum(linea.qty_pedida);
-  const recibida = toNum(linea.qty_recibida);
-
-  const falta = Math.max(0, pedida - recibida);
-  if(falta <= 0){
-    alert("Esta línea ya está completa.");
-    return;
-  }
-
-  let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
-    tipoHierro = metaActual.tipo_hierro;
-    if (!tipoHierro) {
-      alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
-      const p = document.getElementById("panelHierro");
-      p.style.boxShadow = "0 0 0 2px #ef4444";
-      setTimeout(()=>p.style.boxShadow="none", 2000);
-      return;
-    }
-  }
-
-  const check = _addToRealStock_byLinkedOrName(linea, tipoHierro);
-  if(!check.success){
-    alert("Este material no está vinculado / no existe en Stock.\nPulsa “Vincular” y selecciona el material correcto antes de consumir NO asignado.");
-    return;
-  }
-
-  const matId = check.matId;
-  const mat = check.mat;
-
-  // Cantidad a consumir (máx falta)
-  const ask = prompt(`Cantidad a CONSUMIR como NO asignado (máx. ${falta})`, String(falta));
-  if(ask === null) return;
-  let q = parseFloat(String(ask).replace(",", "."));
-  if(isNaN(q) || q <= 0) return;
-  if(q > falta) q = falta;
-
-  const disponible = toNum(getStockQty(matId));
-  const quedaria = disponible - q;
-
-  if(quedaria < 0){
-    const deficit = Math.abs(quedaria);
-    const ok = confirm(
-      `Stock insuficiente para consumir NO asignado.\n\n` +
-      `Material: ${mat.name}\n` +
-      `Disponible: ${disponible}\n` +
-      `Necesario: ${q}\n\n` +
-      `Esto dejará el stock en NEGATIVO: -${deficit}\n\n` +
-      `¿Confirmas consumir igualmente?`
-    );
-    if(!ok) return;
-  }
-
-  stockMovements.push({
-    id: uuid(),
-    matId: matId,
-    type: 'out',
-    qty: q,
-    date: new Date().toISOString(),
-    ref: refActual,
-    concept: metaActual.concepto || "",
-    reason: "unassigned_borrow"
-  });
-  saveStockLocal();
-
-  // Cumple la recepción de la línea (igual que consumir normal)
-  linea.qty_recibida = recibida + q;
-  linea.ok = (toNum(linea.qty_recibida) >= pedida);
-
-  // Registrar deuda por pedido (multi-material)
-  const ub = ensureUnassigned(metaActual);
-  const found = (ub.items || []).find(it => it && it.matId === matId);
-  if(found){
-    found.qtyPending = toNum(found.qtyPending) + q;
-    found.lastActionAt = Date.now();
-  }else{
-    (ub.items || (ub.items=[])).push({
-      matId: matId,
-      name: mat.name,
-      unit: mat.unit || (linea.unit || ""),
-      qtyPending: q,
-      createdAt: Date.now(),
-      lastActionAt: Date.now()
-    });
-  }
-  metaActual.unassignedBorrow = ub;
-  saveMetaActual();
-
-  guardarEstadoLocal();
-
-  alert(`⚠️ Consumido material NO asignado.\nMaterial: ${mat.name}\nCantidad: ${q}\n\nQueda pendiente devolverlo.`);
-  updateNoAsigPill();
-  renderTabla();
-  cargarLista();
-}
-
-
-/* ========= MODAL CREACIÓN ========= */
-function abrirModalCreacion(data) {
-  pendingCreation = data;
-  document.getElementById("modMatName").textContent = data.name;
-
-  const cats = [...new Set(stockMaterials.map(m => m.cat).filter(Boolean))].sort();
-  const selCat = document.getElementById("modCatSelect");
-  selCat.innerHTML = `<option value="" disabled selected>-- Elige Categoría --</option>` +
-                     cats.map(c => `<option value="${c}">${c}</option>`).join("");
-
-  document.getElementById("modGrpSelect").innerHTML = `<option value="" disabled selected>-- Elige Categoría primero --</option>`;
-
-  document.getElementById("modQtyInput").value = data.diff;
-  document.getElementById("modUnitInput").value = data.unit || "ud";
-  document.getElementById("modMinInput").value = "";
-
-  document.getElementById("modCatInput").value = "";
-  document.getElementById("modGrpInput").value = "";
-  document.getElementById("modCatInput").classList.add("hidden");
-  document.getElementById("modGrpInput").classList.add("hidden");
-  document.getElementById("modCatSelect").classList.remove("hidden");
-  document.getElementById("modGrpSelect").classList.remove("hidden");
-
-  document.getElementById("modalCrear").classList.add("active");
-}
-function cerrarModalCreacion() {
-  document.getElementById("modalCrear").classList.remove("active");
-  pendingCreation = null;
-}
-function toggleInput(type) {
-  const sel = document.getElementById(type === 'cat' ? "modCatSelect" : "modGrpSelect");
-  const inp = document.getElementById(type === 'cat' ? "modCatInput" : "modGrpInput");
-
-  if (inp.classList.contains("hidden")) {
-    sel.classList.add("hidden");
-    inp.classList.remove("hidden");
-    inp.focus();
-  } else {
-    inp.classList.add("hidden");
-    sel.classList.remove("hidden");
-  }
-}
-function cargarGruposModal() {
-  const cat = document.getElementById("modCatSelect").value;
-  const grps = [...new Set(stockMaterials.filter(m => m.cat === cat).map(m => m.grp).filter(Boolean))].sort();
-
-  const selGrp = document.getElementById("modGrpSelect");
-  selGrp.innerHTML = `<option value="" disabled selected>-- Elige Grupo --</option>` +
-                     grps.map(g => `<option value="${g}">${g}</option>`).join("");
-}
-function guardarNuevoMaterial() {
-  if (!pendingCreation) return;
-
-  const catInput = document.getElementById("modCatInput");
-  const catVal = !catInput.classList.contains("hidden") ? catInput.value.trim() : document.getElementById("modCatSelect").value;
-  const grpInput = document.getElementById("modGrpInput");
-  const grpVal = !grpInput.classList.contains("hidden") ? grpInput.value.trim() : document.getElementById("modGrpSelect").value;
-
-  const unitVal = document.getElementById("modUnitInput").value.trim() || "ud";
-  const minVal = parseInt(document.getElementById("modMinInput").value) || 0;
-  const qtyVal = parseFloat(document.getElementById("modQtyInput").value) || 0;
-
-  if (!catVal || !grpVal) { alert("Por favor, indica Categoría y Grupo."); return; }
-  if (qtyVal <= 0) { alert("La cantidad a sumar debe ser mayor que 0."); return; }
-
-  const newId = uuid();
-  stockMaterials.push({
-    id: newId,
-    cat: catVal,
-    grp: grpVal,
-    name: pendingCreation.name,
-    unit: unitVal,
-    min: minVal
-  });
-
-  stockMovements.push({
-    id: uuid(),
-    matId: newId,
-    type: 'in',
-    qty: qtyVal,
-    date: new Date().toISOString()
-  });
-
-  saveStockLocal();
-
-  const linea = estadoMateriales[pendingCreation.index];
-  linea.linked_matId = newId;
-
-  const k = linkKeyFor(linea);
-  linkMap[k] = { matId: newId, name: pendingCreation.name, cat: catVal, grp: grpVal, unit: unitVal };
-  saveLinkMap();
-
-  linea.aplicado_qty = toNum(linea.aplicado_qty) + qtyVal;
-  guardarEstadoLocal();
-
-  alert(`✅ Ficha creada y stock añadido.\n\nUbicación: ${catVal} > ${grpVal}\nCantidad sumada: ${qtyVal} ${unitVal}`);
-  cerrarModalCreacion();
-  renderTabla();
-}
-
-/* ========= OTROS HELPERS ========= */
-function toggleOk(index, isChecked) {
-  const linea = estadoMateriales[index];
-  linea.ok = isChecked;
-  if (isChecked) {
-    const pedida = toNum(linea.qty_pedida);
-    if (pedida > 0) linea.qty_recibida = pedida;
-  }
-  guardarEstadoLocal();
-  renderTabla();
-  cargarLista();
-}
-function updateQty(index, inputEl) {
-  let val = parseFloat(inputEl.value);
-  if (isNaN(val)) val = 0;
-  const linea = estadoMateriales[index];
-  const pedida = toNum(linea.qty_pedida);
-
-  if (pedida > 0 && val > pedida) {
-    val = pedida;
-    inputEl.value = val;
-    inputEl.classList.remove("flash-limit"); void inputEl.offsetWidth; inputEl.classList.add("flash-limit");
-  }
-  if (val < 0) { val = 0; inputEl.value = 0; }
-
-  linea.qty_recibida = val;
-  linea.ok = (pedida > 0 && val >= pedida);
-
-  guardarEstadoLocal();
-  inputEl.onblur = () => { renderTabla(); cargarLista(); };
-}
-function updateNote(index, txt) { estadoMateriales[index].note = txt; guardarEstadoLocal(); }
-function marcarTodoOk() {
-  estadoMateriales.forEach(l => {
-    l.ok = true;
-    const pedida = toNum(l.qty_pedida);
-    if(pedida > 0) l.qty_recibida = pedida;
-  });
-  guardarEstadoLocal();
-  renderTabla();
-  cargarLista();
-}
-function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
-
-/* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
-function confirmarTodoRecepcion() {
-  const hayBarras = estadoMateriales.some(l => (String(l.unit||"").toLowerCase() === 'barra'));
-  if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
-
-  const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
-  if (val <= 0) { alert("⛔ Indica las UNIDADES."); document.getElementById("inputUnidades").focus(); return; }
-
-  if (!confirm(`Mandar a FABRICACIÓN:\nUnidades: ${val}\n\n(El pedido seguirá en Preparación hasta que todo el material esté recibido.)`)) return;
-  mandarAFabricacion(val, true);
-}
-
-/* ========= MANDAR A FABRICACIÓN (CORE) ========= */
-function mandarAFabricacion(unidadesFinal, withAlert) {
-  if (!refActual) return;
-
-  const rawDb = LS.getItem("ldh_db");
-  let db = { deliveries: [] };
-  if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
-
-  const idx = db.deliveries.findIndex(d => d.ref === refActual);
-
-  const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
-  const notasFinales = notaHierro + "Enviado desde Preparación.";
-  const empresaFinal = String(metaActual.empresa || metaActual.company || "").trim();
-
-  if (idx >= 0) {
-    db.deliveries[idx].total = unidadesFinal;
-    // Mantener empresa por pedido en ldh_db
-    if(empresaFinal){
-      db.deliveries[idx].company = empresaFinal;
-      db.deliveries[idx].empresa  = empresaFinal;
-    } else {
-      if(!db.deliveries[idx].company && db.deliveries[idx].empresa) db.deliveries[idx].company = db.deliveries[idx].empresa;
-      if(!db.deliveries[idx].empresa && db.deliveries[idx].company) db.deliveries[idx].empresa = db.deliveries[idx].company;
-    }
-    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-    if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
-    if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
-      db.deliveries[idx].notes = (db.deliveries[idx].notes ? (db.deliveries[idx].notes + "\n") : "") + notasFinales;
+      const p=JSON.parse(d);
+      materials=p.materials||[];
+      movements=p.movements||[];
+      categoryOrder=p.categoryOrder||[];
+      cleanDuplicates();
+    }catch(e){
+      materials=[]; movements=[]; categoryOrder=[];
     }
   } else {
-    db.deliveries.push({
-      unassignedBorrow: ((metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() })),
-      id: "PED-" + Date.now(),
-      client: "Taller / Interno",
-      ref: refActual,
-      company: empresaFinal || "",
-      empresa: empresaFinal || "",
-      concept: metaActual.concepto || "Sin concepto",
-      datePed: new Date().toISOString().split('T')[0],
-      datePrev: new Date().toISOString().split('T')[0],
-      status: "pendiente",
-      priority: "normal",
-      total: unidadesFinal,
-      delivered: 0,
-      history: [],
-      notes: notasFinales
-    });
+    // si no hay local, dejamos que Firestore mande (si existe). Si no existe, usamos tu semilla.
+    materials=[]; movements=[]; categoryOrder=[];
   }
 
-  LS.setItem("ldh_db", JSON.stringify(db));
-
-  metaActual.en_fabricacion = true;
-  metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
-
-  document.getElementById("pillFab").classList.remove("hidden");
-  if(withAlert){
-    alert(`✅ Enviado a Fabricación.\nUds: ${unidadesFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
-  }
-  cargarLista();
-}
-
-/* ========= AUTO: ENVIAR A FABRICACIÓN SI HACE FALTA ========= */
-function mandarAFabricacionAutoSiHaceFalta(){
-  // Evitar re-enviar (y duplicar notas/acciones) cuando ya existe en Fabricación.
-  // Esto es importante porque al devolver NO-ASIGNADO puede dispararse el auto-cierre de recepción.
-  if(!refActual) return;
-
-  if(metaActual && metaActual.en_fabricacion && ldhHasDelivery(refActual)){
-    // Aseguramos mirror de no-asignado por si cambió
-    mirrorUnassignedToLdhDb();
-    return;
-  }
-  if(ldhHasDelivery(refActual)){
-    metaActual.en_fabricacion = true;
-    metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
-    LS.setItem(KM(refActual), JSON.stringify(metaActual));
-    mirrorUnassignedToLdhDb();
-    return;
-  }
-
-  const unidadesFinal = (parseFloat(document.getElementById("inputUnidades")?.value) || metaActual.unidades || 1);
-  mandarAFabricacion(unidadesFinal, false);
-}
-
-
-/* ========= ELIMINAR ========= */
-function eliminarPedido() {
-  if (confirm("⛔ ¿Eliminar?")) {
-    LS.removeItem(KP(refActual));
-    LS.removeItem(KM(refActual));
-    clearGlobalBorrow(refActual);
-    volverLista();
-  }
-}
-
-/* ========= INIT ========= */
-async function init(){
-  loadLinkMap();
-  loadStockLocal();
-
-  if(USE_FIRESTORE_STOCK){
+  // 2) Firestore: traer remoto (si existe) y escuchar
+  if(USE_FIRESTORE){
     try{
       fbEnsure();
       await fsLoginHidden();
-      await fsLoadOnceToLocal();
+      const ok = await fsLoadOnceToLocal();
       fsReady = true;
       fsStartRealtimeListener();
+
+      if(!ok){
+        // Si NO existe aún en Firestore, entonces usamos tu semilla original y subimos
+        if(!materials.length){
+          materials=[
+            {id:uuid(),cat:"Soldadura, Corte y Desbaste",grp:"Discos",name:"Disco 115mm",unit:"ud",min:10},
+            {id:uuid(),cat:"Soldadura, Corte y Desbaste",grp:"Electrodos",name:"Electrodo 2.5mm",unit:"caja",min:2},
+            {id:uuid(),cat:"Hierro",grp:"Tubos",name:"Tubo 40x40",unit:"br",min:5}
+          ];
+          saveData(); // esto hará scheduleFsSave
+        }else{
+          // si había local pero no remoto, subimos local al remoto
+          await fsDocRef().set({ materials, movements, categoryOrder, createdAt: new Date().toISOString() }, { merge: true });
+        }
+      }
     }catch(e){
-      console.warn("Firestore no disponible, seguimos con local stock:", e);
+      console.warn("Firestore no disponible, seguimos en local:", e);
       fsReady = false;
     }
   }
 
-  cargarLista();
-  // si venimos desde el index con ?openRef=...
-  autoAbrirDesdeQuery();
-}
-init();
-</script>
+  // 3) tu render normal
+  renderTree(); updateSummary(); renderGrid(); checkAlerts();
 
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('#symGrid') && !e.target.closest('.btn.icon')){ $("symGrid").classList.remove('show'); }
+  });
+}
+
+// ====== TU CÓDIGO ORIGINAL (sin tocar UI) ======
+function cleanDuplicates(){
+  const unique = new Map();
+  materials.forEach(m => {
+    const key = `${m.name.trim().toLowerCase()}|${m.cat.trim().toLowerCase()}|${m.grp.trim().toLowerCase()}`;
+    if(!unique.has(key)){ unique.set(key, m); } 
+    else { const original = unique.get(key); movements.forEach(mov => { if(mov.matId === m.id) mov.matId = original.id; }); }
+  });
+  if(materials.length > unique.size){ materials = Array.from(unique.values()); saveData(); }
+}
+
+function saveData(){
+  localStorage.setItem(DB_KEY, JSON.stringify({materials,movements,categoryOrder}));
+  updateSummary();
+  scheduleFsSave(); // <<< ÚNICO CAMBIO: autosync
+}
+
+const $=id=>document.getElementById(id), uuid=()=>Math.random().toString(36).substr(2,9);
+const getStock=id=>movements.filter(m=>m.matId===id).reduce((a,m)=>m.type==='in'?a+m.qty:a-m.qty,0);
+const getStatus=m=>{ const s=getStock(m.id); return s<=0?'danger':(s<=m.min?'warn':'ok'); };
+
+/* --- SYMBOL PICKER --- */
+function toggleSym(){ $("symGrid").classList.toggle('show'); }
+function ins(txt){
+  const el = $("inpName");
+  const start = el.selectionStart; const end = el.selectionEnd; const val = el.value;
+  el.value = val.substring(0, start) + txt + val.substring(end);
+  el.selectionStart = el.selectionEnd = start + txt.length;
+  el.focus();
+}
+
+/* --- TREE & DRAG --- */
+let draggedCat = null;
+
+function renderTree(){
+  const tree=$("categoryTree"); tree.innerHTML="";
+  let cats=[...new Set(materials.map(m=>m.cat))];
+  
+  cats.sort((a,b) => {
+    let ia = categoryOrder.indexOf(a); let ib = categoryOrder.indexOf(b);
+    if(ia === -1) ia = 9999; if(ib === -1) ib = 9999;
+    if(ia === ib) return a.localeCompare(b);
+    return ia - ib;
+  });
+
+  if(cats.length !== categoryOrder.length || !cats.every((c,i)=>c===categoryOrder[i])){ categoryOrder = [...cats]; saveData(); }
+
+  if(cats.length===0){ tree.innerHTML=`<div style="padding:10px;color:var(--muted);font-size:13px;">Sin datos.</div>`; return; }
+
+  cats.forEach(cat=>{
+    const div=document.createElement("div"); 
+    div.className="tree-cat";
+    div.draggable = true;
+    div.dataset.cat = cat;
+    div.addEventListener('dragstart', handleCatDragStart);
+    div.addEventListener('dragover', handleCatDragOver);
+    div.addEventListener('dragleave', handleCatDragLeave);
+    div.addEventListener('drop', handleCatDrop);
+    div.addEventListener('dragend', handleCatDragEnd);
+
+    const row=document.createElement("div"); row.className="tree-cat-row";
+    row.innerHTML=`<div class="tree-cat-content"><span>⬢ ${cat}</span> <span class="tree-arrow">›</span></div> <div class="row-actions"><span class="act-icon edit" title="Renombrar">✎</span><span class="act-icon del" title="Borrar">🗑</span><span class="act-icon print" title="Imprimir Categoría">🖨</span></div>`;
+    
+    row.onclick=(e)=>{
+      if(e.target.classList.contains('edit')){ e.stopPropagation(); renameCategory(cat); return; }
+      if(e.target.classList.contains('del')){ e.stopPropagation(); deleteCategory(cat); return; }
+      if(e.target.classList.contains('print')){ e.stopPropagation(); printCategory(cat); return; }
+      document.querySelectorAll(".tree-cat").forEach(el=>{ if(el!==div) el.classList.remove("open"); });
+      const willOpen = div.classList.toggle("open");
+      document.querySelectorAll(".tree-cat-row").forEach(b=>b.classList.remove("open-state"));
+      if(willOpen){ row.classList.add("open-state"); filterBy(null, null); document.querySelectorAll(".active").forEach(el=>el.classList.remove("active")); } 
+      else { if(currentFilter.cat === cat){ filterBy(null, null); document.querySelectorAll(".active").forEach(el=>el.classList.remove("active")); } }
+    };
+
+    const list=document.createElement("div"); list.className="tree-group-list";
+    const btnAll=document.createElement("div"); btnAll.className="tree-group-row tree-sub-all";
+    btnAll.innerHTML=`<span>👁 Ver todo ${cat}</span>`;
+    btnAll.onclick=(e)=>{ e.stopPropagation(); filterBy(cat,null); markActive(btnAll); };
+    list.appendChild(btnAll);
+
+    [...new Set(materials.filter(m=>m.cat===cat).map(m=>m.grp))].sort().forEach(grp=>{
+      const bG=document.createElement("div"); bG.className="tree-group-row";
+      bG.innerHTML=`<span>• ${grp}</span> <div class="row-actions"><span class="act-icon edit" title="Renombrar">✎</span><span class="act-icon del" title="Borrar">🗑</span></div>`;
+      bG.onclick=(e)=>{ 
+        if(e.target.classList.contains('edit')){ e.stopPropagation(); renameGroup(cat, grp); return; }
+        if(e.target.classList.contains('del')){ e.stopPropagation(); deleteGroup(cat, grp); return; }
+        e.stopPropagation(); 
+        if(currentFilter.cat===cat && currentFilter.grp===grp){ filterBy(null, null); document.querySelectorAll(".active").forEach(el=>el.classList.remove("active")); }
+        else { filterBy(cat,grp); markActive(bG); }
+      };
+      list.appendChild(bG);
+    });
+    div.appendChild(row); div.appendChild(list); tree.appendChild(div);
+  });
+}
+function markActive(el){ document.querySelectorAll(".tree-group-row").forEach(b=>b.classList.remove("active")); el.classList.add("active"); }
+function handleCatDragStart(e) { e.stopPropagation(); draggedCat = this.dataset.cat; this.classList.add('dragging-cat'); e.dataTransfer.effectAllowed = 'move'; }
+function handleCatDragOver(e) { e.preventDefault(); e.stopPropagation(); this.classList.add('drag-over-cat'); e.dataTransfer.dropEffect = 'move'; }
+function handleCatDragLeave(e) { this.classList.remove('drag-over-cat'); }
+function handleCatDragEnd(e) { this.classList.remove('dragging-cat'); document.querySelectorAll('.drag-over-cat').forEach(el => el.classList.remove('drag-over-cat')); draggedCat = null; }
+function handleCatDrop(e) { e.stopPropagation(); const targetCat = this.dataset.cat; if(draggedCat && draggedCat !== targetCat) { const fromIdx = categoryOrder.indexOf(draggedCat); const toIdx = categoryOrder.indexOf(targetCat); if(fromIdx > -1 && toIdx > -1) { const [item] = categoryOrder.splice(fromIdx, 1); categoryOrder.splice(toIdx, 0, item); saveData(); renderTree(); } } return false; }
+
+function printCategory(cat){
+  const rawItems = materials.filter(m => m.cat === cat);
+  if(rawItems.length === 0) return toast("Categoría vacía");
+  const uniqueItems = []; const seenNames = new Set();
+  rawItems.forEach(item => { const n = item.name.trim().toLowerCase(); if(!seenNames.has(n)){ seenNames.add(n); uniqueItems.push(item); } });
+  const isIron = cat.toLowerCase().includes("hierro") || cat.toLowerCase().includes("perfil");
+  let headerExtra = isIron ? `<div class="p-checks"><div class="p-chk"><div class="p-box"></div> Galvanizado</div><div class="p-chk"><div class="p-box"></div> Negro</div></div>` : `<div class="p-subtitle">Control de unidades consumidas</div>`;
+  let html = `<div class="p-header"><div class="p-title"><h1>Hoja de Control</h1><h2>${cat}</h2>${headerExtra}</div><div class="p-meta"><div>ORDEN: <span class="p-line"></span></div><div style="margin-top:4px;">FECHA: <span class="p-line"></span></div><div style="margin-top:4px;">OPERARIO: <span class="p-line"></span></div></div></div><table class="p-table">`;
+  uniqueItems.forEach(m => { html += `<tr class="p-row"><td class="p-cell-name">${m.name} <span>${m.unit}</span></td><td><div class="p-cell-grid">${Array.from({length:20}, (_,i)=> `<div class="p-cb">${i+1}</div>`).join('')}</div></td><td class="p-cell-tot"><span class="tot-label">TOT</span><span class="tot-line"></span></td></tr>`; });
+  html += `</table><div class="p-footer"><div class="p-f-col">Observaciones / Material Adicional</div><div class="p-f-col" style="border:none"><div style="border-top:1px solid #000;padding-top:4px;">Firma</div></div></div>`;
+  $("printArea").innerHTML = html; window.print();
+}
+
+/* --- GRID & DRAG DROP --- */
+let draggedId = null;
+function renderGrid(){
+  const grid=$("grid"), s=$("searchInput").value.toLowerCase();
+  grid.innerHTML = ""; 
+  const clean=!currentFilter.cat && !currentFilter.grp && !currentFilter.status && !s;
+  if(clean){ grid.innerHTML=`<div class="clean-slate"><div style="font-size:40px;margin-bottom:10px;">👋</div><h2>Panel de Control</h2><p>Selecciona una categoría o revisa las alertas.</p></div>`; return; }
+  const f=materials.filter(m=>{
+    const txt=!s || (m.name.toLowerCase().includes(s)||m.grp.toLowerCase().includes(s));
+    let tree=true; if(currentFilter.cat && m.cat!==currentFilter.cat) tree=false; if(currentFilter.grp && m.grp!==currentFilter.grp) tree=false;
+    let st=true; if(currentFilter.status){ const x=getStatus(m); if(currentFilter.status!==x) st=false; }
+    return txt&&tree&&st;
+  });
+  if(f.length===0){ grid.innerHTML=`<div class="clean-slate">Sin resultados.</div>`; return; }
+  
+  f.forEach(m=>{
+    const stk=getStock(m.id), st=getStatus(m);
+    const cls=st==='danger'?'st-danger':(st==='warn'?'st-warn':'st-ok'), txt=st==='danger'?'AGOTADO':(st==='warn'?'BAJO':'OK');
+    const c=document.createElement("div"); c.className="card"; c.draggable = true; c.dataset.id = m.id;
+    c.addEventListener('dragstart', handleDragStart); c.addEventListener('dragover', handleDragOver); c.addEventListener('dragleave', handleDragLeave); c.addEventListener('drop', handleDrop); c.addEventListener('dragend', handleDragEnd);
+    
+    c.innerHTML=`<div class="card-top"><div class="card-titles"><h3>${m.name}</h3><span>${m.cat} > ${m.grp}</span></div><div class="stock-badge ${cls}">${txt}</div></div>
+    <div class="qty-box" onclick="openMove('${m.id}','in')" title="Clic para ajuste manual"><div><span class="qty-val">${stk}</span><span class="qty-unit">${m.unit}</span></div><div class="qty-min">Min: ${m.min}</div></div>
+    <div class="actions"><button class="btn-act sub" onclick="quickMov(event, '${m.id}','out')">－</button><button class="btn-act add" onclick="quickMov(event, '${m.id}','in')">＋</button><button class="btn-act" onclick="editMaterial('${m.id}')" style="max-width:40px">⚙️</button></div>`;
+    grid.appendChild(c);
+  });
+}
+
+function handleDragStart(e) { draggedId = this.dataset.id; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); }
+function handleDragLeave(e) { this.classList.remove('drag-over'); }
+function handleDragEnd(e) { this.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); }
+function handleDrop(e) { e.stopPropagation(); const targetId = this.dataset.id; if(draggedId && draggedId !== targetId) { const fromIndex = materials.findIndex(m => m.id === draggedId); const toIndex = materials.findIndex(m => m.id === targetId); if(fromIndex > -1 && toIndex > -1){ const [item] = materials.splice(fromIndex, 1); materials.splice(toIndex, 0, item); saveData(); renderGrid(); } } return false; }
+
+function updateSummary(){
+  let c={ok:0,warn:0,danger:0}; materials.forEach(m=>c[getStatus(m)]++);
+  $("sumTotal").textContent=materials.length; $("sumOk").textContent=c.ok; $("sumLow").textContent=c.warn; $("sumZero").textContent=c.danger;
+  document.querySelectorAll(".pill").forEach(p=>p.classList.remove("active-filter"));
+  if(currentFilter.status==="ok")$("pillOk").classList.add("active-filter");
+  if(currentFilter.status==="warn")$("pillWarn").classList.add("active-filter");
+  if(currentFilter.status==="danger")$("pillZero").classList.add("active-filter");
+}
+function filterBy(c,g){ currentFilter={cat:c,grp:g,status:null}; renderGrid(); updateSummary(); }
+function filterByStatus(s){
+  if(currentFilter.status===s && s!==null) s=null;
+  currentFilter={cat:null,grp:null,status:s};
+  document.querySelectorAll(".tree-cat").forEach(e=>e.classList.remove("open"));
+  document.querySelectorAll(".active").forEach(e=>e.classList.remove("active"));
+  renderGrid(); updateSummary();
+}
+function checkAlerts(){ const u=localStorage.getItem(SNOOZE_KEY); if(u && new Date()<new Date(u)) return; let p=0; materials.forEach(m=>{if(getStatus(m)!=='ok')p++}); if(p>0){ $("alertMsg").textContent=`Atención: ${p} problemas.`; $("alertPanel").classList.add("show"); } }
+function dismissAlert(){ $("alertPanel").classList.remove("show"); }
+function snoozeAlert(){ const d=parseInt($("snoozeDays").value); if(!d||d<1)return; const f=new Date(); f.setDate(f.getDate()+d); localStorage.setItem(SNOOZE_KEY,f.toISOString()); $("alertPanel").classList.remove("show"); toast(`Pospuesto ${d} días.`); }
+
+/* --- ACTIONS --- */
+let edId=null, movId=null, movT=null;
+function openMaterialModal(){ edId=null; $("modalTitle").textContent="Nuevo"; $("btnDeleteMat").style.display="none"; $("inpName").value=""; $("inpUnit").value=""; $("inpMin").value=""; popSel(); $("modalMaterial").classList.add("show"); }
+function editMaterial(id){ const m=materials.find(x=>x.id===id); if(!m)return; edId=id; $("modalTitle").textContent="Editar"; $("btnDeleteMat").style.display="block"; popSel(m.cat,m.grp); $("inpName").value=m.name; $("inpUnit").value=m.unit; $("inpMin").value=m.min; $("modalMaterial").classList.add("show"); }
+
+function saveMaterial(){
+  const btn = $("btnSaveMat"); if(btn.disabled) return;
+  const c=$("inpCatSelect").value, g=$("inpGrpSelect").value, n=$("inpName").value.trim(), u=$("inpUnit").value, m=parseInt($("inpMin").value)||0;
+  if(!c||!g||!n||!u) return alert("Completa los datos");
+  const existing = materials.find(mat => mat.cat===c && mat.grp===g && mat.name.toLowerCase()===n.toLowerCase() && mat.id !== edId);
+  if(existing) return alert("Ya existe un material con ese nombre en este grupo.");
+  btn.disabled = true;
+  if(edId){ const i=materials.findIndex(x=>x.id===edId); materials[i]={...materials[i],cat:c,grp:g,name:n,unit:u,min:m}; }
+  else{ materials.push({id:uuid(),cat:c,grp:g,name:n,unit:u,min:m}); }
+  saveData(); renderTree(); renderGrid(); closeModal('modalMaterial'); toast("Guardado"); setTimeout(checkAlerts,500); setTimeout(()=> btn.disabled = false, 500);
+}
+
+function popSel(sc,sg){
+  const cats=[...new Set(materials.map(m=>m.cat))].sort();
+  $("inpCatSelect").innerHTML=`<option value="" disabled ${!sc?'selected':''}>Select</option>`+cats.map(c=>`<option value="${c}" ${c===sc?'selected':''}>${c}</option>`).join("");
+  const c=$("inpCatSelect").value;
+  const grps=c?[...new Set(materials.filter(m=>m.cat===c).map(m=>m.grp))].sort():[];
+  $("inpGrpSelect").innerHTML=`<option value="" disabled ${!sg?'selected':''}>Select</option>`+grps.map(g=>`<option value="${g}" ${g===sg?'selected':''}>${g}</option>`).join("");
+}
+function syncCat(el){ popSel(el.value,null); }
+function promptNew(t){ const v=prompt("Nuevo nombre:"); if(v){ const s=$(t==='cat'?"inpCatSelect":"inpGrpSelect"), o=document.createElement("option"); o.value=v; o.text=v; o.selected=true; s.appendChild(o); } }
+
+// Accion rapida desde botones
+function quickMov(e, id, t){
+  e.stopPropagation();
+  const m = materials.find(x=>x.id===id);
+  if(!m) return;
+  if(t==='out' && getStock(id) <= 0){ toast("⛔ El stock ya es 0"); return; }
+
+  movements.push({id:uuid(),matId:id,type:t,qty:1,date:new Date().toISOString()});
+  saveData(); 
+  renderGrid(); 
+  checkAlerts();
+  toast(t==='in' ? `+1 ${m.name}` : `-1 ${m.name}`);
+}
+
+// Ajuste manual
+function openMove(id,t){ movId=id; movT=t; $("moveTitle").textContent="Ajuste Manual"; $("moveSub").textContent=materials.find(x=>x.id===id).name; $("moveQty").value=""; $("modalMove").classList.add("show"); setTimeout(()=>$("moveQty").focus(),100); $("moveQty").onkeydown=(e)=>{if(e.key==="Enter")confMov()}; $("btnConfirmMove").onclick=confMov; }
+
+function confMov(){
+  let valRaw = $("moveQty").value, q = parseFloat(valRaw);
+  if(!valRaw || isNaN(q) || q === 0){ toast("Indica una cantidad válida"); $("moveQty").focus(); return; }
+  let type = q > 0 ? 'in' : 'out'; 
+  q = Math.abs(q);
+  if(type==='out' && q>getStock(movId)){ if(!confirm("⚠ El stock quedará en NEGATIVO.\n¿Continuar?")) return; }
+  movements.push({id:uuid(),matId:movId,type:type,qty:q,date:new Date().toISOString()});
+  saveData(); renderGrid(); closeModal('modalMove'); toast("Ajuste registrado"); checkAlerts();
+}
+
+function renameCategory(oldName){
+  const newName = prompt("Nuevo nombre:", oldName);
+  if(newName && newName !== oldName){ materials.forEach(m => { if(m.cat === oldName) m.cat = newName; }); saveData(); renderTree(); renderGrid(); toast("Renombrado"); }
+}
+function renameGroup(cat, oldName){
+  const newName = prompt("Nuevo nombre:", oldName);
+  if(newName && newName !== oldName){ materials.forEach(m => { if(m.cat === cat && m.grp === oldName) m.grp = newName; }); saveData(); renderTree(); renderGrid(); toast("Renombrado"); }
+}
+function deleteCategory(cat){ if(confirm(`⚠ ¿Borrar categoría "${cat}" y todo su contenido?`)){ materials = materials.filter(m=>m.cat!==cat); saveData(); renderTree(); if(currentFilter.cat===cat) filterBy(null,null); else renderGrid(); toast("Borrado"); } }
+function deleteGroup(cat, grp){ if(confirm(`⚠ ¿Borrar grupo "${grp}" y sus materiales?`)){ materials = materials.filter(m=> !(m.cat===cat && m.grp===grp)); saveData(); renderTree(); if(currentFilter.cat===cat && currentFilter.grp===grp) filterBy(null,null); else renderGrid(); toast("Borrado"); } }
+function deleteMaterial(){ if(!edId) return; if(confirm(`¿Borrar material?`)){ materials = materials.filter(x=>x.id!==edId); saveData(); renderTree(); renderGrid(); closeModal('modalMaterial'); toast("Eliminado"); } }
+
+function closeModal(id){ $(id).classList.remove("show"); }
+$("searchInput").addEventListener("input", renderGrid);
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("visible"); setTimeout(()=>t.classList.remove("visible"),3000); }
+
+// ARRANQUE: con sync
+initWithSync();
+</script>
 
 <script>
 /* ========= AUTO CLOUD SYNC (FULL LOCALSTORAGE) - COMPAT =========
