@@ -1970,5 +1970,229 @@ async function init(){
 init();
 </script>
 
+
+<script>
+/* ========= AUTO CLOUD SYNC (FULL LOCALSTORAGE) - COMPAT =========
+   - Login anónimo si existe auth
+   - Last-Write-Wins por 'rev' en backups/backup_main
+*/
+(function(){
+  const DOC_ID = "backup_main";
+  const REV_KEY = "__cloud_backup_rev";
+  const CID_KEY = "__cloud_client_id";
+  const DEBOUNCE_MS = 2500;
+
+  let applyingRemote = false;
+  let timer = null;
+  let currentRev = Number(localStorage.getItem(REV_KEY) || "0") || 0;
+
+  function getClientId(){
+    let cid = localStorage.getItem(CID_KEY);
+    if(!cid){
+      cid = "cid_" + Math.random().toString(16).slice(2) + "_" + Date.now();
+      localStorage.setItem(CID_KEY, cid);
+    }
+    return cid;
+  }
+
+  function fbReady(){
+    return (window.firebase && firebase.apps && firebase.apps.length);
+  }
+
+  function ensureFb(){
+    if(!window.firebase) return false;
+    // si ya hay init, ok
+    if(firebase.apps && firebase.apps.length) return true;
+    // si el html tiene firebaseConfig global, inicializamos
+    try{
+      if(window.firebaseConfig) firebase.initializeApp(window.firebaseConfig);
+      return true;
+    }catch(e){
+      console.warn("AutoSync: no se pudo inicializar firebase", e);
+      return false;
+    }
+  }
+
+  async function ensureAuth(){
+    try{
+      if(!firebase.auth) return;
+      const auth = firebase.auth();
+      if(!auth.currentUser){
+        await auth.signInAnonymously();
+      }
+    }catch(e){
+      // si reglas permiten sin auth, no bloqueamos
+    }
+  }
+
+  async function backupAll(reason){
+    try{
+      const db = firebase.firestore();
+      const cid = getClientId();
+      const all = {};
+      for(let i=0;i<localStorage.length;i++){
+        const k = localStorage.key(i);
+        all[k] = localStorage.getItem(k);
+      }
+      const json = JSON.stringify(all);
+      const CHUNK = 800000;
+      const total = Math.ceil(json.length / CHUNK);
+      const rev = Date.now();
+
+      const metaRef = db.collection("backups").doc(DOC_ID);
+      await metaRef.set({
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        rev: rev,
+        updatedBy: cid,
+        reason: String(reason||""),
+        totalChunks: total,
+        totalBytes: json.length,
+        totalKeys: Object.keys(all).length
+      }, { merge: true });
+
+      const chunksCol = metaRef.collection("chunks");
+      const batch = db.batch();
+      for(let i=0;i<total;i++){
+        const part = json.slice(i*CHUNK, (i+1)*CHUNK);
+        const cRef = chunksCol.doc(String(i));
+        batch.set(cRef, { i, part });
+      }
+      await batch.commit();
+
+      currentRev = rev;
+      localStorage.setItem(REV_KEY, String(rev));
+    }catch(e){
+      console.warn("❌ AutoSync backup error:", e);
+    }
+  }
+
+  async function restoreAll(){
+    const db = firebase.firestore();
+    const metaRef = db.collection("backups").doc(DOC_ID);
+    const metaSnap = await metaRef.get();
+    if(!metaSnap.exists) return;
+    const meta = metaSnap.data() || {};
+    const total = meta.totalChunks || 0;
+    if(!total) return;
+
+    let json = "";
+    for(let i=0;i<total;i++){
+      const cSnap = await metaRef.collection("chunks").doc(String(i)).get();
+      if(!cSnap.exists) throw new Error("Falta chunk " + i);
+      json += (cSnap.data().part || "");
+    }
+    const all = JSON.parse(json);
+    localStorage.clear();
+    for(const k in all) localStorage.setItem(k, all[k]);
+    currentRev = Number(meta.rev || Date.now());
+    localStorage.setItem(REV_KEY, String(currentRev));
+  }
+
+  function schedule(reason){
+    if(applyingRemote) return;
+    clearTimeout(timer);
+    timer = setTimeout(()=>backupAll(reason), DEBOUNCE_MS);
+  }
+
+  function hookStorage(){
+    const _setItem = localStorage.setItem.bind(localStorage);
+    const _removeItem = localStorage.removeItem.bind(localStorage);
+    const _clear = localStorage.clear.bind(localStorage);
+
+    localStorage.setItem = function(k,v){
+      const r=_setItem(k,v);
+      if(k!==REV_KEY && k!==CID_KEY) schedule("setItem");
+      return r;
+    };
+    localStorage.removeItem = function(k){
+      const r=_removeItem(k);
+      if(k!==REV_KEY && k!==CID_KEY) schedule("removeItem");
+      return r;
+    };
+    localStorage.clear = function(){
+      const r=_clear();
+      schedule("clear");
+      return r;
+    };
+    window.addEventListener("storage", (ev)=>{
+      if(!ev) return;
+      if(ev.key===REV_KEY || ev.key===CID_KEY) return;
+      schedule("storage_event");
+    });
+  }
+
+  function isLocalEmpty(){
+    let n=0;
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k===REV_KEY || k===CID_KEY) continue;
+      n++;
+      if(n>0) break;
+    }
+    return n===0;
+  }
+
+  async function boot(){
+    if(!ensureFb()) return;
+    await ensureAuth();
+    hookStorage();
+
+    const db = firebase.firestore();
+    const cid = getClientId();
+    const metaRef = db.collection("backups").doc(DOC_ID);
+
+    // restore inicial si local vacío
+    if(isLocalEmpty()){
+      try{
+        const metaSnap = await metaRef.get();
+        if(metaSnap.exists){
+          const meta = metaSnap.data() || {};
+          const rev = Number(meta.rev||0)||0;
+          if(rev > currentRev){
+            applyingRemote = true;
+            await restoreAll();
+            // recargar para rehidratar UI
+            setTimeout(()=>location.reload(), 250);
+          }
+        }
+      }catch(e){}
+      finally{ applyingRemote = false; }
+    }
+
+    // listener remoto continuo
+    metaRef.onSnapshot(async (snap)=>{
+      if(!snap.exists) return;
+      const meta = snap.data() || {};
+      const rev = Number(meta.rev||0)||0;
+      const updatedBy = String(meta.updatedBy||"");
+      if(rev <= currentRev) return;
+      if(updatedBy && updatedBy===cid) return;
+
+      applyingRemote = true;
+      try{
+        await restoreAll();
+        setTimeout(()=>location.reload(), 250);
+      }catch(e){
+        console.warn("❌ AutoSync restore error:", e);
+      }finally{
+        applyingRemote = false;
+      }
+    });
+
+    // primer backup para crear doc si no existe
+    setTimeout(()=>schedule("startup"), 3500);
+  }
+
+  // arrancar cuando el resto del script haya inicializado firebaseConfig, etc.
+  const iv = setInterval(()=>{
+    if(window.firebase && (window.firebaseConfig || (firebase.apps && firebase.apps.length))){
+      clearInterval(iv);
+      boot();
+    }
+  }, 500);
+})();
+</script>
+
 </body>
 </html>
