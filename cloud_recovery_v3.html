@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Recuperación Cloud (v3) • Gestión Taller</title>
+  <style>
+    :root {
+      --bg:#0b1220; --card:rgba(255,255,255,.06); --border:rgba(255,255,255,.10);
+      --txt:#e6eefc; --muted:rgba(230,238,252,.75); --accent:#3bb7ff; --warn:#ffcc66; --bad:#ff6b6b;
+    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);margin:0;padding:24px}
+    .wrap{max-width:980px;margin:0 auto}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 18px 14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    h1{margin:0 0 8px;font-size:20px}
+    p{margin:8px 0;color:var(--muted);line-height:1.35}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+    button{background:rgba(59,183,255,.12);border:1px solid rgba(59,183,255,.35);color:var(--txt);
+      border-radius:12px;padding:10px 12px;cursor:pointer;font-weight:650}
+    button.secondary{background:rgba(255,255,255,.06);border:1px solid var(--border);font-weight:600}
+    button.danger{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.40)}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(0,0,0,.20);font-size:12px;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+    .box{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(0,0,0,.18)}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word}
+    .list{max-height:360px;overflow:auto}
+    .item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .item:last-child{border-bottom:0}
+    .id{font-weight:700}
+    .meta{font-size:12px;color:var(--muted)}
+    .right{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .status-ok{color:var(--accent)}
+    .status-warn{color:var(--warn)}
+    .status-bad{color:var(--bad)}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Recuperación de datos (Firestore ⇄ navegador) — v3</h1>
+    <p>
+      Objetivo: <b>ver qué backups existen</b> en Firestore (colección <span class="pill">backups</span>), <b>descargar</b> uno a JSON y/o <b>restaurarlo</b> al <code>localStorage</code> del origen actual.
+      <br/>Esta versión evita guardar “snapshots” enormes en localStorage (para no provocar <i>quota exceeded</i>).
+    </p>
+    <div class="row">
+      <span class="pill">Estado local: <span id="localStat">—</span></span>
+      <span class="pill">Sesión: <span id="sess">—</span></span>
+      <span class="pill">Origen: <span id="origin">—</span></span>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <div class="row" style="margin-top:0">
+          <button id="btnList" class="secondary">🔎 Listar backups en Firestore</button>
+          <button id="btnDlLocal" class="secondary">💾 Descargar mi estado local actual</button>
+        </div>
+        <p class="small">
+          <b>Recomendado:</b> primero descarga tu estado local actual (por si fuese el bueno) y luego explora backups.
+        </p>
+        <div class="box list" style="padding:0">
+          <div id="list" class="mono" style="padding:10px;color:var(--muted)">Pulsa “Listar backups”.</div>
+        </div>
+      </div>
+
+      <div class="box">
+        <p class="small" style="margin-top:0">
+          <b>Restaurar</b> escribe en el <code>localStorage</code> del origen actual:
+          <span class="pill">ldh_db</span>, <span class="pill">taller_stock_v3_data</span>, <span class="pill">link_map_v1</span>.
+        </p>
+        <div class="row">
+          <button id="btnPreview" class="secondary" disabled>👁️ Ver resumen del backup seleccionado</button>
+          <button id="btnDownload" disabled>⬇️ Descargar backup seleccionado</button>
+          <button id="btnRestore" class="danger" disabled>⬅️ Restaurar backup seleccionado</button>
+        </div>
+        <div class="box mono" id="preview" style="min-height:220px;color:var(--muted)">Selecciona un backup de la lista.</div>
+        <p class="small" style="margin-bottom:0">
+          Nota: los <b>conceptos</b> viven dentro de <code>ldh_db.concepts</code> y alimentan los selectores. (Ver código: render de selectores con <code>this.state.concepts</code>). 
+        </p>
+      </div>
+    </div>
+
+    <div class="box" style="margin-top:12px">
+      <div class="mono" id="log" style="color:var(--muted)">Listo.</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+  import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const LS = window.localStorage;
+  const $ = (id)=>document.getElementById(id);
+
+  const log = (msg, cls="")=>{
+    const el = $("log");
+    const ts = new Date().toLocaleString();
+    el.textContent = `[${ts}] ${msg}`;
+    el.className = "mono " + cls;
+  };
+
+  $("origin").textContent = location.origin || "(file://)";
+  $("localStat").textContent = (()=>{
+    try{
+      const has = !!LS.getItem("ldh_db");
+      const kb = Math.round((LS.getItem("ldh_db")||"").length/1024);
+      return has ? `ldh_db: OK (~${kb} KB)` : "ldh_db: VACÍO";
+    }catch(e){
+      return "localStorage inaccesible";
+    }
+  })();
+
+  let uid = null;
+  onAuthStateChanged(auth, (u)=>{
+    if(u){
+      uid = u.uid;
+      $("sess").textContent = uid;
+      log("Auth OK. UID: " + uid, "status-ok");
+    } else {
+      $("sess").textContent = "—";
+    }
+  });
+
+  try{ await signInAnonymously(auth); }
+  catch(e){ log("ERROR auth: " + (e?.message||e), "status-bad"); }
+
+  let backupsIndex = []; // [{id, data}]
+  let selectedId = null;
+
+  function safeToIso(v){
+    if(!v) return "";
+    if(typeof v === "string") return v;
+    if(v.seconds){
+      try{ return new Date(v.seconds*1000).toISOString(); }catch(_){}
+    }
+    return String(v);
+  }
+
+  function summarizeBackupData(d){
+    const out = [];
+    const ldh = d?.ldh_db || d?.ldh || d?.LDH || null;
+    const stock = d?.taller_stock_v3_data || d?.stock || null;
+    const lm = d?.link_map_v1 || d?.linkMap || null;
+
+    if(ldh){
+      try{
+        const dbj = (typeof ldh === "string") ? JSON.parse(ldh) : ldh;
+        const concepts = Array.isArray(dbj?.concepts) ? dbj.concepts.length : 0;
+        const deliveries = Array.isArray(dbj?.deliveries) ? dbj.deliveries.length : 0;
+        const trabajos = Array.isArray(dbj?.trabajos) ? dbj.trabajos.length : 0;
+        out.push(`LDH: concepts=${concepts}  deliveries=${deliveries}  trabajos=${trabajos}`);
+      }catch(e){ out.push("LDH: (no se pudo parsear)"); }
+    } else out.push("LDH: (no presente en este backup)");
+
+    if(stock){
+      try{
+        const st = (typeof stock === "string") ? JSON.parse(stock) : stock;
+        const mats = Array.isArray(st?.materials) ? st.materials.length : 0;
+        const movs = Array.isArray(st?.movements) ? st.movements.length : 0;
+        out.push(`STOCK: materials=${mats}  movements=${movs}`);
+      }catch(e){ out.push("STOCK: (no se pudo parsear)"); }
+    } else out.push("STOCK: (no presente en este backup)");
+
+    if(lm){
+      try{
+        const lmj = (typeof lm === "string") ? JSON.parse(lm) : lm;
+        out.push(`LINKMAP: claves=${Object.keys(lmj||{}).length}`);
+      }catch(e){ out.push("LINKMAP: (no se pudo parsear)"); }
+    } else out.push("LINKMAP: (no presente en este backup)");
+
+    return out.join("\n");
+  }
+
+  function renderList(){
+    const host = $("list");
+    if(!backupsIndex.length){
+      host.innerHTML = '<div style="padding:10px">No se encontraron documentos en <b>backups</b>.</div>';
+      return;
+    }
+    host.innerHTML = backupsIndex.map(b=>{
+      const sel = (b.id === selectedId);
+      const upd = safeToIso(b.data?.updatedAt || b.data?.ts || b.data?.timestamp || b.data?.date);
+      let size = 0;
+      try{ size = Math.round(JSON.stringify(b.data||{}).length/1024); }catch(_){}
+      return `
+        <div class="item" style="background:${sel ? 'rgba(59,183,255,.08)' : 'transparent'}">
+          <div>
+            <div class="id">${b.id}</div>
+            <div class="meta">updatedAt: ${upd || "—"} · ~${size} KB</div>
+          </div>
+          <div class="right">
+            <button class="secondary small" data-id="${b.id}">${sel ? "Seleccionado" : "Seleccionar"}</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    host.querySelectorAll("button[data-id]").forEach(btn=>{
+      btn.addEventListener("click", ()=>selectBackup(btn.dataset.id));
+    });
+  }
+
+  async function listBackups(){
+    log("Listando backups…");
+    backupsIndex = [];
+    selectedId = null;
+    $("btnPreview").disabled = true;
+    $("btnDownload").disabled = true;
+    $("btnRestore").disabled = true;
+    $("preview").textContent = "Selecciona un backup de la lista.";
+
+    try{
+      const snap = await getDocs(collection(db, "backups"));
+      snap.forEach(docu=>{
+        backupsIndex.push({ id: docu.id, data: docu.data() });
+      });
+      backupsIndex.sort((a,b)=>{
+        const ta = a.data?.updatedAt?.seconds ? a.data.updatedAt.seconds*1000 : (Number(a.data?.ts)||Number(a.data?.timestamp)||0);
+        const tb = b.data?.updatedAt?.seconds ? b.data.updatedAt.seconds*1000 : (Number(b.data?.ts)||Number(b.data?.timestamp)||0);
+        return tb - ta;
+      });
+      renderList();
+      log(`OK. Encontrados ${backupsIndex.length} backups.`, "status-ok");
+    }catch(e){
+      log("ERROR listando backups: " + (e?.message||e), "status-bad");
+      $("list").textContent = (e?.stack||e?.message||String(e));
+    }
+  }
+
+  function selectBackup(id){
+    selectedId = id;
+    renderList();
+    $("btnPreview").disabled = false;
+    $("btnDownload").disabled = false;
+    $("btnRestore").disabled = false;
+    $("preview").textContent = "Pulsa “Ver resumen del backup seleccionado”…";
+    log("Seleccionado: " + id, "status-ok");
+  }
+
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
+  $("btnDlLocal").addEventListener("click", ()=>{
+    try{
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        origin: location.origin || "file://",
+        ldh_db: LS.getItem("ldh_db"),
+        taller_stock_v3_data: LS.getItem("taller_stock_v3_data"),
+        link_map_v1: LS.getItem("link_map_v1"),
+      };
+      downloadText("local_export_" + Date.now() + ".json", JSON.stringify(payload, null, 2));
+      log("Descargado estado local actual.", "status-ok");
+    }catch(e){
+      log("ERROR descargando local: " + (e?.message||e), "status-bad");
+    }
+  });
+
+  $("btnList").addEventListener("click", listBackups);
+
+  $("btnPreview").addEventListener("click", ()=>{
+    if(!selectedId) return;
+    const b = backupsIndex.find(x=>x.id===selectedId);
+    if(!b) return;
+    $("preview").textContent = summarizeBackupData(b.data) + "\n\n⚠️ Si este resumen muestra pocos conceptos, ese backup es incompleto.";
+  });
+
+  $("btnDownload").addEventListener("click", ()=>{
+    if(!selectedId) return;
+    const b = backupsIndex.find(x=>x.id===selectedId);
+    if(!b) return;
+    downloadText("backup_" + selectedId + "_" + Date.now() + ".json", JSON.stringify(b.data, null, 2));
+    log("Descargado backup " + selectedId, "status-ok");
+  });
+
+  $("btnRestore").addEventListener("click", ()=>{
+    if(!selectedId) return;
+    const b = backupsIndex.find(x=>x.id===selectedId);
+    if(!b) return;
+
+    if(!confirm("Esto sobrescribirá el localStorage de ESTE origen.\n\nAntes, ¿has descargado tu estado local actual?")) return;
+
+    // Descarga automática del local actual como “antes de restaurar”
+    try{
+      const before = {
+        exportedAt: new Date().toISOString(),
+        note: "auto-before-restore",
+        origin: location.origin || "file://",
+        ldh_db: LS.getItem("ldh_db"),
+        taller_stock_v3_data: LS.getItem("taller_stock_v3_data"),
+        link_map_v1: LS.getItem("link_map_v1"),
+      };
+      downloadText("before_restore_" + Date.now() + ".json", JSON.stringify(before, null, 2));
+    }catch(_){}
+
+    try{
+      const d = b.data || {};
+      const ldh = d.ldh_db || d.ldh || d.LDH || null;
+      const stock = d.taller_stock_v3_data || d.stock || null;
+      const lm = d.link_map_v1 || d.linkMap || null;
+
+      if(ldh!==null) LS.setItem("ldh_db", (typeof ldh === "string") ? ldh : JSON.stringify(ldh));
+      if(stock!==null) LS.setItem("taller_stock_v3_data", (typeof stock === "string") ? stock : JSON.stringify(stock));
+      if(lm!==null) LS.setItem("link_map_v1", (typeof lm === "string") ? lm : JSON.stringify(lm));
+
+      $("localStat").textContent = (()=>{
+        try{
+          const has = !!LS.getItem("ldh_db");
+          const kb = Math.round((LS.getItem("ldh_db")||"").length/1024);
+          return has ? `ldh_db: OK (~${kb} KB)` : "ldh_db: VACÍO";
+        }catch(e){
+          return "localStorage inaccesible";
+        }
+      })();
+
+      $("preview").textContent = summarizeBackupData(d) + "\n\n✅ Restaurado. Abre ahora index.html del mismo origen.";
+      log("Restauración completada.", "status-ok");
+    }catch(e){
+      log("ERROR restaurando: " + (e?.message||e), "status-bad");
+    }
+  });
+</script>
+</body>
+</html>
