@@ -1,206 +1,255 @@
-// cloud_sync.js (lightweight) - fixes missing 404 and renders deliveries lists from localStorage (TallerFlowDB)
-// This file is intentionally dependency-free and safe to load in any module page.
+/* cloud_sync.js (v2) - TallerFlowDB deliveries renderer + basic workflow actions
+   - Reads localStorage key "TallerFlowDB"
+   - Renders "fichas" (cards) for deliveries with basic actions (add delivery qty, set total, delete)
+   - Does NOT depend on Firestore; purely local so it works on GitHub Pages.
+*/
+(function(){
+  'use strict';
 
-(function () {
-  "use strict";
+  const LS_KEY = 'TallerFlowDB';
 
-  function safeParseJSON(s, fallback) {
-    try { return JSON.parse(s); } catch (e) { return fallback; }
+  function loadDB(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}') || {}; }
+    catch(e){ console.warn('[cloud_sync] DB parse error', e); return {}; }
+  }
+  function saveDB(db){
+    localStorage.setItem(LS_KEY, JSON.stringify(db||{}));
   }
 
-  function getDB() {
-    return safeParseJSON(localStorage.getItem("TallerFlowDB") || "{}", {});
+  function sumDelivered(d){
+    const hist = Array.isArray(d?.history) ? d.history : [];
+    return hist.reduce((a,x)=>a + (Number(x?.qty)||0), 0);
+  }
+  function normalize(d){
+    const total = Number(d?.total)||0;
+    const delivered = sumDelivered(d);
+    const pending = Math.max(0, total - delivered);
+    const pct = total>0 ? Math.round((delivered/total)*100) : 0;
+    let stage = 'prep';
+    if (total>0 && delivered>=total) stage = 'entregado';
+    else if (delivered>0) stage = 'fab'; // in production/ongoing
+    // If you later store explicit stage, prefer it:
+    if (d?.stage && typeof d.stage === 'string') stage = d.stage;
+    return { total, delivered, pending, pct, stage };
   }
 
-  function getDeliveries(db) {
-    db = db || getDB();
-    const a = Array.isArray(db.deliveries) ? db.deliveries : [];
-    const b = Array.isArray(db.state && db.state.deliveries) ? db.state.deliveries : [];
-    // Prefer db.deliveries (richer), but merge by ref if both exist.
-    const byRef = new Map();
-    for (const it of b) if (it && it.ref) byRef.set(it.ref, it);
-    for (const it of a) {
-      if (!it || !it.ref) continue;
-      const prev = byRef.get(it.ref) || {};
-      byRef.set(it.ref, Object.assign({}, prev, it));
+  function el(tag, attrs={}, children=[]){
+    const n = document.createElement(tag);
+    for (const [k,v] of Object.entries(attrs||{})){
+      if (k === 'class') n.className = v;
+      else if (k === 'style') n.setAttribute('style', v);
+      else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+      else if (v !== undefined && v !== null) n.setAttribute(k, String(v));
     }
-    return Array.from(byRef.values());
+    for (const c of children){
+      if (c === null || c === undefined) continue;
+      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    }
+    return n;
   }
 
-  function stageFromFlow(flow) {
-    // Choose the "current" stage as the one with progress between 0 and 100 and not completed,
-    // falling back to highest non-100 stage.
-    if (!flow || typeof flow !== "object") return "prep";
-    const order = ["prep", "fab", "pintura", "almacen", "entregado"];
-    // If there is no "prep" key in flow, treat "fab" start as after prep.
-    let best = null;
-    for (const k of order) {
-      const v = Number(flow[k]);
-      if (!Number.isFinite(v)) continue;
-      if (v >= 0 && v < 100) { best = k; break; }
-    }
-    if (!best) {
-      // pick last stage that isn't 100
-      for (const k of order) {
-        const v = Number(flow[k]);
-        if (Number.isFinite(v) && v !== 100) best = k;
-      }
-    }
-    return best || "prep";
+  function findMainPanel(){
+    // Try to locate the existing "Pedidos en curso" panel to insert our UI into.
+    const headers = [...document.querySelectorAll('h1,h2,h3,div,span,p')];
+    const hit = headers.find(x => (x.textContent||'').trim().toLowerCase() === 'pedidos en curso');
+    if (hit) return hit.closest('div') || hit.parentElement;
+    // fallback: first big container under body
+    return document.body;
   }
 
-  function formatDate(d) {
-    if (!d) return "";
-    // expects YYYY-MM-DD
-    return String(d);
-  }
-
-  function pctBar(flow) {
-    const keys = ["fab", "pintura", "almacen", "entregado"];
-    const parts = keys.map(k => {
-      const v = flow && typeof flow === "object" ? Number(flow[k]) : NaN;
-      return `<span style="display:inline-block;min-width:72px;margin-right:10px;opacity:.9">${k}: <b>${Number.isFinite(v)?v:0}%</b></span>`;
-    }).join("");
-    return `<div style="margin-top:6px;font-size:12px">${parts}</div>`;
-  }
-
-  function ensureRender() {
-    const db = getDB();
-    const deliveries = getDeliveries(db);
-
-    // Only render if page has the "Pedidos en curso" section (preparacion/fabricacion/almacen/entregados)
-    const bodyText = (document.body && document.body.innerText) ? document.body.innerText : "";
-    const isLikelyWorkflows = /Pedidos en curso|Preparación|Fabricación|Almac[eé]n|Entregad/i.test(bodyText);
-
-    if (!isLikelyWorkflows) return;
-
-    // Try to find container near heading "Pedidos en curso"
-    let anchor = null;
-    const all = Array.from(document.querySelectorAll("*"));
-    for (const el of all) {
-      const t = (el.textContent || "").trim();
-      if (t === "Pedidos en curso" || t.startsWith("Pedidos en curso")) { anchor = el; break; }
-    }
-
-    // Create/replace a list container
-    let host = document.getElementById("cloudSyncDeliveriesList");
-    if (!host) {
-      host = document.createElement("div");
-      host.id = "cloudSyncDeliveriesList";
-      host.style.marginTop = "12px";
-      host.style.padding = "10px";
-      host.style.borderRadius = "12px";
-      host.style.background = "rgba(0,0,0,.18)";
-      host.style.backdropFilter = "blur(4px)";
-      host.style.border = "1px solid rgba(255,255,255,.08)";
-      host.style.maxWidth = "900px";
-      host.style.width = "calc(100% - 24px)";
-      host.style.boxSizing = "border-box";
-      host.style.color = "#eaf2ff";
-      host.style.fontFamily = "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-    } else {
-      host.innerHTML = "";
-    }
-
-    const title = document.createElement("div");
-    title.style.display = "flex";
-    title.style.justifyContent = "space-between";
-    title.style.alignItems = "center";
-    title.style.marginBottom = "8px";
-    title.innerHTML = `<div style="font-weight:700">Pedidos (desde TallerFlowDB)</div>
-      <div style="font-size:12px;opacity:.8">deliveries: <b>${deliveries.length}</b></div>`;
-    host.appendChild(title);
-
-    if (!deliveries.length) {
-      const empty = document.createElement("div");
-      empty.style.opacity = ".85";
-      empty.textContent = "No hay deliveries en TallerFlowDB.deliveries.";
-      host.appendChild(empty);
-    } else {
-      // Render cards
-      const list = document.createElement("div");
-      list.style.display = "grid";
-      list.style.gridTemplateColumns = "1fr";
-      list.style.gap = "10px";
-
-      const stageWanted = (document.title || "").toLowerCase().includes("fabric") ? "fab"
-        : (document.title || "").toLowerCase().includes("almac") ? "almacen"
-        : (document.title || "").toLowerCase().includes("entreg") ? "entregado"
-        : "prep";
-
-      const filtered = deliveries.filter(d => stageFromFlow(d.flow) === stageWanted || stageWanted === "prep");
-      // If filtering removes everything, show all to avoid "empty" confusion.
-      const finalList = filtered.length ? filtered : deliveries;
-
-      for (const d of finalList) {
-        const card = document.createElement("div");
-        card.style.padding = "10px 12px";
-        card.style.borderRadius = "12px";
-        card.style.border = "1px solid rgba(255,255,255,.08)";
-        card.style.background = "rgba(0,0,0,.20)";
-        const ref = d.ref || "(sin ref)";
-        const concept = d.concept || "";
-        const company = d.company || "";
-        const datePed = formatDate(d.datePed);
-        const datePrev = formatDate(d.datePrev);
-        const total = (d.total != null) ? d.total : "";
-        const stage = stageFromFlow(d.flow);
-
-        card.innerHTML = `
-          <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <div>
-              <div style="font-weight:800;font-size:14px">${ref} <span style="opacity:.75;font-weight:600">· ${concept}</span></div>
-              <div style="font-size:12px;opacity:.85;margin-top:2px">
-                <span style="margin-right:10px">Empresa: <b>${company || "-"}</b></span>
-                <span style="margin-right:10px">Pedido: <b>${datePed || "-"}</b></span>
-                <span style="margin-right:10px">Prev: <b>${datePrev || "-"}</b></span>
-                <span>Total: <b>${total || "-"}</b></span>
-              </div>
-              ${pctBar(d.flow || {})}
-            </div>
-            <div style="text-align:right;min-width:120px">
-              <div style="font-size:12px;opacity:.8">Etapa</div>
-              <div style="font-weight:800">${stage}</div>
-            </div>
-          </div>
-        `;
-        list.appendChild(card);
-      }
-      host.appendChild(list);
-    }
-
-    // Insert into DOM: after anchor's parent block if possible
-    if (anchor) {
-      // walk up a bit to find a block-level container
-      let p = anchor;
-      for (let i = 0; i < 6 && p && p.parentElement; i++) {
-        if (p.tagName === "DIV" && (p.className || "").toString().includes("panel")) break;
-        p = p.parentElement;
-      }
-      (p && p.parentElement ? p.parentElement : document.body).appendChild(host);
-    } else {
-      document.body.appendChild(host);
-    }
-
-    // Remove the "No hay pedidos..." message if present
-    for (const el of Array.from(document.querySelectorAll("*"))) {
-      const t = (el.textContent || "").trim();
-      if (/No hay pedidos/i.test(t)) {
-        // keep headings/buttons; remove only plain text nodes blocks
-        if (el.children.length === 0 && t.length < 80) el.textContent = "";
-      }
+  function hideEmptyMessage(panel){
+    const nodes = panel ? panel.querySelectorAll('*') : [];
+    for (const n of nodes){
+      const t = (n.textContent||'').trim().toLowerCase();
+      if (t.includes('no hay pedidos en preparación')) n.style.display = 'none';
     }
   }
 
-  // Expose helpers for debugging
+  function render(){
+    const db = loadDB();
+    const deliveries = Array.isArray(db.deliveries) ? db.deliveries : [];
+    const panel = findMainPanel();
+    hideEmptyMessage(panel);
+
+    // Remove previous mount
+    const old = document.getElementById('cloudSyncMount');
+    if (old) old.remove();
+
+    const mount = el('div', { id:'cloudSyncMount', style:'margin-top:14px;' });
+
+    // Header row: title + filters
+    const title = el('div', {style:'display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 10px;'},
+      [
+        el('div', {style:'font-weight:700;opacity:0.95;'}, [`Pedidos (fichas) — ${deliveries.length}`]),
+        el('div', {style:'display:flex;gap:8px;flex-wrap:wrap;'}, [
+          btn('Todos', ()=>setFilter('all')),
+          btn('Prep', ()=>setFilter('prep')),
+          btn('Fab', ()=>setFilter('fab')),
+          btn('Entregados', ()=>setFilter('entregado')),
+          btn('Refrescar', ()=>render()),
+        ])
+      ]
+    );
+
+    const list = el('div', {style:'display:flex;flex-direction:column;gap:10px;'});
+    mount.appendChild(title);
+    mount.appendChild(list);
+
+    // State
+    let filter = (window.__cloudSyncFilter || 'all');
+    function setFilter(f){ window.__cloudSyncFilter = f; filter = f; render(); }
+
+    const toShow = deliveries
+      .map(d => ({ d, n: normalize(d) }))
+      .filter(x => filter==='all' ? true : x.n.stage===filter);
+
+    if (toShow.length === 0){
+      list.appendChild(el('div', {style:'opacity:0.75; padding:10px;'}, ['(No hay pedidos para este filtro)']));
+    }
+
+    for (const {d,n} of toShow){
+      list.appendChild(card(d,n));
+    }
+
+    // Insert near the top of the panel
+    panel.appendChild(mount);
+  }
+
+  function btn(label, onClick){
+    return el('button', {
+      class: 'cloudSyncBtn',
+      style: `
+        padding:6px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.18);
+        background: rgba(0,0,0,0.22); color: rgba(255,255,255,0.92);
+        cursor:pointer; font-size:12px;`,
+      onclick: (e)=>{ e.preventDefault(); onClick(); }
+    }, [label]);
+  }
+
+  function card(d,n){
+    const ref = d?.ref || '(sin ref)';
+    const concept = d?.concept ? ` — ${d.concept}` : '';
+    const company = d?.company || '—';
+    const datePed = d?.datePed || '—';
+    const datePrev = d?.datePrev || '—';
+
+    const progressText = n.total>0 ? `${n.delivered}/${n.total} (${n.pct}%)` : `${n.delivered}`;
+
+    const top = el('div', {style:'display:flex;justify-content:space-between;gap:10px;align-items:flex-start;'}, [
+      el('div', {}, [
+        el('div', {style:'font-weight:700;'}, [ref, concept]),
+        el('div', {style:'opacity:0.8; font-size:12px; margin-top:2px;'}, [
+          `Empresa: ${company}   ·   Pedido: ${datePed}   ·   Prev: ${datePrev}   ·   Total: ${n.total||0}`
+        ]),
+      ]),
+      el('div', {style:'text-align:right; min-width:110px;'}, [
+        el('div', {style:'opacity:0.8;font-size:12px;'}, ['Etapa']),
+        el('div', {style:'font-weight:800; text-transform:uppercase;'}, [n.stage]),
+      ])
+    ]);
+
+    const barOuter = el('div', {style:'height:10px;border-radius:999px;background:rgba(255,255,255,0.10);overflow:hidden;margin-top:8px;'});
+    const barInner = el('div', {style:`height:100%;width:${Math.min(100,Math.max(0,n.pct))}%;background:rgba(0,160,255,0.75);`});
+    barOuter.appendChild(barInner);
+
+    const stats = el('div', {style:'display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:6px;'}, [
+      el('div', {style:'opacity:0.85;font-size:12px;'}, [`Entregado: ${progressText} · Pendiente: ${n.pending}`]),
+      el('div', {style:'display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;'}, [
+        btn('+ Entrega', ()=>addEntrega(d)),
+        btn('Editar total', ()=>editTotal(d)),
+        btn('Ver notas', ()=>showNotes(d)),
+        btn('Eliminar', ()=>removeDelivery(d)),
+      ])
+    ]);
+
+    const wrap = el('div', {
+      style: `
+        border:1px solid rgba(255,255,255,0.12);
+        border-radius:14px;
+        padding:12px 12px 10px;
+        background: rgba(0,0,0,0.18);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+      `
+    }, [top, barOuter, stats]);
+
+    return wrap;
+  }
+
+  function findIndexByRef(db, ref){
+    const arr = Array.isArray(db.deliveries) ? db.deliveries : [];
+    return arr.findIndex(x => (x?.ref||'') === ref);
+  }
+
+  function addEntrega(d){
+    const qtyStr = prompt('Cantidad entregada ahora (número):', '1');
+    if (qtyStr === null) return;
+    const qty = Number(qtyStr);
+    if (!Number.isFinite(qty) || qty<=0) return alert('Cantidad inválida');
+    const date = prompt('Fecha (YYYY-MM-DD):', new Date().toISOString().slice(0,10));
+    if (!date) return;
+
+    const db = loadDB();
+    const idx = findIndexByRef(db, d?.ref);
+    if (idx < 0) return alert('No se encontró el pedido en DB');
+    const item = db.deliveries[idx];
+    item.history = Array.isArray(item.history) ? item.history : [];
+    item.history.push({date, qty});
+    // Update flow (treat as units)
+    item.flow = item.flow || {};
+    const delivered = item.history.reduce((a,x)=>a+(Number(x?.qty)||0),0);
+    const total = Number(item.total)||0;
+    item.flow.entregado = delivered;
+    item.flow.fab = Math.max(0, total - delivered);
+    db.deliveries[idx] = item;
+    saveDB(db);
+    render();
+  }
+
+  function editTotal(d){
+    const db = loadDB();
+    const idx = findIndexByRef(db, d?.ref);
+    if (idx < 0) return alert('No se encontró el pedido en DB');
+    const item = db.deliveries[idx];
+
+    const totalStr = prompt('Nuevo TOTAL (unidades):', String(item.total ?? '0'));
+    if (totalStr === null) return;
+    const total = Number(totalStr);
+    if (!Number.isFinite(total) || total<0) return alert('Total inválido');
+
+    item.total = total;
+    const delivered = sumDelivered(item);
+    item.flow = item.flow || {};
+    item.flow.entregado = delivered;
+    item.flow.fab = Math.max(0, total - delivered);
+    db.deliveries[idx] = item;
+    saveDB(db);
+    render();
+  }
+
+  function showNotes(d){
+    const notes = d?.partialNotes || (Array.isArray(d?.history) ? d.history.map(x=>`${x.date}: ${x.qty}`).join('\n') : '');
+    alert(notes ? notes : '(sin notas)');
+  }
+
+  function removeDelivery(d){
+    if (!confirm(`Eliminar pedido "${d?.ref||''}"?`)) return;
+    const db = loadDB();
+    db.deliveries = (Array.isArray(db.deliveries) ? db.deliveries : []).filter(x => (x?.ref||'') !== (d?.ref||''));
+    saveDB(db);
+    render();
+  }
+
+  // Public API
   window.CloudSync = {
-    getDB,
-    getDeliveries: () => getDeliveries(getDB()),
+    render,
+    loadDB,
+    saveDB,
   };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", ensureRender);
+  // Auto-render on DOM ready
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', render);
   } else {
-    ensureRender();
+    render();
   }
 })();
