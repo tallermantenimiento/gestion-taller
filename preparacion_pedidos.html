@@ -156,6 +156,38 @@
   to{ filter:brightness(1.18); }
 }
 
+
+/* ==== PINTURA NO ASIGNADA: UI destacada ==== */
+.btn-paint-return{
+  font-weight: 800;
+  letter-spacing: .02em;
+  border: 2px solid rgba(255,255,255,.22);
+  background: rgba(255, 165, 0, .18);
+}
+.btn-paint-borrow{
+  font-weight: 800;
+  border: 2px solid rgba(255,255,255,.22);
+  background: rgba(0, 200, 255, .14);
+}
+
+/* Picker */
+#paintBorrowPicker{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:99999;}
+#paintBorrowPicker .pbp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65);}
+#paintBorrowPicker .pbp-card{position:relative;max-width:820px;width:92vw;max-height:80vh;overflow:auto;
+  background:rgba(25,25,28,.98);border:1px solid rgba(255,255,255,.14);border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);padding:14px 14px 10px;}
+#paintBorrowPicker .pbp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;}
+#paintBorrowPicker input, #paintBorrowPicker select{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:10px;
+  padding:8px 10px;outline:none;
+}
+#paintBorrowPicker .pbp-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:10px;}
+#paintBorrowPicker .pbp-list{width:100%;border-collapse:separate;border-spacing:0 8px;}
+#paintBorrowPicker .pbp-list td{padding:10px 10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);}
+#paintBorrowPicker .pbp-list tr td:first-child{border-radius:12px 0 0 12px;}
+#paintBorrowPicker .pbp-list tr td:last-child{border-radius:0 12px 12px 0;}
+#paintBorrowPicker .pbp-pill{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.14);font-size:12px;margin-left:6px;}
 </style>
 </head>
 <body>
@@ -405,6 +437,19 @@ window.addEventListener('storage', (ev)=>{
     }
   }catch(e){}
 });
+// ⚠️ Aviso importante (solo file://): el Stock y Preparación NO comparten localStorage si se abren como archivo.
+// Abre con http://localhost para que el stock real aparezca (si no, verás Stock: 0).
+(function(){
+  try{
+    if(location && location.protocol === 'file:'){
+      if(!sessionStorage.getItem('prep_warn_file_origin')){
+        sessionStorage.setItem('prep_warn_file_origin','1');
+        alert('⚠️ Estás abriendo el programa como archivo (file://).\n\nEn este modo, Stock y Preparación NO comparten localStorage, por eso puede salir "Stock: 0" y no vincular.\n\nSolución: abrir la carpeta con un servidor local y entrar por http://localhost (python -m http.server).');
+      }
+    }
+  }catch(e){}
+})();
+
 
 const UNASSIGNED_KEY = r => "prep_unassigned_" + r; // respaldo opcional
 
@@ -452,10 +497,300 @@ function normName(s){
     .replace(/[’'"]/g,"")
     .replace(/×/g,"x");
 }
+
+function getLineText(line){
+  try{
+    if(!line) return '';
+    const out = [];
+    const push = (v)=>{ if(v===undefined||v===null) return; const s=String(v).trim(); if(s) out.push(s); };
+
+    // Campos más habituales
+    push(line.mat); push(line.material); push(line.name); push(line.title); push(line.concepto); push(line.desc);
+    // Variantes que aparecen en fichas antiguas / otros módulos
+    push(line.descripcion); push(line.descrip); push(line.text); push(line.texto); push(line.label); push(line.tipo);
+    push(line.categoria); push(line.subcategoria); push(line.color); push(line.ral);
+
+    // Si hay objetos anidados típicos
+    if(line.item){ push(line.item.mat); push(line.item.material); push(line.item.name); push(line.item.title); push(line.item.desc); }
+    if(line.materialObj){ push(line.materialObj.name); push(line.materialObj.title); push(line.materialObj.mat); }
+
+    // Si existe info de pintura en algún subobjeto
+    if(line.pintura){ push(line.pintura.nombre); push(line.pintura.color); push(line.pintura.ral); push(line.pintura.query); }
+    if(line.paint){ push(line.paint.name); push(line.paint.color); push(line.paint.ral); push(line.paint.query); }
+
+    // Fallback: inspección genérica de strings dentro del objeto
+    try{
+      Object.keys(line).forEach(k=>{
+        const v=line[k];
+        if(typeof v==='string') push(v);
+        else if(v && typeof v==='object'){
+          // recoge strings de primer nivel del subobjeto
+          Object.keys(v).slice(0,12).forEach(kk=>{
+            const vv=v[kk];
+            if(typeof vv==='string') push(vv);
+          });
+        }
+      });
+    }catch(e){}
+
+    // Último recurso: JSON string (sirve para detectar palabras aunque no sepamos el campo)
+    if(!out.length){
+      try{ out.push(JSON.stringify(line)); }catch(e){}
+    }
+    return out.join(' | ').toLowerCase();
+  }catch(e){
+    return '';
+  }
+}
+function isPaintLine(line){
+  try{
+    const txt = getLineText(line);
+    if(!txt) return false;
+    // detecta por texto (pintura / paint / RAL) o por claves
+    if(/\bpintur\b|\bpaint\b/i.test(txt)) return true;
+    if(/\bral\s*[:#-]?\s*\d{3,4}\b/i.test(txt)) return true;
+
+    const cat = String(line && (line.cat||line.category||'') || '').toLowerCase();
+    const grp = String(line && (line.grp||line.group||line.seccion||'') || '').toLowerCase();
+    if(cat.includes('pintur') || grp.includes('pintur')) return true;
+
+    // fallback fuerte: stringify por si la ficha antigua no usa campos estándar
+    const s = (()=>{ try{return JSON.stringify(line).toLowerCase();}catch(e){return '';} })();
+    return /pintur|\bral\s*\d{3,4}/.test(s);
+  }catch(e){
+    return false;
+  }
+}
+
+/* ==== PINTURA NO ASIGNADA: Picker fuzzy con stocks por empresa ==== */
+function _norm(s){
+  return String(s||'')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
+}
+function _words(s){ return _norm(s).split(' ').filter(Boolean); }
+
+function _getAllPaintOptions(){
+  try{ loadStockLocal(); }catch(e){}
+  const mats = (typeof stockMaterials!=='undefined' && Array.isArray(stockMaterials)) ? stockMaterials : [];
+  const out = [];
+  for(const m of mats){
+    if(String(m.cat||'').toLowerCase()!=='pintura') continue;
+    const grp = String(m.grp||'').trim();
+    if(!/^pintura\s+/i.test(grp)) continue;
+    const empresa = grp.replace(/^pintura\s+/i,'').trim().toUpperCase();
+    const id = m.id || m.matId || m._id || m.key;
+    if(!id) continue;
+    out.push({
+      id, empresa,
+      name: String(m.name||'').trim(),
+      unit: m.unit || '',
+      qty: toNum(m.qty ?? m.stock ?? m.cant ?? 0),
+      _normName: _norm(m.name||'')
+    });
+  }
+  return out;
+}
+
+function _scorePaint(opt, queryWords){
+  if(queryWords.length===0) return 0;
+  let score = 0;
+  for(const w of queryWords){
+    if(opt._normName.includes(w)) score += 1;
+  }
+  // bonus si contiene 'ral' y/o dígitos
+  const q = queryWords.join(' ');
+  if(q.includes('ral') && opt._normName.includes('ral')) score += 0.5;
+  const num = q.match(/\d{3,4}/g);
+  if(num){
+    for(const n of num){
+      if(opt._normName.includes(n)) score += 1.5;
+    }
+  }
+  return score;
+}
+
+let __pbpState = { visible:false, maxQty:0, onPick:null, selectedId:null, options:[] };
+
+
+
+// === Auto-link pintura al abrir ficha (corrige fichas antiguas guardadas sin vínculo) ===
+function _autoLinkPaintLinesForCurrentPedido(){
+  const empresa = (metaActual && (metaActual.empresa||metaActual.company||metaActual.emp||'')) || '';
+  if(!empresa) return;
+  const stockData = getStockData();
+  const optsAll = _getAllPaintOptions(stockData);
+  const opts = optsAll.filter(o => String(o.empresa||'').toLowerCase() === String(empresa).toLowerCase());
+  if(!opts.length) return;
+  let changed = false;
+  (estadoMateriales||[]).forEach(line => {
+    if(!isPaintLine(line)) return;
+    if(line && line.stockLinkId) return; // ya vinculado
+    let q = String(line.paintQuery||line.color||line.ral||line.mat||line.material||line.nombre||line.name||line.title||'').trim();
+    // Fallback: fichas antiguas pueden guardar el texto en campos no estándar
+    if(!q){
+      const t = getLineText(line);
+      q = String(t||'').trim();
+    }
+    // Último recurso: extraer 'pintura ...' del stringify
+    if(!q){
+      try{
+        const s = JSON.stringify(line);
+        const mm = /\b(pintura[^"\n\r\}\],]*)/i.exec(s);
+        if(mm) q = mm[1];
+      }catch(e){}
+    }
+    if(!q) return;
+    const qw = _words(q);
+    let best = null, bestScore = 0;
+    for(const o of opts){
+      const sc = _scorePaint(o, qw);
+      if(sc > bestScore){ bestScore = sc; best = o; }
+    }
+    if(best && bestScore > 0){
+      line.stockLinkId = best.id;
+      line.stockLinkLabel = best.name;
+      line.stockLinkEmpresa = best.empresa;
+      changed = true;
+    }
+  });
+  if(changed){
+    try { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales||[])); } catch(e){}
+    // Auto-vincular líneas de pintura al abrir pedido
+  try{ autoLinkPaintLines(); }catch(e){ console.warn('autoLinkPaintLines error', e); }
+
+  renderTabla();
+  }
+}
+
+function openPaintBorrowPicker({query, maxQty, onPick}){
+  const root = document.getElementById('paintBorrowPicker');
+  if(!root) { alert('Picker de pintura no disponible.'); return; }
+
+  __pbpState.visible = true;
+  __pbpState.maxQty = maxQty;
+  __pbpState.onPick = onPick;
+  __pbpState.selectedId = null;
+  __pbpState.options = _getAllPaintOptions();
+
+  root.style.display = 'flex';
+  root.setAttribute('aria-hidden','false');
+
+  const qEl = document.getElementById('pbpQuery');
+  const qtyEl = document.getElementById('pbpQty');
+  const maxInfo = document.getElementById('pbpMaxInfo');
+  if(maxInfo) maxInfo.textContent = `Máx: ${maxQty}`;
+  if(qEl){ qEl.value = String(query||''); }
+  if(qtyEl){ qtyEl.value = String(maxQty); }
+
+  const repaint = () => {
+    const q = String(qEl?.value||'').trim();
+    const w = _words(q);
+    const scored = __pbpState.options
+      .map(o => ({...o, _score:_scorePaint(o,w)}))
+      .filter(o => w.length===0 ? true : o._score>0)
+      .sort((a,b)=> (b._score - a._score) || (a.empresa.localeCompare(b.empresa,'es',{sensitivity:'base'})) || (a.name.localeCompare(b.name,'es',{sensitivity:'base'})))
+      .slice(0, 40);
+
+    const tbl = document.getElementById('pbpTable');
+    if(!tbl) return;
+
+    let html = '';
+    if(scored.length===0){
+      html = `<tr><td style="border-radius:12px;background:rgba(255,80,80,.12);border:1px solid rgba(255,80,80,.25);">
+        No se encontraron pinturas con: <b>${q.replace(/</g,'&lt;')}</b><br>
+        Consejo: usa palabras clave (ej: <i>antracita</i>, <i>ral 7016</i>, <i>blanco</i>).
+      </td></tr>`;
+    }else{
+      html = scored.map(o=>{
+        const checked = (__pbpState.selectedId===o.id) ? 'checked' : '';
+        const qty = (Number.isFinite(o.qty) ? o.qty : 0);
+        const qtyStr = (Math.round(qty*100)/100).toString();
+        return `<tr>
+          <td style="width:36px;text-align:center;">
+            <input type="radio" name="pbpPick" value="${o.id}" ${checked}>
+          </td>
+          <td>
+            <div style="font-weight:800;">${o.name.replace(/</g,'&lt;')}</div>
+            <div style="opacity:.85;font-size:12px;margin-top:2px;">
+              <span class="pbp-pill">${o.empresa}</span>
+              <span class="pbp-pill">Stock: ${qtyStr}</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+    tbl.innerHTML = html;
+
+    // hook radios
+    tbl.querySelectorAll('input[name="pbpPick"]').forEach(r=>{
+      r.addEventListener('change', ()=>{
+        __pbpState.selectedId = r.value;
+      });
+    });
+
+    // auto-select first if none
+    if(!__pbpState.selectedId){
+      const first = tbl.querySelector('input[name="pbpPick"]');
+      if(first){
+        first.checked = true;
+        __pbpState.selectedId = first.value;
+      }
+    }
+  };
+
+  repaint();
+
+  if(qEl && !qEl.__pbpBound){
+    qEl.__pbpBound = true;
+    qEl.addEventListener('input', ()=> repaint());
+    qEl.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); document.getElementById('pbpConfirm')?.click(); }});
+  }
+
+  const close = () => {
+    __pbpState.visible = false;
+    root.style.display = 'none';
+    root.setAttribute('aria-hidden','true');
+  };
+
+  const btnClose = document.getElementById('pbpClose');
+  const btnCancel = document.getElementById('pbpCancel');
+  const btnConfirm = document.getElementById('pbpConfirm');
+  root.querySelector('.pbp-backdrop')?.addEventListener('click', close);
+
+  if(btnClose) btnClose.onclick = close;
+  if(btnCancel) btnCancel.onclick = close;
+
+  if(btnConfirm) btnConfirm.onclick = () => {
+    if(!__pbpState.selectedId){ alert('Selecciona una pintura.'); return; }
+    const pick = __pbpState.options.find(o=>o.id===__pbpState.selectedId);
+    if(!pick){ alert('Selección inválida.'); return; }
+
+    const ask = String(qtyEl?.value||'').trim();
+    let q = parseFloat(ask.replace(',', '.'));
+    if(isNaN(q) || q<=0){ alert('Cantidad inválida.'); return; }
+    if(q > __pbpState.maxQty) q = __pbpState.maxQty;
+
+    close();
+    try{ __pbpState.onPick && __pbpState.onPick(pick, q); }catch(e){ console.warn(e); }
+  };
+}
+
+
+
 function linkKeyFor(line){
   const n = normName(line.mat);
   const u = normName(line.unit || "");
-  return `${n}|${u}`;
+  let k = `${n}|${u}`;
+  // Para PINTURA, el vínculo debe ser específico por empresa receptora (evita que un pedido herede la pintura de otra empresa).
+  try{
+    if (typeof isPaintLine === "function" && isPaintLine(line)) {
+      const emp = normName((metaActual && (metaActual.empresa || metaActual.company || metaActual.emp)) || "");
+      if (emp) k += `|EMP:${emp}`;
+    }
+  }catch(e){}
+  return k;
 }
 function toNum(x){ const n = Number(x); return isNaN(n)?0:n; }
 
@@ -569,12 +904,27 @@ function devolverNoAsignadoLinea(lineIndex){
   if(qty<=0) return;
 
   // localizar material real para sumar a stock
-  const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
-  if(!check.success){
-    alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
-    return;
+  // Para préstamos (pintura de otra empresa), devolvemos DIRECTO al matId registrado
+  let matIdReturn = null;
+  let matReturn = null;
+  if(rec && rec.item && rec.item.matId){
+    matIdReturn = rec.item.matId;
+    matReturn = getMatById(matIdReturn);
+    if(!matReturn){
+      alert('No se encuentra el material de devolución en Stock (matId).');
+      return;
+    }
+  }else{
+    const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
+    if(!check.success){
+      alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
+      return;
+    }
+    matIdReturn = check.matId;
+    matReturn = check.mat;
   }
-  stockMovements.push({ id: uuid(), matId: check.matId, type:'in', qty: qty, date: new Date().toISOString(), ref: refActual, concept: metaActual.concepto||'', reason:'devolucion_no_asignado' });
+
+  stockMovements.push({ id: uuid(), matId: matIdReturn, type:'in', qty: qty, date: new Date().toISOString(), ref: refActual, concept: metaActual.concepto||'', reason:'devolucion_no_asignado' });
   saveStockLocal();
 
   // limpiar deuda en meta
@@ -589,9 +939,9 @@ function devolverNoAsignadoLinea(lineIndex){
   LS.setItem(KM(refActual), JSON.stringify(metaActual));
 
   alert(`✅ Devuelto material no asignado.
-Material: ${check.mat.name}
+Material: ${matReturn.name}
 Cantidad: ${qty}
-Stock actual: ${getStockQty(check.matId)}`);
+Stock actual: ${getStockQty(matIdReturn)}`);
   renderTabla();
   cargarLista();
 }
@@ -992,12 +1342,34 @@ function saveLinkMap(){
         if(!l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
         if(!l.linked_matId && l.matId)      l.linked_matId = l.matId;
         if(!l.linked_matId && l.stock_matId) l.linked_matId = l.stock_matId;
+
+          // Auto-link PINTURA si llega sin vínculo (usa empresa receptora del pedido)
+          try{
+            const emp = String(metaParaGuardar.empresa || metaParaGuardar.company || metaParaGuardar.emp || "").trim();
+            if(emp && isPaintLine(l) && !l.linked_matId){
+              const q = String(l.paintQuery || l.color || l.mat || l.material || l.nombre || "").trim();
+              const opts = _getAllPaintOptions(emp);
+              if(opts && opts.length){
+                let best=null, bestScore=-1;
+                for(const opt of opts){
+                  const s = _scorePaintOption(q, opt);
+                  if(s > bestScore){ bestScore = s; best = opt; }
+                }
+                if(best && bestScore > 0){
+                  l.linked_matId = best.id;
+                  l.linked_matName = best.name;
+                  l._autoLinkedPaint = true;
+                }
+              }
+            }
+          }catch(e){}
+
         return l;
       });
 
       LS.setItem(KP(ref), JSON.stringify(materialesImport));
-
-      LS.removeItem("latest_materials_v1");
+      try{ LS.setItem("prep_last_import_ref", ref); }catch(_){ }
+LS.removeItem("latest_materials_v1");
       LS.removeItem("pedido_en_preparacion");
       LS.removeItem("prep_pedido_payload");
     } catch (e) { console.error("Error importando:", e); }
@@ -1164,6 +1536,36 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
 }
 
   estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
+      // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
+      estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
+        if(!l || typeof l!=='object') return l;
+
+        // Normaliza nombres (distintos formatos: mat/material/name/title)
+        if(l.mat==null && l.material!=null) l.mat = l.material;
+        if(l.mat==null && l.name!=null) l.mat = l.name;
+        if(l.mat==null && l.title!=null) l.mat = l.title;
+        if(l.mat==null && l.concepto!=null) l.mat = l.concepto;
+
+        if(l.material==null && l.mat!=null) l.material = l.mat;
+        if(l.name==null && l.material!=null) l.name = l.material;
+
+        // Cantidades legacy
+        if(l.pedida==null && l.qty_pedida!=null) l.pedida = l.qty_pedida;
+        if(l.qty_pedida==null && l.pedida!=null) l.qty_pedida = l.pedida;
+        if(l.recibida==null && l.qty_recibida!=null) l.recibida = l.qty_recibida;
+        if(l.qty_recibida==null && l.recibida!=null) l.qty_recibida = l.recibida;
+
+        // Normaliza vínculo a Stock (distintos formatos: stockLinkId/stockId/matId/linked_matId)
+        if(l.stockLinkId==null && l.stockId!=null) l.stockLinkId = l.stockId;
+        if(l.stockLinkId==null && l.matId!=null) l.stockLinkId = l.matId;
+        if(l.stockLinkId==null && l.linked_matId!=null) l.stockLinkId = l.linked_matId;
+
+        // Mantén compatibilidad: si existe stockLinkId y falta stockId, rellénalo
+        if(l.stockId==null && l.stockLinkId!=null) l.stockId = l.stockLinkId;
+
+        return l;
+      });
+
 
   document.getElementById("ref").textContent = ref;
   document.getElementById("concepto").textContent = metaActual.concepto || "";
@@ -1249,6 +1651,14 @@ function autoCerrarSiCompletoPorRecepcion(){
 
 /* ========= VINCULACIÓN ========= */
 function getLinkedMatIdForLine(line){
+  // Para PINTURA: sólo aceptamos el vínculo que viene del Cálculo (por empresa),
+  // nunca heredamos un link global por nombre (evita que SKLUM/CREATE se crucen).
+  try{
+    if (typeof isPaintLine === "function" && isPaintLine(line)) {
+      if(line.linked_matId && getMatById(line.linked_matId)) return line.linked_matId;
+      return null;
+    }
+  }catch(e){}
   if(line.linked_matId && getMatById(line.linked_matId)) return line.linked_matId;
   const k = linkKeyFor(line);
   const rec = linkMap[k];
@@ -1279,6 +1689,8 @@ function clearLinkForLine(index){
 
 /* ========= MODAL VINCULAR ========= */
 function abrirModalVincular(index){
+  try{ if(isPaintLine(estadoMateriales[index])){ alert('La pintura no se vincula manualmente en Preparación. Debe venir vinculada desde Cálculo.'); return; } }catch(e){}
+
   linkModalCtx = { lineIndex: index, chosenMatId: null };
 
   const line = estadoMateriales[index];
@@ -1403,16 +1815,20 @@ function renderTabla() {
 
     if (falta > 0) {
       btnHtml += `<button class="btn-mini" onclick="consumirDeStock(${index})">Consumir stock (-${falta})</button>`;
-      btnHtml += `<button class="btn-mini unassigned" onclick="consumirNoAsignado(${index})">Consumir NO asignado</button>`;
+      btnHtml += isPaintLine(linea)
+        ? `<button class="btn-mini btn-paint-borrow unassigned" onclick="consumirNoAsignado(${index})">PINTURA: consumir NO asignado</button>`
+        : `<button class="btn-mini unassigned" onclick="consumirNoAsignado(${index})">Consumir NO asignado</button>`;
     }
 
     // Si existe deuda no asignada para esta línea, ofrecer devolución desde Preparación
     const uaRec = _uaFindForLine(linea);
     if(uaRec && uaRec.pending>0){
-      btnHtml += `<button class="btn-mini btn-danger" onclick="devolverNoAsignadoLinea(${index})">Devolver no asignado (+${uaRec.pending})</button>`;
+      btnHtml += isPaintLine(linea)
+        ? `<button class="btn-mini btn-paint-return" onclick="devolverNoAsignadoLinea(${index})">PINTURA NO ASIGNADA (devolver +${uaRec.pending})</button>`
+        : `<button class="btn-mini btn-danger" onclick="devolverNoAsignadoLinea(${index})">Devolver no asignado (+${uaRec.pending})</button>`;
     }
 
-    const btnVincular = `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
+    const btnVincular = isPaintLine(linea) ? `` : `<button class="btn-mini" onclick="abrirModalVincular(${index})">Vincular</button>`;
 
     const tr = document.createElement("tr");
     tr.className = rowClass;
@@ -1507,14 +1923,14 @@ function guardarLinea(index) {
     return;
   }
 
-  stockMovements.push({ id: uuid(), matId: check.matId, type: 'in', qty: diff, date: new Date().toISOString() });
+  stockMovements.push({ id: uuid(), matId: matIdReturn, type: 'in', qty: diff, date: new Date().toISOString() });
   saveStockLocal();
 
   linea.aplicado_qty = yaAplicado + diff;
   guardarEstadoLocal();
 
   const newTotal = getStockQty(check.matId);
-  alert(`✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`);
+  alert(`✅ Stock Actualizado.\nMaterial: ${matReturn.name}\nTotal: ${newTotal}`);
   renderTabla();
 }
 
@@ -1593,6 +2009,95 @@ function consumirDeStock(index){
 /* ========= CONSUMIR NO ASIGNADO (movimiento "out" + alerta) ========= */
 function consumirNoAsignado(index){
   const linea = estadoMateriales[index];
+
+  
+  // === PINTURA: préstamo desde otra empresa (NO asignado) ===
+  if(isPaintLine(linea)){
+    const pedida0 = toNum(linea.qty_pedida);
+    const recibida0 = toNum(linea.qty_recibida);
+    const falta0 = Math.max(0, pedida0 - recibida0);
+    if(falta0<=0){ alert("Esta línea ya está completa."); return; }
+
+    // Abrir selector: busca por palabras (RAL o nombre) y muestra opciones con stock y empresa.
+    openPaintBorrowPicker({
+      query: String(linea.mat||"").trim(),
+      maxQty: falta0,
+      onPick: (pick, qty) => {
+        try{ loadStockLocal(); }catch(e){}
+        const matId = pick.id || pick.matId || pick._id || pick.key;
+        if(!matId){ alert("No se pudo resolver el ID de la pintura prestada."); return; }
+
+        // ✅ Vincular esta línea al stock seleccionado (para que deje de aparecer como 'Sin vínculo')
+        try{ setLinkForLine(index, matId); }catch(e){ console.warn('setLinkForLine failed', e); }
+        try{ linea.stockLinkEmpresa = String(pick.empresa||''); linea.stockLinkLabel = String(pick.name||''); }catch(e){}
+
+        const disponible = toNum(getStockQty(matId));
+        const quedaria = disponible - qty;
+        if(quedaria < 0){
+          const deficit = Math.abs(quedaria);
+          const ok = confirm(
+            `Stock insuficiente en ${pick.empresa}.` + "\n\n" +
+            `Material: ${pick.name}` + "\n" +
+            `Disponible: ${disponible}` + "\n" +
+            `Necesario: ${qty}` + "\n\n" +
+            `Esto dejará el stock en NEGATIVO: -${deficit}` + "\n\n" +
+            `¿Confirmas consumir igualmente?`
+          );
+          if(!ok) return;
+        }
+
+        // movimiento stock (sale de empresa prestante)
+        stockMovements.push({
+          id: uuid(),
+          matId: matId,
+          type: "out",
+          qty: qty,
+          date: new Date().toISOString(),
+          ref: refActual,
+          concept: metaActual.concepto || "",
+          reason: "unassigned_borrow_paint",
+          fromEmpresa: pick.empresa
+        });
+        saveStockLocal();
+
+        // completar recepción
+        linea.qty_recibida = recibida0 + qty;
+        linea.ok = (toNum(linea.qty_recibida) >= pedida0);
+
+        // registrar deuda (guardar de dónde salió)
+        const ub = ensureUnassigned(metaActual);
+        const found = (ub.items || []).find(it => it && it.matId === matId && String(it.fromEmpresa||"")===String(pick.empresa||""));
+        if(found){
+          found.qtyPending = toNum(found.qtyPending) + qty;
+          found.lastActionAt = Date.now();
+        }else{
+          (ub.items || (ub.items=[])).push({
+            matId: matId,
+            name: pick.name,
+            unit: pick.unit || (linea.unit || ""),
+            qtyPending: qty,
+            fromEmpresa: String(pick.empresa||""),
+            createdAt: Date.now(),
+            lastActionAt: Date.now()
+          });
+        }
+        metaActual.unassignedBorrow = ub;
+        saveMetaActual();
+        guardarEstadoLocal();
+
+        alert(`⚠️ Consumida PINTURA NO ASIGNADA (préstamo).` + "\n" +
+              `Empresa prestante: ${pick.empresa}` + "\n" +
+              `Material: ${pick.name}` + "\n" +
+              `Cantidad: ${qty}` + "\n\n" +
+              `Queda pendiente devolverla a ${pick.empresa}.`);
+        updateNoAsigPill();
+        renderTabla();
+        cargarLista();
+      }
+    });
+    return;
+  }
+
 
   const pedida = toNum(linea.qty_pedida);
   const recibida = toNum(linea.qty_recibida);
@@ -2192,5 +2697,52 @@ init();
 })();
 </script>
 
-</body>
-</html>
+
+<script>
+(function(){
+  function tryOpenImported(){
+    try{
+      const r = localStorage.getItem("prep_last_import_ref");
+      if(!r) return;
+      localStorage.removeItem("prep_last_import_ref");
+      if(typeof abrirPedido === "function"){
+        abrirPedido(r);
+      }
+    }catch(e){}
+  }
+  // Espera a que el listado esté cargado
+  document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(tryOpenImported, 250);
+  });
+})();
+</script>
+
+
+<div id="paintBorrowPicker" aria-hidden="true">
+  <div class="pbp-backdrop"></div>
+  <div class="pbp-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div>
+        <div style="font-size:18px;font-weight:800;">Consumir PINTURA NO ASIGNADA</div>
+        <div id="pbpSub" style="opacity:.85;font-size:13px;margin-top:2px;">Elige empresa + pintura (búsqueda por palabras: RAL o nombre).</div>
+      </div>
+      <button class="btn" id="pbpClose">Cerrar</button>
+    </div>
+
+    <div class="pbp-row">
+      <label style="font-size:13px;opacity:.9;">Buscar:</label>
+      <input id="pbpQuery" type="text" placeholder="Ej: antracita 7016, ral 7016, blanco..." style="min-width:260px;flex:1;">
+      <label style="font-size:13px;opacity:.9;">Cantidad:</label>
+      <input id="pbpQty" type="text" style="width:110px;">
+      <span id="pbpMaxInfo" class="pbp-pill"></span>
+    </div>
+
+    <table class="pbp-list" id="pbpTable"></table>
+
+    <div class="pbp-actions">
+      <button class="btn" id="pbpCancel">Cancelar</button>
+      <button class="btn btn-primary" id="pbpConfirm">Consumir</button>
+    </div>
+  </div>
+</div>
+</body></html>
