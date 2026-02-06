@@ -1262,30 +1262,32 @@ function saveLinkMap(){
   if (snap) {
     try {
       const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
-      // UID de pedido para distinguir envíos distintos aunque compartan referencia
-      const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
-      const pedidoUid = incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
 
-      // Si ya existe un pedido con la misma referencia pero es OTRO concepto/u otro UID, no lo pisamos:
-      // generamos una referencia única con sufijo.
-      let ref = refBase;
-      const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
-      if (existsAny) {
-        let metaExist = {};
-        try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
-        const existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
-        const existConcept = String(metaExist.concepto || '').trim();
-        const incConcept = String(snap.concepto || '').trim();
-        const sameOrder = (existUid && existUid === pedidoUid);
-        const conflict = !sameOrder && ((existConcept && incConcept && existConcept !== incConcept) || !existUid || existUid !== pedidoUid);
-        if (conflict) {
-          let i = 2;
-          while (LS.getItem(KP(refBase + ' #' + i)) || LS.getItem(KM(refBase + ' #' + i))) i++;
-          ref = refBase + ' #' + i;
-        }
-      }
+// UID de pedido:
+// - Si el pedido ya existe con esa referencia, REUTILIZAMOS su UID para NO crear "#2".
+// - Si no existe, usamos el UID entrante o generamos uno nuevo.
+const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
-      let qty = encontrarNumero(snap) || 1;
+let ref = refBase;
+const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
+
+let metaExist = {};
+let existUid = "";
+if (existsAny) {
+  try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
+  existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
+}
+
+// UID FINAL: preferimos el UID existente (si lo hay), si no el entrante, si no uno nuevo.
+const pedidoUid = existUid || incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+
+// IMPORTANTE: al importar desde Cálculo queremos 1 solo pedido por referencia.
+// Si existe ya el pedido, lo sobreescribimos (NO generamos "#2").
+if (existsAny && refBase) {
+  ref = refBase;
+}
+
+let qty = encontrarNumero(snap) || 1;
 
       let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
@@ -1321,9 +1323,12 @@ function saveLinkMap(){
       const materialesImport = (materialesSrc || []).map(l => {
         if(!l || typeof l !== 'object') return l;
         // normaliza cantidades mínimas esperadas por Preparación
+        // FIX: al ENTRAR desde Cálculo, siempre arrancamos como PENDIENTE
+        l.estado = 'pendiente'; l.status = 'pendiente';
+        l.completo = false; l.done = false; l.isDone = false; l.isCompleted = false;
         if(l.qty_pedida === undefined && l.qty !== undefined) l.qty_pedida = l.qty;
-        if(l.qty_recibida === undefined) l.qty_recibida = 0;
-        if(l.aplicado_qty === undefined) l.aplicado_qty = 0;
+        l.qty_recibida = 0; // force reset on import from cálculo
+        l.aplicado_qty = 0; // force reset on import from cálculo
 
         // normaliza el vínculo a stock
         if(!l.linked_matId && l.stockMatId) l.linked_matId = l.stockMatId;
@@ -1550,7 +1555,63 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
         // Mantén compatibilidad: si existe stockLinkId y falta stockId, rellénalo
         if(l.stockId==null && l.stockLinkId!=null) l.stockId = l.stockLinkId;
 
-        return l;
+        
+  // === AUTO-VÍNCULO PINTURA (por empresa + nombre) ===
+  try{
+    const empresaPedido = String((metaActual.empresa || metaActual.company || "")).trim();
+    if(empresaPedido){
+      const norm = (s)=> String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+      const grpNeed = norm("pintura " + empresaPedido);
+      // helper: extrae nombre de pintura desde la línea "pintura — XXX"
+      const extractPaintName = (line)=>{
+        const n = String(line?.mat ?? line?.material ?? line?.name ?? "").trim();
+        const parts = n.split("—");
+        if(parts.length>=2) return parts.slice(1).join("—").trim();
+        return "";
+      };
+      const mats = (Array.isArray(stockMaterials)?stockMaterials:[]).map(m=>({
+        id: String(m.id||m._id||""),
+        name: String(m.name||m.mat||m.material||""),
+        cat: String(m.cat||""),
+        grp: String(m.grp||m.group||"")
+      })).filter(m=>m.id && norm(m.cat)==="pintura" && norm(m.grp)===grpNeed);
+
+      if(mats.length){
+        let changed = false;
+        estadoMateriales.forEach(line=>{
+          try{
+            if(typeof isPaintLine==="function" && isPaintLine(line)){
+              if(line.linked_matId && getMatById(line.linked_matId)) return;
+              const want = norm(extractPaintName(line));
+              let pick = null;
+              if(want){
+                // match fuerte por nombre normalizado
+                pick = mats.find(m=>norm(m.name)===want) || mats.find(m=>norm(m.name).includes(want) || want.includes(norm(m.name)));
+              }
+              // fallback: si hay token RAL en la línea
+              if(!pick){
+                const raw = String(extractPaintName(line)||line.mat||"");
+                const mRal = raw.match(/RAL\s*:?\s*(\d{3,5})/i);
+                if(mRal){
+                  const token = norm("ral "+mRal[1]);
+                  pick = mats.find(m=>norm(m.name).includes(token));
+                }
+              }
+              if(!pick && mats.length===1) pick = mats[0];
+              if(pick){
+                line.linked_matId = pick.id;
+                changed = true;
+              }
+            }
+          }catch(_){}
+        });
+        if(changed){
+          try{ LS.setItem(KP(ref), JSON.stringify(estadoMateriales)); }catch(_){}
+        }
+      }
+    }
+  }catch(_){}
+return l;
       });
 
 
