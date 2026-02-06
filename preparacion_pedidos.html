@@ -437,19 +437,6 @@ window.addEventListener('storage', (ev)=>{
     }
   }catch(e){}
 });
-// ⚠️ Aviso importante (solo file://): el Stock y Preparación NO comparten localStorage si se abren como archivo.
-// Abre con http://localhost para que el stock real aparezca (si no, verás Stock: 0).
-(function(){
-  try{
-    if(location && location.protocol === 'file:'){
-      if(!sessionStorage.getItem('prep_warn_file_origin')){
-        sessionStorage.setItem('prep_warn_file_origin','1');
-        alert('⚠️ Estás abriendo el programa como archivo (file://).\n\nEn este modo, Stock y Preparación NO comparten localStorage, por eso puede salir "Stock: 0" y no vincular.\n\nSolución: abrir la carpeta con un servidor local y entrar por http://localhost (python -m http.server).');
-      }
-    }
-  }catch(e){}
-})();
-
 
 const UNASSIGNED_KEY = r => "prep_unassigned_" + r; // respaldo opcional
 
@@ -586,7 +573,7 @@ function _getAllPaintOptions(){
       id, empresa,
       name: String(m.name||'').trim(),
       unit: m.unit || '',
-      qty: toNum(m.qty ?? m.stock ?? m.cant ?? 0),
+      qty: getStockQty(id),
       _normName: _norm(m.name||'')
     });
   }
@@ -2026,10 +2013,6 @@ function consumirNoAsignado(index){
         try{ loadStockLocal(); }catch(e){}
         const matId = pick.id || pick.matId || pick._id || pick.key;
         if(!matId){ alert("No se pudo resolver el ID de la pintura prestada."); return; }
-
-        // ✅ Vincular esta línea al stock seleccionado (para que deje de aparecer como 'Sin vínculo')
-        try{ setLinkForLine(index, matId); }catch(e){ console.warn('setLinkForLine failed', e); }
-        try{ linea.stockLinkEmpresa = String(pick.empresa||''); linea.stockLinkLabel = String(pick.name||''); }catch(e){}
 
         const disponible = toNum(getStockQty(matId));
         const quedaria = disponible - qty;
