@@ -405,6 +405,29 @@ a:hover, a:hover * { color: #ffffff !important; }
 .paint-list-item .btn-icon:hover{ filter: none !important; background: rgba(30,41,59,0.75) !important; }
 /* ====== FIN FIX ====== */
 </style>
+
+<style>
+/* LDH_PEND_CONFIG_DIALOG_V1 */
+#ldhPendOverlay{position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:14px;}
+#ldhPendModal{width:min(720px, 96vw);max-height:92vh;overflow:auto;background:rgba(2,6,23,.92);border:1px solid rgba(148,163,184,.20);border-radius:18px;box-shadow:0 30px 90px rgba(0,0,0,.65);padding:16px 16px 14px;}
+#ldhPendModal h3{margin:0 0 10px 0;font-size:1.15rem;}
+#ldhPendModal .sub{opacity:.85;font-size:.9rem;margin-top:2px;}
+#ldhPendModal .seg{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 12px;}
+#ldhPendModal .seg button{flex:1;min-width:160px;}
+#ldhPendModal .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#ldhPendModal .grid .full{grid-column:1 / -1;}
+#ldhPendModal .hint{opacity:.75;font-size:.85rem;margin-top:6px;line-height:1.25}
+#ldhPendModal .listTramos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;}
+#ldhPendModal .listTramos .cell{background:rgba(15,23,42,.50);border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:10px;}
+#ldhPendModal .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+#ldhPendModal .pillInfo{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid rgba(148,163,184,.22);background:rgba(15,23,42,.55);opacity:.95;font-size:.85rem;}
+#ldhPendModal .kpi{font-weight:900;}
+@media (max-width:560px){
+  #ldhPendModal .grid{grid-template-columns:1fr;}
+  #ldhPendModal .listTramos{grid-template-columns:1fr 1fr;}
+}
+</style>
+
 </head>
 <body>
 <div style="position:sticky;top:0;z-index:9999;padding:10px 12px;background:rgba(2,6,23,0.70);backdrop-filter: blur(10px);border-bottom:1px solid rgba(148,163,184,0.18);">
@@ -415,6 +438,25 @@ a:hover, a:hover * { color: #ffffff !important; }
 
 
 <div class="container">
+
+<div id="conceptInboxBox" class="card" style="margin-top:14px; display:none;">
+  <h3 style="margin:0 0 10px 0;">📥 Materiales importados (Concepto)</h3>
+  <div style="display:flex; gap:12px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:260px;">
+      <div style="font-weight:800; margin-bottom:6px;">Perfilería (arriba hasta que la bajes)</div>
+      <div id="conceptInboxPerfiles" style="font-size:13px; opacity:.95;"></div>
+    </div>
+    <div style="flex:1; min-width:260px;">
+      <div style="font-weight:800; margin-bottom:6px;">Accesorios pendientes de configurar</div>
+      <div id="conceptInboxPend" style="font-size:13px; opacity:.95;"></div>
+    </div>
+  </div>
+  <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+    <button class="btn btn-chip" id="btnPasarImportados" type="button" style="font-weight:900;">⬇️ Pasar importados a la lista</button>
+    <button class="btn" id="btnDevolverConcepto" type="button" style="font-weight:900;">↩️ Devolver factores al Concepto</button>
+    <span style="font-size:12px; opacity:.75;">Baja perfilería a la lista y devuelve Pintura (L) + Disolvente (L).</span>
+  </div>
+</div>
     <header>
         <h2>CALCULADORA DE PINTURA PRO</h2>
         <small>Gestión de Stock y Colores</small>
@@ -1044,6 +1086,563 @@ a:hover, a:hover * { color: #ffffff !important; }
     }
   };
 </script>
+
+
+<script>
+/* LDH_CONCEPT_INBOX_PATCH_V1 */
+(function(){
+  const IN_PREFIX  = 'LDH_PINTURA_IN|';
+  const OUT_PREFIX = 'LDH_PINTURA_OUT|';
+
+  function esc(s){ return String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function $(id){ return document.getElementById(id); }
+
+  function parseDimFromName(name){
+    const n = (name||'').toLowerCase();
+    let m = n.match(/(\d{2,3})\s*[x×]\s*(\d{2,3})/);
+    if(m) return { kind:'rect', a:parseFloat(m[1]), b:parseFloat(m[2]) };
+    m = n.match(/(?:ø|diam|d)\s*(\d{2,3})/);
+    if(m) return { kind:'round', d:parseFloat(m[1]) };
+    return null;
+  }
+
+  function autoAddPerfil(perfil){
+    const name = perfil?.name || '';
+    const largoMM = Number(perfil?.largoMM)||0;
+    if(!name || !largoMM) return { ok:false, reason:'missing' };
+
+    const dim = parseDimFromName(name);
+    if(!dim) return { ok:false, reason:'nodim' };
+
+    const largoM = largoMM/1000;
+    let areaItem = 0;
+    let desc = name;
+
+    if(dim.kind==='rect'){
+      const a = dim.a, b = dim.b;
+      areaItem = (((a + b) * 2) / 1000) * largoM;
+      desc = `Rect. ${a}x${b}mm`;
+    }else if(dim.kind==='round'){
+      const d = dim.d;
+      areaItem = (Math.PI * (d/1000)) * largoM;
+      desc = `Tubo Ø${d}mm`;
+    }
+
+    if(areaItem>0){
+      // listaMateriales existe en el módulo base
+      listaMateriales.push({ desc: desc, largo: largoMM, area: areaItem });
+      return { ok:true };
+    }
+    return { ok:false, reason:'calc' };
+  }
+
+  function renderInbox(info){
+    const box = $('conceptInboxBox');
+    if(!box) return;
+    box.style.display = '';
+
+    const pWrap = $('conceptInboxPerfiles');
+    const pendWrap = $('conceptInboxPend');
+
+    if(pWrap){
+      const lines = (info.perfiles||[]).map(p => `• ${esc(p.name)} — ${Number(p.largoMM)||0} mm`).join('<br>');
+      pWrap.innerHTML = lines || '<span style="opacity:.7">—</span>';
+    }
+
+    if(pendWrap){
+      if(!(info.pendientes||[]).length){
+        pendWrap.innerHTML = '<span style="opacity:.7">—</span>';
+      }else{
+        pendWrap.innerHTML = (info.pendientes||[]).map((p, idx) => {
+          return `<div style="display:flex; gap:10px; align-items:center; margin:6px 0; padding:6px 8px; border:1px solid var(--border); border-radius:10px; background:rgba(15,23,42,0.35);">
+            <div style="flex:1;"><strong>${esc(p.name)}</strong>${p.cant?` <span style="opacity:.8">x${p.cant}</span>`:''}</div>
+            <button class="btn btn-chip" type="button" data-pend-idx="${idx}">Configurar</button>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    const btnPass = $('btnPasarImportados');
+    if(btnPass){
+      const has = (info.perfiles && info.perfiles.length);
+      btnPass.disabled = !has;
+      btnPass.style.opacity = btnPass.disabled ? '0.6' : '';
+      btnPass.title = btnPass.disabled ? 'No hay perfiles arriba' : '';
+    }
+  }
+
+  function wirePendButtons(){
+    const pendWrap = $('conceptInboxPend');
+    if(!pendWrap) return;
+    pendWrap.querySelectorAll('button[data-pend-idx]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const idx = Number(btn.getAttribute('data-pend-idx'));
+        configurarPendiente(idx);
+      });
+    });
+  }
+
+  
+  
+  // --- Diálogo guiado para accesorios (chapa plana / chapa doblada / manual) ---
+  // Nota: este asistente genera/normaliza el overlay en runtime para evitar desajustes de IDs entre versiones.
+  (function(){
+    function num(v){
+      const s = String(v ?? '').trim().replace(',', '.');
+      const n = parseFloat(s);
+      return isFinite(n) ? n : 0;
+    }
+    function fmtM2(v){
+      const n = Number(v) || 0;
+      return n.toLocaleString('es-ES', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    }
+
+    const TEMPLATE_HTML = `
+      <div id="ldhPendModal" style="width:min(760px, 96vw); max-height:92vh; overflow:auto;
+           background:rgba(2,6,23,.92); border:1px solid rgba(148,163,184,.20);
+           border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,.65);
+           padding:16px 16px 14px; color:#e9eef5;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <div id="ldhPendTitle" style="font-weight:900; font-size:16px;">Configurar accesorio</div>
+            <div id="ldhPendSub" style="opacity:.8; font-size:12px; margin-top:2px;">—</div>
+          </div>
+          <button type="button" id="ldhPendClose" class="btn btn-chip" style="font-weight:900;">✖</button>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+          <button type="button" class="btn" data-ldh-tipo="chapa_plana">📄 Chapa plana</button>
+          <button type="button" class="btn" data-ldh-tipo="chapa_doblada">📐 Chapa doblada</button>
+          <button type="button" class="btn" data-ldh-tipo="manual">🧩 Otro / manual</button>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:12px;">
+          <label style="width:170px;">
+            <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Cantidad</div>
+            <input id="ldhPendCant" class="input" inputmode="numeric" value="1">
+          </label>
+          <div style="flex:1; display:flex; align-items:center; gap:10px; justify-content:flex-end; min-width:220px;">
+            <span style="font-size:12px; opacity:.8;">Superficie (2 caras):</span>
+            <span style="display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px;
+                  border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.55);">
+              <span style="opacity:.85; font-size:12px;">m²</span>
+              <b id="ldhPendArea" style="font-weight:950;">0,000</b>
+            </span>
+          </div>
+        </div>
+
+        <div id="ldhPendBody" style="margin-top:12px;">
+          <!-- contenido dinámico -->
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap;">
+          <button type="button" id="ldhPendCancel" class="btn btn-chip" style="font-weight:900;">Cancelar</button>
+          <button type="button" id="ldhPendOk" class="btn" style="font-weight:950;">✅ Añadir a la lista</button>
+        </div>
+      </div>
+    `;
+
+    function ensureOverlay(){
+      let ov = document.getElementById('ldhPendOverlay');
+      if(!ov){
+        ov = document.createElement('div');
+        ov.id = 'ldhPendOverlay';
+        document.body.appendChild(ov);
+      }
+      // Normalizar overlay (si existía markup antiguo, lo sustituimos por el actual)
+      ov.setAttribute('role','dialog');
+      ov.setAttribute('aria-modal','true');
+      ov.style.cssText = [
+        'position:fixed','inset:0','z-index:100000',
+        'background:rgba(0,0,0,.55)','backdrop-filter:blur(6px)',
+        'display:none','align-items:center','justify-content:center','padding:14px'
+      ].join(';');
+      ov.innerHTML = TEMPLATE_HTML;
+      return ov;
+    }
+
+    function setActiveTipo(ov, tipo){
+      ov.querySelectorAll('[data-ldh-tipo]').forEach(b=>{
+        const on = (b.getAttribute('data-ldh-tipo') === tipo);
+        b.style.outline = on ? '2px solid rgba(99,102,241,.65)' : '';
+        b.style.boxShadow = on ? '0 0 0 3px rgba(99,102,241,.12)' : '';
+      });
+      ov.dataset.ldhTipo = tipo;
+    }
+
+    function getTipo(ov){
+      return ov?.dataset?.ldhTipo || 'chapa_plana';
+    }
+
+    function renderBody(ov, tipo){
+      const body = ov.querySelector('#ldhPendBody');
+      if(!body) return;
+
+      if(tipo === 'chapa_plana'){
+        body.innerHTML = `
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label style="flex:1; min-width:220px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Ancho (mm)</div>
+              <input id="ldhPendA" class="input" inputmode="decimal" placeholder="Ej: 300">
+            </label>
+            <label style="flex:1; min-width:220px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Largo (mm)</div>
+              <input id="ldhPendL" class="input" inputmode="decimal" placeholder="Ej: 1200">
+            </label>
+          </div>
+          <div style="margin-top:8px; font-size:12px; opacity:.8;">Regla: <b>chapa = 2 caras</b>.</div>
+        `;
+      }else if(tipo === 'chapa_doblada'){
+        body.innerHTML = `
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label style="width:190px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Nº pliegues</div>
+              <input id="ldhPendP" class="input" inputmode="numeric" value="1">
+            </label>
+            <label style="flex:1; min-width:220px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Largo (mm)</div>
+              <input id="ldhPendL" class="input" inputmode="decimal" placeholder="Ej: 1200">
+            </label>
+          </div>
+          <div id="ldhPendTramos" style="margin-top:10px;"></div>
+          <div style="margin-top:8px; font-size:12px; opacity:.8;">Introduce el <b>desarrollo</b> por tramos (mm). Regla: <b>chapa = 2 caras</b>.</div>
+        `;
+        setTimeout(()=>syncTramos(ov), 0);
+      }else{
+        body.innerHTML = `
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label style="flex:1; min-width:260px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Descripción</div>
+              <input id="ldhPendDesc" class="input" placeholder="Ej: Accesorio manual">
+            </label>
+            <label style="width:200px;">
+              <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">m² (1 cara)</div>
+              <input id="ldhPendM2" class="input" inputmode="decimal" placeholder="Ej: 0,25">
+            </label>
+          </div>
+          <div style="margin-top:8px; font-size:12px; opacity:.8;">En manual también aplicamos <b>2 caras</b> (m²×2).</div>
+        `;
+      }
+    }
+
+    function syncTramos(ov){
+      const pEl = ov.querySelector('#ldhPendP');
+      const wrap = ov.querySelector('#ldhPendTramos');
+      if(!pEl || !wrap) return;
+
+      const p = Math.max(0, Math.floor(num(pEl.value)));
+      const n = p + 1;
+
+      let html = `<div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:6px;">Tramos del desarrollo (${n})</div>`;
+      html += `<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">`;
+      for(let i=0;i<n;i++){
+        html += `
+          <label>
+            <div style="font-weight:800; font-size:12px; opacity:.9; margin-bottom:4px;">Tramo ${i+1} (mm)</div>
+            <input class="input ldhPendT" inputmode="decimal" placeholder="Ej: 50">
+          </label>`;
+      }
+      html += `</div>`;
+      wrap.innerHTML = html;
+
+      wrap.querySelectorAll('input').forEach(inp => inp.addEventListener('input', ()=>recalcArea(ov)));
+    }
+
+    function recalcArea(ov){
+      const tipo = getTipo(ov);
+      let area1cara = 0;
+      let largoMM = 0;
+
+      if(tipo === 'chapa_plana'){
+        const a = num(ov.querySelector('#ldhPendA')?.value);
+        const l = num(ov.querySelector('#ldhPendL')?.value);
+        largoMM = l;
+        area1cara = (a/1000) * (l/1000);
+      }else if(tipo === 'chapa_doblada'){
+        const l = num(ov.querySelector('#ldhPendL')?.value);
+        largoMM = l;
+        let desarrollo = 0;
+        ov.querySelectorAll('#ldhPendTramos input.ldhPendT').forEach(inp => { desarrollo += num(inp.value); });
+        area1cara = (desarrollo/1000) * (l/1000);
+      }else{
+        area1cara = num(ov.querySelector('#ldhPendM2')?.value);
+      }
+
+      const area2caras = Math.max(0, area1cara * 2);
+      const areaEl = ov.querySelector('#ldhPendArea');
+      if(areaEl) areaEl.textContent = fmtM2(area2caras);
+
+      ov.__ldhPendDraft = { tipo, area2caras, largoMM };
+      return ov.__ldhPendDraft;
+    }
+
+    function wireDynamicInputs(ov){
+      // inputs dentro del body
+      ov.querySelectorAll('#ldhPendBody input').forEach(inp=>{
+        inp.addEventListener('input', ()=>{
+          if(inp.id === 'ldhPendP'){ syncTramos(ov); }
+          recalcArea(ov);
+        });
+      });
+      recalcArea(ov);
+    }
+
+    window.__ldhOpenPendDialog = function({idx, item, onCommit}){
+      const ov = ensureOverlay();
+
+      const title = ov.querySelector('#ldhPendTitle');
+      const sub = ov.querySelector('#ldhPendSub');
+      const cantEl = ov.querySelector('#ldhPendCant');
+
+      if(title) title.textContent = 'Configurar accesorio';
+      if(sub) sub.textContent = (item?.name ? `Pendiente: ${item.name}` : 'Pendiente');
+
+      if(cantEl){
+        const c = Number(item?.cant || item?.cantidad || 1) || 1;
+        cantEl.value = String(c);
+      }
+
+      ov.style.display = 'flex';
+      const close = ()=>{ ov.style.display='none'; };
+
+      // Cerrar
+      ov.querySelector('#ldhPendClose')?.addEventListener('click', close);
+      ov.querySelector('#ldhPendCancel')?.addEventListener('click', close);
+
+      // Click fuera (fondo) cierra
+      ov.onclick = (e)=>{ if(e.target === ov) close(); };
+
+      // Tipo
+      const setTipo = (tipo)=>{
+        setActiveTipo(ov, tipo);
+        renderBody(ov, tipo);
+        setTimeout(()=>wireDynamicInputs(ov), 0);
+      };
+
+      ov.querySelectorAll('[data-ldh-tipo]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const t = btn.getAttribute('data-ldh-tipo') || 'chapa_plana';
+          setTipo(t);
+        });
+      });
+
+      // Default
+      setTipo('chapa_plana');
+
+      // OK
+      ov.querySelector('#ldhPendOk')?.addEventListener('click', ()=>{
+        try{
+          const tipo = getTipo(ov);
+          const cant = num(cantEl?.value || 1) || 1;
+
+          const draft = recalcArea(ov);
+          const area2caras = Number(draft?.area2caras || 0);
+          const largoMM = Number(draft?.largoMM || 0);
+
+          let desc = item?.name || 'Accesorio';
+
+          if(tipo === 'chapa_plana'){
+            const a = num(ov.querySelector('#ldhPendA')?.value);
+            const l = num(ov.querySelector('#ldhPendL')?.value);
+            desc = `${desc} (chapa plana ${a}x${l} mm)`;
+          }else if(tipo === 'chapa_doblada'){
+            const p = Math.max(0, Math.floor(num(ov.querySelector('#ldhPendP')?.value)));
+            const l = num(ov.querySelector('#ldhPendL')?.value);
+            let desarrollo = 0;
+            ov.querySelectorAll('#ldhPendTramos input.ldhPendT').forEach(inp => { desarrollo += num(inp.value); });
+            desc = `${desc} (chapa doblada ${p} pliegues, desarrollo ${desarrollo} mm, largo ${l} mm)`;
+          }else{
+            const d = ov.querySelector('#ldhPendDesc')?.value?.trim();
+            if(d) desc = d;
+          }
+
+          if(!(area2caras > 0)){
+            alert('La superficie es 0. Revisa medidas.');
+            return;
+          }
+
+          close();
+          onCommit && onCommit({ desc, largoMM, area: area2caras, cant });
+        }catch(e){
+          console.warn(e);
+          alert('No se pudo guardar la configuración.');
+        }
+      });
+    };
+  })();
+
+function configurarPendiente(idx){
+    try{
+      const info = window.__conceptInbox;
+      const it = info?.pendientes?.[idx];
+      if(!it) return;
+
+      // Abrir diálogo guiado (chapa plana / chapa doblada / manual)
+      window.__ldhOpenPendDialog && window.__ldhOpenPendDialog({
+        idx,
+        item: it,
+        onCommit: (payload)=>{
+          // payload: { desc, largoMM, area, cant }
+          if(!payload) return;
+
+          const cant = Number(payload.cant)||1;
+          const areaTotal = (Number(payload.area)||0) * cant;
+
+          listaMateriales.push({
+            desc: payload.desc + (cant>1 ? ` x${cant}` : ''),
+            largo: Number(payload.largoMM||0).toLocaleString('es-ES'),
+            area: areaTotal
+          });
+
+          guardarDatosLocal();
+          try{ renderizarTabla(); }catch(e){}
+          try{ recalcularTotales(); }catch(e){}
+
+          // consumir pendiente
+          info.pendientes.splice(idx,1);
+          renderInbox(info);
+          wirePendButtons();
+        }
+      });
+    }catch(e){ console.warn(e); }
+  }
+
+  function pasarImportados(){
+    try{
+      const info = window.__conceptInbox;
+      if(!info){ alert('No hay importación activa.'); return; }
+      if(!info.perfiles || !info.perfiles.length){ alert('Ya no quedan perfiles arriba para pasar.'); return; }
+
+      let added = 0;
+      let restantes = [];
+      let skipped = [];
+
+      (info.perfiles||[]).forEach(per=>{
+        const r = autoAddPerfil(per);
+        if(r.ok) added++;
+        else { restantes.push(per); skipped.push(per.name||'(sin nombre)'); }
+      });
+
+      // consumir los que se pudieron bajar
+      info.perfiles = restantes;
+      renderInbox(info);
+      wirePendButtons();
+
+      try{ renderizarTabla(); }catch(e){}
+      try{ recalcularTotales(); }catch(e){}
+
+      if(skipped.length){
+        alert('Añadidos a la lista: ' + added
+          + '\nNo se pudieron convertir automáticamente (se quedan arriba):\n- '
+          + skipped.slice(0,12).join('\n- ')
+          + (skipped.length>12?'\n…':''));
+      }else{
+        alert('Importados añadidos a la lista: ' + added);
+      }
+    }catch(e){
+      console.warn(e);
+      alert('No se pudieron pasar los importados.');
+    }
+  }
+
+  function devolverFactores(){
+    try{
+      // Asegurar que los totales/factores están actualizados en pantalla
+      recalcularTotales();
+
+      // Leer LOS FACTORES REALES de abajo (junto a los botones "Copiar")
+      // fac-bote  = factor de botes de 4L necesarios
+      // fac-bidon = factor de bidones de 25L necesarios
+      const _toNum = (txt)=>{
+        const s = String(txt ?? '').replace(',', '.');
+        const m = s.match(/-?\d+(?:\.\d+)?/);
+        const n = m ? parseFloat(m[0]) : 0;
+        return isFinite(n) ? n : 0;
+      };
+
+      const facBote  = _toNum(document.getElementById('fac-bote')?.innerText);
+      const facBidon = _toNum(document.getElementById('fac-bidon')?.innerText);
+
+      // También enviamos los litros mostrados (por si el Concepto los usa)
+      const litrosPintura   = _toNum(document.getElementById('info-bote-litros')?.innerText);
+      const litrosDisolvente= _toNum(document.getElementById('info-bidon-litros')?.innerText);
+
+      const out = {
+        kind: 'concept_pintura_out',
+        ts: Date.now(),
+
+        // ✅ Estos son los "factores reales" que ves abajo con los botones Copiar
+        factorPintura: facBote,
+        factorDisolvente: facBidon,
+
+        // Extra (no rompe compatibilidad si el Concepto lo ignora)
+        litrosPintura,
+        litrosDisolvente
+      };
+
+      window.name = OUT_PREFIX + JSON.stringify(out);
+      window.location.href = 'index.html#config';
+    }catch(e){
+      console.error(e);
+      alert('No se pudo devolver al concepto');
+    }
+  }
+
+  function receiveInbox(){
+    try{
+      if(window.name && window.name.startsWith(IN_PREFIX)){
+        const raw = window.name.slice(IN_PREFIX.length);
+        window.name = '';
+        const info = JSON.parse(raw);
+
+        window.__conceptInbox = info;
+        renderInbox(info);
+        wirePendButtons();
+
+        // no auto-bajar; solo refrescar UI base
+        try{ renderizarTabla(); }catch(e){}
+        try{ recalcularTotales(); }catch(e){}
+      }
+    }catch(e){ console.warn(e); }
+  }
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    receiveInbox();
+    const btnPass = $('btnPasarImportados');
+    if(btnPass) btnPass.addEventListener('click', pasarImportados);
+    const btnBack = $('btnDevolverConcepto');
+    if(btnBack) btnBack.addEventListener('click', devolverFactores);
+  });
+})();
+</script>
+
+<!-- LDH_PEND_CONFIG_DIALOG_MARKUP_V1 -->
+<div id="ldhPendOverlay" role="dialog" aria-modal="true">
+  <div id="ldhPendModal">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+      <div style="flex:1;">
+        <h3>⚙️ Configurar accesorio</h3>
+        <div class="sub" id="ldhPendTitleSub">—</div>
+      </div>
+      <button class="btn" type="button" id="ldhPendCloseTop" title="Cerrar">✖</button>
+    </div>
+
+    <div class="seg" style="margin-top:12px;">
+      <button class="btn" type="button" data-ldh-tipo="chapa_plana">📄 Chapa plana</button>
+      <button class="btn" type="button" data-ldh-tipo="chapa_doblada">📐 Chapa doblada</button>
+      <button class="btn" type="button" data-ldh-tipo="otro">🧩 Otro / manual</button>
+    </div>
+
+    <div id="ldhPendBody">
+      <!-- contenido dinámico -->
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="button" id="ldhPendCancel">Cancelar</button>
+      <button class="btn" type="button" id="ldhPendOk" style="font-weight:950;">✅ Añadir a la lista</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
