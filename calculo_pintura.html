@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Pintura PRO - Decimal Punto</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📏</text></svg>">
+    
+    <style>
+        /* --- ESTILOS (Idénticos, solo ajustes funcionales) --- */
+        :root {
+            --color-corporativo: #2c3e50;
+            --color-acento: #34495e;
+            --color-fondo: #f4f6f7;
+            --color-destacado: #27ae60;
+            --color-borrar: #c0392b;
+            --color-aviso: #e67e22;
+            --color-config: #8e44ad;
+            --color-lab: #2980b9; 
+            --texto-blanco: #ffffff;
+        }
+
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--color-fondo); color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+
+        header { background-color: var(--color-corporativo); color: var(--texto-blanco); padding: 20px; text-align: center; position: relative; }
+        .print-header { display: none; } 
+        .btn-limpiar { position: absolute; right: 20px; top: 25px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); color: white; font-size: 0.8em; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+        .panel { padding: 25px; }
+        .config-box { background-color: #fff8e1; border-left: 5px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .custom-material-box { background-color: #e8f8f5; border: 1px solid #d1f2eb; border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; }
+        .paint-config-box { background-color: #f4ecf7; border: 1px solid #e8daef; border-radius: 8px; padding: 10px 15px; margin-bottom: 25px; }
+        .backup-box { background-color: #ebf5fb; border: 1px solid #d6eaf8; border-radius: 8px; padding: 10px 15px; margin-bottom: 25px; margin-top: 30px; border-left: 5px solid #3498db; }
+
+        .custom-header { font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;}
+        .custom-header.green { color: var(--color-destacado); }
+        .custom-header.purple { color: var(--color-config); }
+        .custom-header.blue { color: var(--color-lab); font-size: 0.9em; margin-top: 10px;}
+        .custom-form { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+        
+        .input-group { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+        .row { display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end; }
+        .col { flex: 1; min-width: 140px; }
+        
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9em; color: var(--color-corporativo); }
+        input[type="text"], select, input[type="number"] { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        input:focus { border-color: var(--color-corporativo); outline: none; }
+        .hidden { display: none; }
+        
+        button { cursor: pointer; border: none; font-weight: bold; transition: 0.2s; border-radius: 4px; }
+        button.add-btn { background-color: var(--color-acento); color: var(--texto-blanco); padding: 12px; width: 100%; margin-top: 15px; font-size: 1em; text-transform: uppercase; }
+        button.save-btn { color: white; padding: 8px; width: 100%; margin-top: 5px; font-size: 0.9em; }
+        button.calib-btn { background-color: var(--color-lab); color: white; padding: 8px; width: 100%; margin-top: 10px; }
+        
+        .bg-green { background-color: var(--color-destacado); }
+        .bg-purple { background-color: var(--color-config); }
+        
+        .btn-backup { padding: 8px 15px; color: white; font-size: 0.9em; margin-right: 10px; }
+        .bg-export { background-color: #2980b9; }
+        .bg-import { background-color: #27ae60; }
+        
+        button.btn-icon { background-color: white; border: 1px solid #ccc; padding: 4px 8px; font-size: 0.9em; margin-left: 5px; color: #555; }
+        button.btn-icon:hover { background-color: #eee; }
+        button.btn-cancel { background-color: #95a5a6; color: white; padding: 8px; width: 100%; margin-top: 5px; font-size: 0.9em; display: none; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 25px; font-size: 0.95em; }
+        thead { background-color: var(--color-corporativo); color: white; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .text-right { text-align: right; }
+        
+        .results-section { margin-top: 30px; background-color: #eafaf1; padding: 20px; border-radius: 6px; border: 1px solid #d5f5e3; }
+        .results-header { color: var(--color-destacado); margin-top: 0; border-bottom: 2px solid var(--color-destacado); padding-bottom: 10px; margin-bottom: 15px;}
+        .res-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.1em; }
+        .big-total { font-size: 1.4em; color: var(--color-corporativo); border-top: 2px dashed #ccc; padding-top: 15px; margin-top: 15px; font-weight: 800; }
+
+        .val-container { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+        .btn-copy { background-color: #f8f9fa; border: 1px solid #ccc; color: #555; font-size: 0.75em; padding: 5px 10px; border-radius: 4px; text-transform: uppercase; }
+        .btn-print { background-color: var(--color-corporativo); color: white; padding: 15px; width: 100%; margin-top: 20px; font-size: 1.2em; display: flex; justify-content: center; align-items: center; gap: 10px; }
+        
+        .stock-info { margin-top: 20px; background: white; padding: 15px; border-radius: 6px; border-left: 5px solid var(--color-corporativo); font-size: 0.95em; color: #555; }
+        .stock-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 1.1em; }
+        .paint-list-item { display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px; border-bottom: 1px solid #eee; font-size: 0.9em; }
+        .info-litros { font-weight: bold; color: #333; margin-right: 10px; font-size: 1em; }
+
+        .calibrator-box { margin-top: 15px; border-top: 1px dashed #aaa; padding-top: 10px; display: none; background-color: #eaf2f8; padding: 10px; border-radius: 5px; border-left: 4px solid var(--color-lab); }
+
+        @media print {
+            body { background-color: white; -webkit-print-color-adjust: exact; padding: 0; }
+            .container { box-shadow: none; max-width: 100%; margin: 0; border: none; }
+            .input-group, .custom-material-box, .paint-config-box, .btn-print, .btn-delete, .btn-icon, .btn-limpiar, .btn-copy, .add-btn, header h2, header small, .save-btn, .btn-cancel, .backup-box { display: none !important; }
+            .config-box { border: none; background: none; padding: 0; margin-bottom: 20px; justify-content: flex-start; }
+            header { background-color: white; color: black; border-bottom: 2px solid black; padding: 10px 0; text-align: left; }
+            .print-header { display: block; }
+            .print-header h1 { font-size: 1.8em; margin: 0; color: #333; }
+            .print-header p { margin: 5px 0 0 0; color: #666; font-size: 0.9em; }
+            table { border: 1px solid #ccc; width: 100%; margin-top: 20px; }
+            thead { background-color: #eee !important; color: black !important; border-bottom: 2px solid #333; }
+            th, td { border: 1px solid #ddd; padding: 8px; }
+            .results-section { border: 2px solid #333; background-color: white !important; margin-top: 30px; }
+            .stock-info { border: 1px solid #ccc; border-left: 5px solid #333; }
+            .print-footer { display: block !important; margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px; display: flex; justify-content: space-between; }
+        }
+        .print-footer { display: none; }
+    </style>
+<style>
+/* ====== TEMA CORPORATIVO (heredado de index base) ====== */
+:root {
+        /* Paleta Antracita & Acero */
+        --sidebar-bg: #0f172a;      /* Antracita oscuro */
+        --sidebar-hover: #1e293b;   /* Antracita medio */
+        --sidebar-text: #f1f5f9;    /* Blanco humo */
+
+        --bg-main: #f8fafc;         /* Fondo muy claro */
+        --card-bg: #ffffff;
+
+        --primary: #334155;         /* Antracita azulado (Botones principales) */
+        --primary-hover: #475569;
+
+        --accent: #0ea5e9;          /* Azul eléctrico suave para detalles */
+        --border: #e2e8f0;
+
+        --success: #10b981;         /* Verde éxito */
+        --warning: #f59e0b;         /* Naranja aviso */
+        --danger: #ef4444;          /* Rojo peligro */
+
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+
+        --radius: 8px;
+        --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+    }
+
+/* Fondo general oscuro como el programa */
+html, body {
+  background: radial-gradient(1200px 800px at 20% 10%, rgba(56,189,248,0.10), transparent 55%),
+              radial-gradient(900px 700px at 80% 20%, rgba(59,130,246,0.10), transparent 55%),
+              linear-gradient(135deg, #050b16 0%, #0b1223 45%, #050b16 100%) !important;
+  color: var(--sidebar-text, #f1f5f9) !important;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important;
+}
+
+/* Contenedores tipo card */
+.card, .panel, .container, .box, .section, .wrap, .content, .main, .layout {
+  background: rgba(2, 6, 23, 0.55) !important;
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Inputs y selects */
+input, select, textarea {
+  background: rgba(15, 23, 42, 0.72) !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  border-radius: 12px !important;
+  outline: none !important;
+}
+input::placeholder, textarea::placeholder {
+  color: rgba(203, 213, 225, 0.65) !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(14, 165, 233, 0.60) !important;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18) !important;
+}
+
+/* Autofill (Chrome) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f1f5f9 !important;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px rgba(15,23,42,0.92) inset !important;
+}
+
+/* Botones */
+button, .btn, input[type="button"], input[type="submit"] {
+  background: linear-gradient(180deg, rgba(56,189,248,0.22), rgba(14,165,233,0.10)) !important;
+  color: #e0f2fe !important;
+  border: 1px solid rgba(56,189,248,0.35) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.30) !important;
+  padding: 10px 14px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+}
+button:hover, .btn:hover, input[type="button"]:hover, input[type="submit"]:hover {
+  filter: brightness(1.08);
+}
+button:active, .btn:active {
+  transform: translateY(1px);
+}
+
+/* Tablas/listados */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(2, 6, 23, 0.35) !important;
+  border: 1px solid rgba(148,163,184,0.14) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+th, td {
+  border-bottom: 1px solid rgba(148,163,184,0.12) !important;
+  color: #e2e8f0 !important;
+}
+th {
+  background: rgba(15,23,42,0.85) !important;
+  font-weight: 900 !important;
+}
+tr:nth-child(even) td {
+  background: rgba(15,23,42,0.35) !important;
+}
+
+/* Modales */
+.modal, .dialog, .popup, [role="dialog"] {
+  background: rgba(2, 6, 23, 0.92) !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.55) !important;
+}
+/* Headers */
+h1, h2, h3, h4, label {
+  color: #f1f5f9 !important;
+}
+small, .muted, .hint {
+  color: rgba(203,213,225,0.72) !important;
+}
+/* ====== FIN TEMA CORPORATIVO ====== */
+</style>
+<style>
+/* ====== AJUSTE FINO: menos chillón + más compacto ====== */
+:root{
+  /* acentos más sobrios */
+  --accent-soft: rgba(148,163,184,0.22);
+  --accent-border: rgba(148,163,184,0.28);
+  --accent-text: rgba(226,232,240,0.92);
+}
+
+/* Escala general más compacta */
+html{ font-size: 14px; }
+body{ line-height: 1.25; }
+h1{ font-size: 1.35rem !important; }
+h2{ font-size: 1.15rem !important; }
+h3{ font-size: 1.05rem !important; }
+label{ font-size: 0.92rem !important; }
+small, .muted, .hint{ font-size: 0.85rem !important; }
+
+/* Cards más compactas */
+.card, .panel, .container, .box, .section, .wrap, .content, .main, .layout{
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+}
+
+/* Inputs/Selects más compactos */
+input, select, textarea{
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+/* Botones: menos azul, más sobrio + compactos */
+button, .btn, input[type="button"], input[type="submit"]{
+  background: rgba(15,23,42,0.65) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid var(--accent-border) !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.25) !important;
+  padding: 8px 12px !important;
+  font-weight: 800 !important;
+}
+button:hover, .btn:hover, input[type="button"]:hover, input[type="submit"]:hover{
+  background: rgba(30,41,59,0.75) !important;
+  border-color: rgba(226,232,240,0.22) !important;
+  filter: none !important;
+}
+
+/* Si el módulo tiene botones con clases "primary"/"accent"/"blue", neutralízalos */
+.primary, .accent, .btn-primary, .btn-accent, .btn-blue, .blue, .ok, .success{
+  background: rgba(15,23,42,0.65) !important;
+  border-color: rgba(148,163,184,0.28) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Chips/píldoras: quitar colores chillones */
+.pill, .badge, .chip{
+  background: rgba(148,163,184,0.14) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: rgba(226,232,240,0.92) !important;
+}
+
+/* Tablas más sobrias */
+th{
+  background: rgba(15,23,42,0.92) !important;
+}
+tr:nth-child(even) td{
+  background: rgba(15,23,42,0.28) !important;
+}
+
+/* Enlaces */
+a{ color: rgba(226,232,240,0.92) !important; }
+a:hover{ color: #ffffff !important; }
+
+/* ====== FIN AJUSTE FINO ====== */
+</style>
+<style>
+/* ====== FIX CONTRASTE TEXTOS (headers/boxes del módulo) ====== */
+/* Quitar fondos claros heredados del módulo y llevarlos al estilo corporativo */
+.backup-box, .config-box, .paint-config-box, .custom-material-box, .calibrator-box {
+  background: rgba(2, 6, 23, 0.55) !important;
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Encabezados de secciones (antes púrpura/verde) */
+.custom-header,
+.custom-header.purple,
+.custom-header.green,
+.results-header,
+.stock-header {
+  background: rgba(15, 23, 42, 0.78) !important;
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  color: #f1f5f9 !important;
+}
+.custom-header * ,
+.results-header *,
+.stock-header * {
+  color: #f1f5f9 !important;
+}
+
+/* Formularios internos */
+.custom-form, .row, .col {
+  color: #f1f5f9 !important;
+}
+.custom-form label,
+.paint-config-box label,
+.custom-material-box label,
+.config-box label {
+  color: rgba(226,232,240,0.95) !important;
+}
+
+/* Textos auxiliares que venían en gris #555/#666 con estilo inline */
+.backup-box [style*="color:#666"],
+.backup-box [style*="color: #666"],
+.backup-box [style*="color:#555"],
+.backup-box [style*="color: #555"],
+.paint-config-box [style*="color:#666"],
+.paint-config-box [style*="color: #666"],
+.paint-config-box [style*="color:#555"],
+.paint-config-box [style*="color: #555"],
+.custom-material-box [style*="color:#666"],
+.custom-material-box [style*="color: #666"],
+.custom-material-box [style*="color:#555"],
+.custom-material-box [style*="color: #555"]{
+  color: rgba(203,213,225,0.80) !important;
+}
+
+/* Links tipo "CALCÚLALO AQUÍ" */
+a, a * { color: rgba(226,232,240,0.95) !important; }
+a:hover, a:hover * { color: #ffffff !important; }
+
+/* Inputs dentro de estos boxes: asegurar texto visible */
+.backup-box input, .backup-box select,
+.paint-config-box input, .paint-config-box select,
+.custom-material-box input, .custom-material-box select,
+.calibrator-box input, .calibrator-box select {
+  color: #f1f5f9 !important;
+  background: rgba(15,23,42,0.72) !important;
+}
+
+/* Botones pequeños de edición/borrar dentro de listas */
+.paint-config-box button, .custom-material-box button {
+  background: rgba(15,23,42,0.65) !important;
+  border-color: rgba(148,163,184,0.28) !important;
+  color: #e2e8f0 !important;
+}
+/* ====== FIN FIX CONTRASTE ====== */
+</style>
+<style>
+/* ====== FIX: Pinturas Guardadas visibles en tema oscuro ====== */
+#listaPinturasContainer{
+  border: 1px solid rgba(148,163,184,0.18) !important;
+  background: rgba(2,6,23,0.35) !important;
+}
+.paint-list-item{
+  background: rgba(15,23,42,0.72) !important;
+  color: rgba(241,245,249,0.95) !important;
+  border-bottom: 1px solid rgba(148,163,184,0.12) !important;
+}
+.paint-list-item strong{ color: #ffffff !important; }
+.paint-list-item span{ color: rgba(241,245,249,0.92) !important; }
+.paint-list-item .btn-icon{
+  background: rgba(15,23,42,0.65) !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: rgba(241,245,249,0.95) !important;
+}
+.paint-list-item .btn-icon:hover{ filter: none !important; background: rgba(30,41,59,0.75) !important; }
+/* ====== FIN FIX ====== */
+</style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:9999;padding:10px 12px;background:rgba(2,6,23,0.70);backdrop-filter: blur(10px);border-bottom:1px solid rgba(148,163,184,0.18);">
+  <button class="btn" type="button" onclick="window.location.href='index.html'" style="display:inline-flex;align-items:center;gap:8px;">
+    ← Volver al menú
+  </button>
+</div>
+
+
+<div class="container">
+    <header>
+        <h2>CALCULADORA DE PINTURA PRO</h2>
+        <small>Gestión de Stock y Colores</small>
+        <button class="btn-limpiar" onclick="borrarTodo()">🗑️ Borrar Lista</button>
+
+        <div class="print-header">
+            <h1>ORDEN DE PINTURA</h1>
+            <p id="fecha-impresion">Fecha: --/--/----</p>
+        </div>
+    </header>
+
+    <div class="panel">
+        
+        <div class="config-box">
+            <div style="flex:1;">
+                <label>🎨 Pintura a Utilizar:</label>
+                <select id="selectPintura" onchange="cambiarPintura()" style="font-weight:bold; border-color:var(--color-config);">
+                    </select>
+                <div style="font-size:0.8em; color:#666; margin-top:4px;">
+                    Factor actual: <span id="factorDisplay">0.00</span> L/m²
+                </div>
+            </div>
+            <div>
+                <label>⚙️ Manos:</label>
+                <input type="text" id="manos" value="1.5" style="width:80px; text-align:center; font-size:1.2em; font-weight:bold;" onkeyup="validarDecimal(this); recalcularTotales()" inputmode="decimal">
+            </div>
+        </div>
+
+        <div class="backup-box">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong>💾 SEGURIDAD DE DATOS:</strong>
+                <div>
+                    <button class="btn-backup bg-export" onclick="cloudGuardarCopia()">⬇️ Guardar Copia</button>
+                    <button class="btn-backup bg-import" onclick="cloudCargarCopia()">⬆️ Cargar Copia</button>
+                    <input type="file" id="fileInput" style="display:none" onchange="importarDatos(this)">
+                </div>
+            </div>
+            <div style="font-size:0.85em; color:#666; margin-top:5px;">
+                Si cambias de ordenador o borras el historial, usa estos botones para no perder tus colores y materiales.
+            </div>
+        </div>
+
+        <div class="paint-config-box">
+            <div class="custom-header purple" onclick="toggleElement('paintConfigForm')">
+                <span>🎨 EDITAR / AÑADIR COLORES</span>
+                <small style="font-weight:normal; margin-left:10px; color:#555;">(Clic para abrir)</small>
+            </div>
+            
+            <div id="paintConfigForm" class="custom-form">
+                <div class="row">
+                    <div class="col" style="flex:2;">
+                        <label>Nombre del Color:</label>
+                        <input type="text" id="newPaintName" placeholder="Ej: Blanco Satinado">
+                    </div>
+                    <div class="col">
+                        <label>Consumo (L/m² por mano):</label>
+                        <input type="text" id="newPaintFactor" placeholder="Ej: 0.120" onkeyup="validarDecimal(this)" inputmode="decimal">
+                    </div>
+                </div>
+                
+                <div style="display:flex; gap:10px;">
+                    <button id="btnSavePaint" class="save-btn bg-purple" onclick="guardarPintura()">Guardar Nuevo Color</button>
+                    <button id="btnCancelEdit" class="btn-cancel" onclick="cancelarEdicionPintura()">Cancelar</button>
+                </div>
+                
+                <div class="custom-header blue" onclick="toggleElement('calibratorBox')">
+                    <span>🧪 ¿No sabes el factor? CÁLCULALO AQUÍ</span>
+                </div>
+                <div id="calibratorBox" class="calibrator-box">
+                    <div class="row">
+                        <div class="col">
+                            <label>Superficie Prueba (m²):</label>
+                            <div style="display:flex; gap:5px;">
+                                <input type="text" id="calibM2" placeholder="0.00" onkeyup="validarDecimal(this)" inputmode="decimal">
+                                <button onclick="copiarAreaTotal()" title="Copiar área actual" style="width:40px; margin-top:5px;">⬇️</button>
+                            </div>
+                        </div>
+                        <div class="col"><label>Mezcla (L):</label><input type="text" id="calibMix" placeholder="0.6" onkeyup="validarDecimal(this)" inputmode="decimal"></div>
+                        <div class="col"><label>Disolv (%):</label><input type="text" id="calibDisolv" value="15" onkeyup="validarDecimal(this)" inputmode="decimal"></div>
+                        <div class="col"><label>Manos:</label><input type="text" id="calibManos" value="1.5" onkeyup="validarDecimal(this)" inputmode="decimal"></div>
+                    </div>
+                    <button class="calib-btn" onclick="calcularYUsarFactor()">🔬 Calcular</button>
+                </div>
+
+                <div style="margin-top:15px;">
+                    <strong style="color:var(--color-config);">Pinturas Guardadas:</strong>
+                    <div id="listaPinturasContainer" style="margin-top:5px; border:1px solid #ddd; border-radius:4px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="custom-material-box">
+            <div class="custom-header green" onclick="toggleElement('customForm')">
+                <span>➕ CREAR MATERIAL PERSONALIZADO</span>
+                <small style="font-weight:normal; margin-left:10px; color:#555;">(Clic para abrir)</small>
+            </div>
+            <div id="customForm" class="custom-form">
+                <div class="row">
+                    <div class="col">
+                        <label>Nombre del Material:</label>
+                        <input type="text" id="newMatName" placeholder="Ej: Moldura Especial 500">
+                    </div>
+                    <div class="col">
+                        <label>Perímetro / Desarrollo (mm):</label>
+                        <input type="number" id="newMatPerim" placeholder="Ej: 500" onkeyup="formatearNumero(this)">
+                    </div>
+                </div>
+                <button class="save-btn bg-green" onclick="guardarMaterialPersonalizado()">Guardar Material</button>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <div class="row">
+                <div class="col" style="flex: 2;">
+                    <label>Seleccionar Material</label>
+                    <select id="tipo" onchange="mostrarInputs()">
+                        <optgroup label="Perfiles Estándar">
+                            <option value="tubo">Tubo Redondo / Macizo Redondo</option>
+                            <option value="cuadrado">Tubo Cuadrado / Macizo Cuadrado</option>
+                            <option value="angular">Ángulo (L)</option>
+                            <option value="pletina">Pletina / Chapa Plana (2 Caras)</option>
+                            <option value="u_chapa">Perfil U / UPN / Chapa Plegada</option>
+                        </optgroup>
+                        <optgroup label="Vigas Estructurales">
+                            <option value="ipn">Viga I (IPN / IPE)</option>
+                            <option value="heb">Viga H (HEA / HEB)</option>
+                        </optgroup>
+                        <optgroup label="Personalizados" id="customOptGroup">
+                            <option value="manual">⚠️ Introducir Perímetro Manualmente</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Largo (mm)</label>
+                    <input type="text" id="largoMM" placeholder="Ej: 3.000" onkeyup="formatearNumero(this)">
+                </div>
+            </div>
+
+            <div class="row" style="margin-top:15px;">
+                <div class="col" id="col-a">
+                    <label id="lbl-a">Diámetro (mm)</label>
+                    <input type="text" id="medidaA" placeholder="Ej: 80" onkeyup="formatearNumero(this)">
+                </div>
+                <div class="col hidden" id="group-b">
+                    <label id="lbl-b">Alto (mm)</label>
+                    <input type="text" id="medidaB" placeholder="Ej: 40" onkeyup="formatearNumero(this)">
+                </div>
+                <div class="col hidden" id="group-c">
+                    <label id="lbl-c">Ala 2 (mm)</label>
+                    <input type="text" id="medidaC" placeholder="Ej: 50" onkeyup="formatearNumero(this)">
+                </div>
+                <div class="col hidden" id="group-perim">
+                    <label>Perímetro (mm)</label>
+                    <input type="text" id="medidaPerim" placeholder="Ej: 600" onkeyup="formatearNumero(this)" style="background:#e8f8f5; border-color:#27ae60;">
+                </div>
+            </div>
+
+            <button class="add-btn" onclick="agregarItem()">+ Agregar a la Lista</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Material</th>
+                    <th>Longitud</th>
+                    <th class="text-right">Área Total</th>
+                    <th class="text-right" style="width:50px;"></th>
+                </tr>
+            </thead>
+            <tbody id="tabla-body"></tbody>
+        </table>
+
+        <div class="results-section">
+            <h3 class="results-header">MATERIAL NECESARIO</h3>
+            
+            <div class="res-row"><span>Superficie Total:</span> <strong id="total-area">0.00 m²</strong></div>
+            <div class="res-row"><span>Pintura Pura:</span> <strong id="total-pintura">0.000 L</strong></div>
+            <div class="res-row"><span>Disolvente (15%):</span> <strong id="total-disolvente">0.000 L</strong></div>
+            
+            <div class="res-row big-total">
+                <span>MEZCLA TOTAL:</span> <span id="total-mezcla">0.00 Litros</span>
+            </div>
+            
+            <div class="stock-info">
+                <h4 class="stock-header">CONTROL DE STOCK</h4>
+                
+                <div class="stock-row">
+                    <span><strong>PINTURA</strong> (Bote 4L):</span>
+                    <div class="val-container">
+                        <span id="info-bote-litros" class="info-litros">0.000 L</span>
+                        <span class="info-label">→ Factor:</span>
+                        <strong id="fac-bote" style="color:#c0392b;">0.000</strong>
+                        <button class="btn-copy" onclick="copiarDato('fac-bote', this)">Copiar</button>
+                    </div>
+                </div>
+
+                <div class="stock-row">
+                    <span><strong>DISOLVENTE</strong> (Bidón 25L):</span>
+                    <div class="val-container">
+                        <span id="info-bidon-litros" class="info-litros">0.000 L</span>
+                        <span class="info-label">→ Factor:</span>
+                        <strong id="fac-bidon" style="color:#2980b9;">0.0000</strong>
+                        <button class="btn-copy" onclick="copiarDato('fac-bidon', this)">Copiar</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-print" onclick="imprimirPedido()">
+                <span>🖨️</span> IMPRIMIR PEDIDO
+            </button>
+        </div>
+        
+        <div class="print-footer">
+            <div><strong>Observaciones:</strong><br><br><br>__________________________</div>
+            <div><strong>Firma Operario:</strong><br><br><br>__________________________</div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURACIÓN BASE ---
+    const PORCENTAJE_DISOLVENTE = 0.15;
+    const CAPACIDAD_BOTE = 4.0;
+    const CAPACIDAD_BIDON = 25.0;
+
+    let listaMateriales = [];
+    let materialesPersonalizados = [];
+    let listaPinturas = [];
+    let pinturaActualIndex = 0; 
+    let editandoPinturaIndex = -1; 
+    let areaTotalActual = 0;
+
+    window.onload = function() {
+        if(localStorage.getItem('pintura_lista')) listaMateriales = JSON.parse(localStorage.getItem('pintura_lista'));
+        if(localStorage.getItem('pintura_manos')) document.getElementById('manos').value = localStorage.getItem('pintura_manos');
+        if(localStorage.getItem('pintura_custom_mats')) materialesPersonalizados = JSON.parse(localStorage.getItem('pintura_custom_mats'));
+        if(localStorage.getItem('pintura_db_colores')) {
+            listaPinturas = JSON.parse(localStorage.getItem('pintura_db_colores'));
+        } else {
+            listaPinturas = [
+                { nombre: "Gris Antracita (Calibrado)", factor: 0.0888 },
+                { nombre: "Blanco (Ejemplo)", factor: 0.120 },
+                { nombre: "Imprimación Roja", factor: 0.100 }
+            ];
+            guardarDBPinturas();
+        }
+        if(localStorage.getItem('pintura_seleccionada_idx')) {
+            pinturaActualIndex = parseInt(localStorage.getItem('pintura_seleccionada_idx'));
+            if (pinturaActualIndex >= listaPinturas.length) pinturaActualIndex = 0;
+        }
+
+        actualizarDropdownPinturas();
+        renderizarListaConfigPinturas();
+        actualizarDropdownPersonalizados();
+        renderizarTabla();
+        recalcularTotales(); 
+        actualizarFecha();
+    };
+
+    // --- FUNCIONES AUXILIARES DE PUNTO DECIMAL ---
+    function validarDecimal(input) {
+        // Reemplaza comas por puntos y elimina caracteres no numéricos (excepto un punto)
+        let val = input.value;
+        if(val.includes(',')) {
+            val = val.replace(/,/g, '.');
+            input.value = val;
+        }
+    }
+
+    // --- FUNCIONES DE SEGURIDAD (EXPORTAR/IMPORTAR) ---
+    function exportarDatos() {
+        const datos = {
+            colores: listaPinturas,
+            materiales_custom: materialesPersonalizados,
+            lista_actual: listaMateriales,
+            pintura_seleccionada: pinturaActualIndex,
+            manos: document.getElementById('manos').value
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(datos));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "copia_seguridad_pintura.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function importarDatos(input) {
+        const file = input.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const datos = JSON.parse(e.target.result);
+                if(datos.colores) { listaPinturas = datos.colores; guardarDBPinturas(); }
+                if(datos.materiales_custom) { materialesPersonalizados = datos.materiales_custom; localStorage.setItem('pintura_custom_mats', JSON.stringify(materialesPersonalizados)); }
+                if(datos.lista_actual) { listaMateriales = datos.lista_actual; guardarDatosLocal(); }
+                if(datos.pintura_seleccionada !== undefined) { pinturaActualIndex = datos.pintura_seleccionada; localStorage.setItem('pintura_seleccionada_idx', pinturaActualIndex); }
+                if(datos.manos) { document.getElementById('manos').value = datos.manos; localStorage.setItem('pintura_manos', datos.manos); }
+
+                actualizarDropdownPinturas(); renderizarListaConfigPinturas(); actualizarDropdownPersonalizados(); renderizarTabla(); recalcularTotales();
+                alert("Datos restaurados correctamente.");
+            } catch(err) {
+                alert("Error al leer el archivo. Asegúrate de que es una copia válida.");
+            }
+        };
+        reader.readAsText(file);
+        input.value = ""; 
+    }
+
+    // --- GESTIÓN PINTURAS ---
+    function guardarDBPinturas() { localStorage.setItem('pintura_db_colores', JSON.stringify(listaPinturas)); }
+    function actualizarDropdownPinturas() {
+        const select = document.getElementById('selectPintura');
+        select.innerHTML = "";
+        listaPinturas.forEach((p, index) => {
+            const option = document.createElement('option');
+            option.value = index; option.text = p.nombre;
+            if(index === pinturaActualIndex) option.selected = true;
+            select.appendChild(option);
+        });
+        document.getElementById('factorDisplay').innerText = listaPinturas[pinturaActualIndex].factor.toFixed(4);
+    }
+    function cambiarPintura() {
+        pinturaActualIndex = parseInt(document.getElementById('selectPintura').value);
+        localStorage.setItem('pintura_seleccionada_idx', pinturaActualIndex);
+        document.getElementById('factorDisplay').innerText = listaPinturas[pinturaActualIndex].factor.toFixed(4);
+        recalcularTotales();
+    }
+    function guardarPintura() {
+        const nombre = document.getElementById('newPaintName').value;
+        const factor = parseFloat(document.getElementById('newPaintFactor').value);
+        if(!nombre || !factor) { alert("Introduce nombre y consumo."); return; }
+        if (editandoPinturaIndex === -1) {
+            listaPinturas.push({ nombre: nombre, factor: factor });
+            pinturaActualIndex = listaPinturas.length - 1;
+            alert("Color creado.");
+        } else {
+            listaPinturas[editandoPinturaIndex] = { nombre: nombre, factor: factor };
+            pinturaActualIndex = editandoPinturaIndex;
+            alert("Color actualizado.");
+        }
+        guardarDBPinturas(); actualizarDropdownPinturas(); renderizarListaConfigPinturas(); cambiarPintura(); cancelarEdicionPintura();
+    }
+    function editarPintura(index) {
+        document.getElementById('newPaintName').value = listaPinturas[index].nombre;
+        document.getElementById('newPaintFactor').value = listaPinturas[index].factor.toFixed(4); // Forzar punto visual
+        editandoPinturaIndex = index;
+        document.getElementById('btnSavePaint').innerText = "🔄 Actualizar Color";
+        document.getElementById('btnCancelEdit').style.display = "block";
+        document.getElementById('paintConfigForm').style.display = 'block';
+        document.getElementById('paintConfigForm').scrollIntoView({behavior: 'smooth'});
+    }
+    function cancelarEdicionPintura() {
+        document.getElementById('newPaintName').value = '';
+        document.getElementById('newPaintFactor').value = '';
+        editandoPinturaIndex = -1;
+        document.getElementById('btnSavePaint').innerText = "Guardar Nuevo Color";
+        document.getElementById('btnCancelEdit').style.display = "none";
+    }
+    function borrarPintura(index) {
+        if(listaPinturas.length <= 1) { alert("Debe quedar al menos una pintura."); return; }
+        if (editandoPinturaIndex === index) cancelarEdicionPintura();
+        if(!confirm("¿Borrar este color?")) return;
+        listaPinturas.splice(index, 1);
+        pinturaActualIndex = 0;
+        guardarDBPinturas(); actualizarDropdownPinturas(); renderizarListaConfigPinturas(); cambiarPintura();
+    }
+    function renderizarListaConfigPinturas() {
+        const container = document.getElementById('listaPinturasContainer');
+        container.innerHTML = "";
+        listaPinturas.forEach((p, index) => {
+            const div = document.createElement('div');
+            div.className = 'paint-list-item';
+            // Visualización forzada con punto
+            div.innerHTML = `<span><strong>${p.nombre}</strong> (${p.factor.toFixed(4)} L/m²)</span><div><button class="btn-icon edit" onclick="editarPintura(${index})" title="Editar">✏️</button><button class="btn-icon delete" onclick="borrarPintura(${index})" title="Borrar">🗑️</button></div>`;
+            container.appendChild(div);
+        });
+    }
+
+    // --- CALIBRADOR ---
+    function copiarAreaTotal() { document.getElementById('calibM2').value = areaTotalActual.toFixed(2); }
+    function calcularYUsarFactor() {
+        const m2 = parseFloat(document.getElementById('calibM2').value);
+        const mix = parseFloat(document.getElementById('calibMix').value);
+        const disolvente = parseFloat(document.getElementById('calibDisolv').value) / 100;
+        const manos = parseFloat(document.getElementById('calibManos').value);
+        if(!m2 || !mix || !manos) { alert("Rellena todos los datos del calibrador."); return; }
+        const pinturaPura = mix / (1 + disolvente);
+        const factor = pinturaPura / (m2 * manos);
+        document.getElementById('newPaintFactor').value = factor.toFixed(4); // Forzar punto visual
+        alert("Factor calculado y copiado arriba. Ponle un nombre y guarda el color.");
+    }
+
+    // --- INTERFAZ & MATERIALES ---
+    function toggleElement(id) { const el = document.getElementById(id); el.style.display = (el.style.display === 'block') ? 'none' : 'block'; }
+    function guardarMaterialPersonalizado() {
+        const nombre = document.getElementById('newMatName').value;
+        const perim = parseFloat(document.getElementById('newMatPerim').value);
+        if (!nombre || !perim) { alert("Faltan datos."); return; }
+        materialesPersonalizados.push({ name: nombre, perim: perim });
+        localStorage.setItem('pintura_custom_mats', JSON.stringify(materialesPersonalizados));
+        document.getElementById('newMatName').value = ''; document.getElementById('newMatPerim').value = '';
+        actualizarDropdownPersonalizados(); alert(`Material "${nombre}" guardado.`);
+    }
+    function actualizarDropdownPersonalizados() {
+        const group = document.getElementById('customOptGroup');
+        while (group.children.length > 1) { group.removeChild(group.lastChild); }
+        materialesPersonalizados.forEach((mat, index) => {
+            const option = document.createElement('option'); option.value = 'custom_' + index; option.text = `★ ${mat.name} (P: ${mat.perim}mm)`; group.appendChild(option);
+        });
+    }
+
+    function mostrarInputs() {
+        const tipo = document.getElementById('tipo').value;
+        const groupB = document.getElementById('group-b'); const groupC = document.getElementById('group-c'); const groupPerim = document.getElementById('group-perim'); const colA = document.getElementById('col-a'); const lblA = document.getElementById('lbl-a'); const lblB = document.getElementById('lbl-b');
+        groupB.classList.add('hidden'); groupC.classList.add('hidden'); groupPerim.classList.add('hidden'); colA.classList.remove('hidden'); 
+        document.getElementById('medidaA').value = ''; document.getElementById('medidaB').value = ''; document.getElementById('medidaC').value = ''; document.getElementById('medidaPerim').value = '';
+
+        if (tipo === 'tubo') { lblA.innerText = "Diámetro (mm)"; } 
+        else if (tipo === 'cuadrado') { lblA.innerText = "Ancho (mm)"; lblB.innerText = "Alto (mm)"; groupB.classList.remove('hidden'); } 
+        else if (tipo === 'angular') { lblA.innerText = "Lado A (mm)"; lblB.innerText = "Lado B (mm)"; groupB.classList.remove('hidden'); } 
+        else if (tipo === 'pletina') { lblA.innerText = "Ancho (mm)"; } 
+        else if (tipo === 'u_chapa') { lblA.innerText = "Ala 1 (mm)"; lblB.innerText = "Base (mm)"; document.getElementById('lbl-c').innerText = "Ala 2 (mm)"; groupB.classList.remove('hidden'); groupC.classList.remove('hidden'); }
+        else if (tipo === 'ipn' || tipo === 'heb') { lblA.innerText = "Altura (h)"; lblB.innerText = "Ancho (b)"; groupB.classList.remove('hidden'); }
+        else if (tipo === 'manual') { colA.classList.add('hidden'); groupPerim.classList.remove('hidden'); }
+        else if (tipo.startsWith('custom_')) { colA.classList.add('hidden'); }
+    }
+
+    function agregarItem() {
+        const tipo = document.getElementById('tipo').value;
+        const largoMM = limpiarNumero(document.getElementById('largoMM').value);
+        if (largoMM === 0) { alert("Falta el Largo."); return; }
+        const mA = limpiarNumero(document.getElementById('medidaA').value);
+        const mB = limpiarNumero(document.getElementById('medidaB').value);
+        const mC = limpiarNumero(document.getElementById('medidaC').value);
+        const largoM = largoMM / 1000;
+        let areaItem = 0; let descripcion = "";
+
+        if (tipo === 'tubo') { areaItem = (Math.PI * (mA/1000)) * largoM; descripcion = `Tubo Ø${mA}mm`; } 
+        else if (tipo === 'cuadrado') { areaItem = (((mA + mB) * 2) / 1000) * largoM; descripcion = `Rect. ${mA}x${mB}mm`; } 
+        else if (tipo === 'angular') { areaItem = (((mA + mB) * 2) / 1000) * largoM; descripcion = `Angular ${mA}x${mB}mm`; }
+        else if (tipo === 'pletina') { areaItem = ((mA / 1000) * largoM) * 2; descripcion = `Pletina ${mA}mm`; }
+        else if (tipo === 'u_chapa') { areaItem = (((mA + mB + mC) / 1000) * largoM) * 2; descripcion = `UPN/U ${mA}x${mB}x${mC}mm`; }
+        else if (tipo === 'ipn') { areaItem = (((2*mA) + (4*mB)) / 1000) * largoM; descripcion = `Viga I ${mA}x${mB}`; }
+        else if (tipo === 'heb') { areaItem = (((2*mA) + (4*mB)) / 1000) * largoM; descripcion = `Viga H ${mA}x${mB}`; }
+        else if (tipo === 'manual') {
+            const perimMM = limpiarNumero(document.getElementById('medidaPerim').value);
+            if(perimMM === 0) { alert("Indica el perímetro."); return; }
+            areaItem = (perimMM / 1000) * largoM; descripcion = `Manual (P:${perimMM})`;
+        }
+        else if (tipo.startsWith('custom_')) {
+            const index = parseInt(tipo.split('_')[1]); const mat = materialesPersonalizados[index];
+            areaItem = (mat.perim / 1000) * largoM; descripcion = `${mat.name}`;
+        }
+
+        if (areaItem <= 0 && tipo !== 'custom_') { alert("Revisa las medidas."); return; }
+        listaMateriales.push({ desc: descripcion, largo: largoMM.toLocaleString('es-ES'), area: areaItem });
+        guardarDatosLocal(); renderizarTabla(); recalcularTotales();
+        document.getElementById('largoMM').value = '';
+    }
+
+    function borrarItem(index) { listaMateriales.splice(index, 1); guardarDatosLocal(); renderizarTabla(); recalcularTotales(); }
+    function renderizarTabla() {
+        const tbody = document.getElementById('tabla-body'); tbody.innerHTML = "";
+        listaMateriales.forEach((item, index) => {
+            // item.area.toFixed(2) asegura PUNTO decimal
+            const row = `<tr><td><strong>${item.desc}</strong></td><td>${item.largo} mm</td><td class="text-right">${item.area.toFixed(2)} m²</td><td class="text-right"><button class="btn-icon delete" onclick="borrarItem(${index})">X</button></td></tr>`;
+            tbody.innerHTML += row;
+        });
+    }
+    function recalcularTotales() {
+        // Obtenemos valor de "manos" como float, reemplazando coma si quedase alguna
+        let manosRaw = document.getElementById('manos').value.replace(',', '.');
+        const manos = parseFloat(manosRaw) || 0;
+        localStorage.setItem('pintura_manos', manosRaw);
+        
+        const factorPintura = listaPinturas[pinturaActualIndex].factor;
+        let areaTotal = listaMateriales.reduce((acc, item) => acc + item.area, 0);
+        areaTotalActual = areaTotal;
+        const pinturaPura = areaTotal * factorPintura * manos;
+        const disolvente = pinturaPura * PORCENTAJE_DISOLVENTE;
+        const mezcla = pinturaPura + disolvente;
+        const fBote = pinturaPura / CAPACIDAD_BOTE; const fBidon = disolvente / CAPACIDAD_BIDON;
+
+        // toFixed asegura puntos
+        document.getElementById('total-area').innerText = areaTotal.toFixed(2) + " m²";
+        document.getElementById('total-pintura').innerText = pinturaPura.toFixed(3) + " L";
+        document.getElementById('total-disolvente').innerText = disolvente.toFixed(3) + " L";
+        document.getElementById('total-mezcla').innerText = mezcla.toFixed(2) + " Litros";
+        document.getElementById('fac-bote').innerText = fBote.toFixed(3);
+        document.getElementById('fac-bidon').innerText = fBidon.toFixed(4);
+        document.getElementById('info-bote-litros').innerText = pinturaPura.toFixed(3) + " L";
+        document.getElementById('info-bidon-litros').innerText = disolvente.toFixed(3) + " L";
+    }
+
+    function guardarDatosLocal() { localStorage.setItem('pintura_lista', JSON.stringify(listaMateriales)); }
+    function borrarTodo() { if(confirm("¿Borrar toda la lista de materiales?")) { listaMateriales = []; guardarDatosLocal(); renderizarTabla(); recalcularTotales(); } }
+    function actualizarFecha() { const hoy = new Date(); document.getElementById('fecha-impresion').innerText = "Fecha: " + hoy.toLocaleDateString() + " " + hoy.toLocaleTimeString(); }
+    function imprimirPedido() { actualizarFecha(); window.print(); }
+    function copiarDato(idElemento, btn) { const valor = document.getElementById(idElemento).innerText; navigator.clipboard.writeText(valor).then(() => { const t = btn.innerText; btn.innerText = "¡OK!"; setTimeout(() => { btn.innerText = t; }, 1000); }); }
+    
+    // Formatear enteros (miles con punto está bien, pero NO usar para decimales)
+    function formatearNumero(input) { let v = input.value.replace(/\D/g, ""); v = v.replace(/\B(?=(\d{3})+(?!\d))/g, "."); input.value = v; }
+    function limpiarNumero(v) { if (!v) return 0; return parseFloat(v.replace(/\./g, "")) || 0; }
+</script>
+
+
+<script type="module">
+  // === Firestore Sync (módulo Cálculo Pintura) ===
+  // Sin tocar index: usa la MISMA configuración Firebase del programa general.
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+
+  let __fb = null;
+
+  function _ensureFirebase(){
+    if(__fb) return __fb;
+    try{
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+      __fb = { app, auth, db, doc, getDoc, setDoc, serverTimestamp };
+      // Exponer por compatibilidad
+      window.__FIREBASE__ = window.__FIREBASE__ || __fb;
+    }catch(e){
+      console.warn("Firebase init error (pintura):", e);
+      __fb = { error: e };
+    }
+    return __fb;
+  }
+
+  const LS_KEYS = [
+    "pintura_db_colores",
+    "pintura_lista",
+    "pintura_custom_mats",
+    "pintura_manos",
+    "pintura_seleccionada_idx"
+  ];
+
+  async function _getUid(){
+    const fb = _ensureFirebase();
+    if(fb?.error) return null;
+    return await new Promise((resolve) => {
+      try{
+        onAuthStateChanged(fb.auth, (user) => resolve(user?.uid || null), () => resolve(null));
+      }catch(e){ resolve(null); }
+    });
+  }
+
+  async function guardarPinturaEnNube(){
+    const fb = _ensureFirebase();
+    if(fb?.error) throw fb.error;
+    const uid = await _getUid();
+    if(!uid) throw new Error("No hay sesión iniciada en Firebase (abre primero el programa principal e inicia sesión).");
+
+    const data = {};
+    for(const k of LS_KEYS){
+      const v = localStorage.getItem(k);
+      if(v !== null && v !== undefined) data[k] = v;
+    }
+
+    const ref = doc(fb.db, "module_pintura", uid);
+    await setDoc(ref, {
+      updatedAt: serverTimestamp(),
+      data
+    }, { merge: true });
+
+    return true;
+  }
+
+  async function cargarPinturaDesdeNube(){
+    const fb = _ensureFirebase();
+    if(fb?.error) throw fb.error;
+    const uid = await _getUid();
+    if(!uid) throw new Error("No hay sesión iniciada en Firebase (abre primero el programa principal e inicia sesión).");
+
+    const ref = doc(fb.db, "module_pintura", uid);
+    const snap = await getDoc(ref);
+    if(!snap.exists()) throw new Error("No hay copia en nube todavía (usa 'Guardar Copia' una vez).");
+    const payload = snap.data() || {};
+    const data = payload.data || {};
+
+    for(const k of LS_KEYS){
+      if(Object.prototype.hasOwnProperty.call(data, k)){
+        localStorage.setItem(k, data[k]);
+      }
+    }
+    // Recargar para que el módulo relea localStorage y re-renderice
+    location.reload();
+  }
+
+  // Botones existentes (mantiene export/import como fallback)
+  window.cloudGuardarCopia = async function(){
+    try{
+      await guardarPinturaEnNube();
+      alert("Copia guardada en la nube ✅");
+    }catch(e){
+      console.warn(e);
+      // Fallback al sistema antiguo (archivo JSON)
+      try{ window.exportarDatos && window.exportarDatos(); }
+      catch(_e){}
+      alert("No se pudo guardar en nube. Se ha generado una copia local (archivo).");
+    }
+  };
+
+  window.cloudCargarCopia = async function(){
+    try{
+      await cargarPinturaDesdeNube();
+    }catch(e){
+      console.warn(e);
+      // Fallback al sistema antiguo (archivo JSON)
+      try{ document.getElementById('fileInput')?.click(); }catch(_e){}
+      alert("No se pudo cargar desde nube. Selecciona un archivo de copia local.");
+    }
+  };
+</script>
+
+</body>
+</html>
