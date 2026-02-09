@@ -1099,7 +1099,7 @@ a:hover, a:hover * { color: #ffffff !important; }
 
   function parseDimFromName(name){
     const n = (name||'').toLowerCase();
-    let m = n.match(/(\d{2,3})\s*[x×]\s*(\d{2,3})/);
+    let m = n.match(/(\d{1,3})\s*[x×]\s*(\d{1,3})/);
     if(m) return { kind:'rect', a:parseFloat(m[1]), b:parseFloat(m[2]) };
     m = n.match(/(?:ø|diam|d)\s*(\d{2,3})/);
     if(m) return { kind:'round', d:parseFloat(m[1]) };
@@ -1547,37 +1547,25 @@ function configurarPendiente(idx){
 
   function devolverFactores(){
     try{
-      // Asegurar que los totales/factores están actualizados en pantalla
       recalcularTotales();
 
-      // Leer LOS FACTORES REALES de abajo (junto a los botones "Copiar")
-      // fac-bote  = factor de botes de 4L necesarios
-      // fac-bidon = factor de bidones de 25L necesarios
-      const _toNum = (txt)=>{
-        const s = String(txt ?? '').replace(',', '.');
-        const m = s.match(/-?\d+(?:\.\d+)?/);
-        const n = m ? parseFloat(m[0]) : 0;
-        return isFinite(n) ? n : 0;
-      };
+      const manosRaw = (document.getElementById('manos')?.value || '1').replace(',', '.');
+      const manos = parseFloat(manosRaw) || 1;
 
-      const facBote  = _toNum(document.getElementById('fac-bote')?.innerText);
-      const facBidon = _toNum(document.getElementById('fac-bidon')?.innerText);
+      const idxSel = parseInt(document.getElementById('selectPintura')?.value || pinturaActualIndex || 0);
+      const factorP = (listaPinturas[idxSel] && typeof listaPinturas[idxSel].factor === 'number') ? listaPinturas[idxSel].factor : (listaPinturas[pinturaActualIndex]?.factor || 0);
+      const areaTotal = listaMateriales.reduce((acc, item) => acc + item.area, 0);
 
-      // También enviamos los litros mostrados (por si el Concepto los usa)
-      const litrosPintura   = _toNum(document.getElementById('info-bote-litros')?.innerText);
-      const litrosDisolvente= _toNum(document.getElementById('info-bidon-litros')?.innerText);
+      const factorPorM2 = factorP * manos;
+      const factorDisPorM2 = factorPorM2 * PORCENTAJE_DISOLVENTE;
 
-      const out = {
-        kind: 'concept_pintura_out',
+      const pinturaPura = areaTotal * factorPorM2;
+      const disolvente = pinturaPura * PORCENTAJE_DISOLVENTE;
+const out = {
+        kind:'concept_pintura_out',
         ts: Date.now(),
-
-        // ✅ Estos son los "factores reales" que ves abajo con los botones Copiar
-        factorPintura: facBote,
-        factorDisolvente: facBidon,
-
-        // Extra (no rompe compatibilidad si el Concepto lo ignora)
-        litrosPintura,
-        litrosDisolvente
+        factorPintura: Number(factorPorM2.toFixed(6)),
+        factorDisolvente: Number(factorDisPorM2.toFixed(6))
       };
 
       window.name = OUT_PREFIX + JSON.stringify(out);
