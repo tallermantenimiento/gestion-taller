@@ -578,6 +578,7 @@ a:hover, a:hover * { color: #ffffff !important; }
                             <option value="cuadrado">Tubo Cuadrado / Macizo Cuadrado</option>
                             <option value="angular">Ángulo (L)</option>
                             <option value="pletina">Pletina / Chapa Plana (2 Caras)</option>
+                            <option value="pared">🧱 Pintura pared (alto×ancho)</option>
                             <option value="u_chapa">Perfil U / UPN / Chapa Plegada</option>
                         </optgroup>
                         <optgroup label="Vigas Estructurales">
@@ -595,7 +596,16 @@ a:hover, a:hover * { color: #ffffff !important; }
                 </div>
             </div>
 
-            <div class="row" style="margin-top:15px;">
+            
+            <div class="row hidden" id="wallRow" style="margin-top:12px;">
+                <div class="col" style="flex:2;">
+                    <label>🧱 Pintura pared</label>
+                    <button type="button" class="add-btn" style="margin-top:0; text-transform:none;" onclick="abrirDialogoPared()">Configurar paredes…</button>
+                    <div style="margin-top:6px; font-size:12px; opacity:.75;">Añade paredes a la lista actual (no se archivan medidas).</div>
+                </div>
+            </div>
+
+<div class="row" style="margin-top:15px;">
                 <div class="col" id="col-a">
                     <label id="lbl-a">Diámetro (mm)</label>
                     <input type="text" id="medidaA" placeholder="Ej: 80" onkeyup="formatearNumero(this)">
@@ -614,7 +624,7 @@ a:hover, a:hover * { color: #ffffff !important; }
                 </div>
             </div>
 
-            <button class="add-btn" onclick="agregarItem()">+ Agregar a la Lista</button>
+            <button id="btnAgregarItem" class="add-btn" onclick="agregarItem()">+ Agregar a la Lista</button>
         </div>
 
         <table>
@@ -878,6 +888,19 @@ a:hover, a:hover * { color: #ffffff !important; }
         groupB.classList.add('hidden'); groupC.classList.add('hidden'); groupPerim.classList.add('hidden'); colA.classList.remove('hidden'); 
         document.getElementById('medidaA').value = ''; document.getElementById('medidaB').value = ''; document.getElementById('medidaC').value = ''; document.getElementById('medidaPerim').value = '';
 
+        // Pared: se configura por diálogo (sin guardar medidas)
+        const wallRow = document.getElementById('wallRow');
+        const btnAdd = document.getElementById('btnAgregarItem');
+        if (tipo === 'pared') {
+            groupB.classList.add('hidden'); groupC.classList.add('hidden'); groupPerim.classList.add('hidden'); colA.classList.add('hidden');
+            if (wallRow) wallRow.classList.remove('hidden');
+            if (btnAdd) btnAdd.style.display = 'none';
+            return;
+        } else {
+            if (wallRow) wallRow.classList.add('hidden');
+            if (btnAdd) btnAdd.style.display = '';
+        }
+
         if (tipo === 'tubo') { lblA.innerText = "Diámetro (mm)"; } 
         else if (tipo === 'cuadrado') { lblA.innerText = "Ancho (mm)"; lblB.innerText = "Alto (mm)"; groupB.classList.remove('hidden'); } 
         else if (tipo === 'angular') { lblA.innerText = "Lado A (mm)"; lblB.innerText = "Lado B (mm)"; groupB.classList.remove('hidden'); } 
@@ -926,7 +949,8 @@ a:hover, a:hover * { color: #ffffff !important; }
         const tbody = document.getElementById('tabla-body'); tbody.innerHTML = "";
         listaMateriales.forEach((item, index) => {
             // item.area.toFixed(2) asegura PUNTO decimal
-            const row = `<tr><td><strong>${item.desc}</strong></td><td>${item.largo} mm</td><td class="text-right">${item.area.toFixed(2)} m²</td><td class="text-right"><button class="btn-icon delete" onclick="borrarItem(${index})">X</button></td></tr>`;
+            const lenCell = (item.unit === 'm') ? `${item.largo}` : `${item.largo} mm`;
+            const row = `<tr><td><strong>${item.desc}</strong></td><td>${lenCell}</td><td class="text-right">${item.area.toFixed(2)} m²</td><td class="text-right"><button class="btn-icon delete" onclick="borrarItem(${index})">X</button></td></tr>`;
             tbody.innerHTML += row;
         });
     }
@@ -964,6 +988,135 @@ a:hover, a:hover * { color: #ffffff !important; }
     // Formatear enteros (miles con punto está bien, pero NO usar para decimales)
     function formatearNumero(input) { let v = input.value.replace(/\D/g, ""); v = v.replace(/\B(?=(\d{3})+(?!\d))/g, "."); input.value = v; }
     function limpiarNumero(v) { if (!v) return 0; return parseFloat(v.replace(/\./g, "")) || 0; }
+
+    // --- DIÁLOGO: PINTURA PARED (no se archiva) ---
+    let __wallPlanTotal = 0;
+    let __wallPlanNext = 1;
+
+    function __numDot(v){
+        const s = String(v ?? '').trim().replace(',', '.');
+        const n = parseFloat(s);
+        return isFinite(n) ? n : 0;
+    }
+    function __fmt(n, d=2){
+        const x = Number(n)||0;
+        return x.toLocaleString('es-ES', { minimumFractionDigits:d, maximumFractionDigits:d }).replace(/\./g, '#').replace(/,/g, '.').replace(/#/g, ',');
+    }
+    function __fmtM2(n){
+        const x = Number(n)||0;
+        return x.toLocaleString('es-ES', { minimumFractionDigits:3, maximumFractionDigits:3 });
+    }
+
+    function abrirDialogoPared(){
+        const ov = document.getElementById('ldhWallOverlay');
+        if(!ov) return;
+        // si no hay plan activo, inicializar con valor actual
+        const totalEl = document.getElementById('ldhWallTotal');
+        if(__wallPlanTotal === 0){
+            const t = Math.max(1, Math.floor(__numDot(totalEl?.value || 1)));
+            __wallPlanTotal = t;
+            __wallPlanNext = 1;
+            if(totalEl) totalEl.value = String(t);
+        }else{
+            if(totalEl) totalEl.value = String(__wallPlanTotal);
+        }
+        __wallUpdateNextLabel();
+        __wallRecalcAreaPreview();
+        ov.style.display = 'flex';
+    }
+
+    function __wallClose(){
+        const ov = document.getElementById('ldhWallOverlay');
+        if(ov) ov.style.display = 'none';
+    }
+
+    function __wallUpdateNextLabel(){
+        const nextEl = document.getElementById('ldhWallNext');
+        if(nextEl){
+            nextEl.textContent = `Pared ${__wallPlanNext}`;
+        }
+    }
+
+    function __wallRecalcAreaPreview(){
+        const caras = Math.max(1, Math.min(2, Math.floor(__numDot(document.getElementById('ldhWallCaras')?.value || 1))));
+        const alto = __numDot(document.getElementById('ldhWallAlto')?.value);
+        const ancho = __numDot(document.getElementById('ldhWallAncho')?.value);
+        const area = Math.max(0, alto * ancho * caras);
+        const areaEl = document.getElementById('ldhWallArea');
+        if(areaEl) areaEl.textContent = __fmtM2(area);
+        return { caras, alto, ancho, area };
+    }
+
+    function __wallAddOne(){
+        // permitir fijar total si estamos en pared 1
+        const totalEl = document.getElementById('ldhWallTotal');
+        const tWanted = Math.max(1, Math.floor(__numDot(totalEl?.value || 1)));
+        if(__wallPlanNext === 1){
+            __wallPlanTotal = tWanted;
+        }
+
+        if(__wallPlanNext > __wallPlanTotal){
+            alert('Ya has configurado todas las paredes.');
+            __wallPlanTotal = 0; __wallPlanNext = 1;
+            __wallClose();
+            return;
+        }
+
+        const { caras, alto, ancho, area } = __wallRecalcAreaPreview();
+        if(!(area > 0)){
+            alert('El área es 0. Revisa alto/ancho.');
+            return;
+        }
+
+        const carasTxt = (caras === 2) ? '2 caras' : '1 cara';
+        const desc = `Pared ${__wallPlanNext} (${carasTxt}) ${alto}×${ancho} m`;
+
+        listaMateriales.push({
+            desc,
+            largo: `${alto}×${ancho} m`,
+            unit: 'm',
+            area
+        });
+
+        guardarDatosLocal();
+        renderizarTabla();
+        recalcularTotales();
+
+        __wallPlanNext += 1;
+
+        if(__wallPlanNext > __wallPlanTotal){
+            alert('Paredes completadas ✅');
+            __wallPlanTotal = 0; __wallPlanNext = 1;
+            __wallClose();
+            return;
+        }
+
+        __wallUpdateNextLabel();
+        // limpiar medidas para siguiente (opcional: mantenemos para editar rápido)
+        // document.getElementById('ldhWallAlto').value = '';
+        // document.getElementById('ldhWallAncho').value = '';
+        __wallRecalcAreaPreview();
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+        const ov = document.getElementById('ldhWallOverlay');
+        if(ov){
+            ov.addEventListener('click', (e)=>{ if(e.target === ov) __wallClose(); });
+        }
+        document.getElementById('ldhWallCloseTop')?.addEventListener('click', __wallClose);
+        document.getElementById('ldhWallCancel')?.addEventListener('click', __wallClose);
+        document.getElementById('ldhWallAdd')?.addEventListener('click', __wallAddOne);
+
+        ['ldhWallCaras','ldhWallAlto','ldhWallAncho'].forEach(id=>{
+            document.getElementById(id)?.addEventListener('input', __wallRecalcAreaPreview);
+        });
+
+        // si el usuario cambia el total antes de empezar, recalculamos plan al abrir; aquí solo actualizamos preview
+        document.getElementById('ldhWallTotal')?.addEventListener('input', ()=>{
+            // no tocamos el plan si ya está empezado; se fija al añadir pared 1
+        });
+    });
+
 </script>
 
 
@@ -1633,6 +1786,65 @@ function configurarPendiente(idx){
     <div class="actions">
       <button class="btn" type="button" id="ldhPendCancel">Cancelar</button>
       <button class="btn" type="button" id="ldhPendOk" style="font-weight:950;">✅ Añadir a la lista</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- LDH_WALL_DIALOG_V1 -->
+<div id="ldhWallOverlay" role="dialog" aria-modal="true" style="position:fixed; inset:0; z-index:100001; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); display:none; align-items:center; justify-content:center; padding:14px;">
+  <div id="ldhWallModal" style="width:min(720px, 96vw); max-height:92vh; overflow:auto; background:rgba(2,6,23,.92); border:1px solid rgba(148,163,184,.20); border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,.65); padding:16px 16px 14px;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+      <div style="flex:1;">
+        <h3 style="margin:0;">🧱 Pintura pared</h3>
+        <div id="ldhWallSub" style="opacity:.80; font-size:12px; margin-top:4px;">Configura paredes una a una (no se guardan medidas).</div>
+      </div>
+      <button type="button" class="btn" id="ldhWallCloseTop" title="Cerrar">✖</button>
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <label style="width:170px;">
+        <div style="font-weight:900; font-size:12px; opacity:.9; margin-bottom:4px;">Nº de paredes</div>
+        <input id="ldhWallTotal" inputmode="numeric" value="1">
+      </label>
+
+      <div style="flex:1; min-width:220px; display:flex; justify-content:flex-end;">
+        <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.55);">
+          <span style="opacity:.85; font-size:12px;">Siguiente:</span>
+          <b id="ldhWallNext" style="font-weight:950;">Pared 1</b>
+        </span>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <label style="width:170px;">
+        <div style="font-weight:900; font-size:12px; opacity:.9; margin-bottom:4px;">Caras</div>
+        <select id="ldhWallCaras">
+          <option value="1">Una cara</option>
+          <option value="2">Dos caras</option>
+        </select>
+      </label>
+      <label style="flex:1; min-width:220px;">
+        <div style="font-weight:900; font-size:12px; opacity:.9; margin-bottom:4px;">Alto (m)</div>
+        <input id="ldhWallAlto" inputmode="decimal" placeholder="Ej: 2.50">
+      </label>
+      <label style="flex:1; min-width:220px;">
+        <div style="font-weight:900; font-size:12px; opacity:.9; margin-bottom:4px;">Ancho (m)</div>
+        <input id="ldhWallAncho" inputmode="decimal" placeholder="Ej: 4.00">
+      </label>
+    </div>
+
+    <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+      <span style="display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.22); background:rgba(15,23,42,.55);">
+        <span style="opacity:.85; font-size:12px;">Área (esta pared):</span>
+        <b id="ldhWallArea" style="font-weight:950;">0,000</b>
+        <span style="opacity:.75; font-size:12px;">m²</span>
+      </span>
+    </div>
+
+    <div style="margin-top:14px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+      <button type="button" class="btn" id="ldhWallCancel">Cerrar</button>
+      <button type="button" class="btn" id="ldhWallAdd" style="font-weight:950;">✅ Añadir pared</button>
     </div>
   </div>
 </div>
