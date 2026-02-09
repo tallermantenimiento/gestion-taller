@@ -1226,18 +1226,45 @@ function saveLinkMap(){
 /* ========= IMPORTACIÓN DE DATOS DESDE CALCULO/OTROS ========= */
 (function verificarImports() {
   const encontrarNumero = (obj) => {
-    if (!obj) return null;
-    const posiblesKeys = ["cantidad", "unidades", "units", "qty", "quantity", "amount", "totalUnits", "total"];
-    for (let key of posiblesKeys) {
-      if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return parseFloat(obj[key]);
-    }
-    if (obj.vars) {
-      for (let key of posiblesKeys) {
-        if (obj.vars[key] !== undefined && obj.vars[key] !== null && obj.vars[key] !== "") return parseFloat(obj.vars[key]);
-      }
-    }
-    return null;
+  if (!obj) return null;
+
+  // Preferencia explícita: vars.cantidad -> unidades -> cantidad (solo si >= 1)
+  const tryNum = (v) => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = parseFloat(String(v).replace(",", "."));
+    if (isNaN(n)) return null;
+    // Queremos unidades de fabricación: si viene 0.x (ej: cantidad de pintura), lo ignoramos
+    if (n < 1) return null;
+    return n;
   };
+
+  // 1) vars.cantidad (lo normal en tu cálculo)
+  if (obj.vars && obj.vars.cantidad !== undefined) {
+    const n = tryNum(obj.vars.cantidad);
+    if (n !== null) return n;
+  }
+
+  // 2) unidades / units
+  const nU = tryNum(obj.unidades !== undefined ? obj.unidades : obj.units);
+  if (nU !== null) return nU;
+
+  // 3) cantidad / qty / quantity / amount / totalUnits / total
+  const posiblesKeys = ["cantidad", "qty", "quantity", "amount", "totalUnits", "total"];
+  for (let key of posiblesKeys) {
+    const n = tryNum(obj[key]);
+    if (n !== null) return n;
+  }
+
+  // 4) vars fallback (por si alguien lo manda ahí)
+  if (obj.vars) {
+    for (let key of ["unidades", "units", "cantidad", "qty", "quantity", "amount", "totalUnits", "total"]) {
+      const n = tryNum(obj.vars[key]);
+      if (n !== null) return n;
+    }
+  }
+
+  return null;
+};
 
   // === Entrada de pedido (compatible con file://) ===
   // 1) window.name (paso directo desde Cálculo/Index)
@@ -1288,6 +1315,30 @@ if (existsAny && refBase) {
 }
 
 let qty = encontrarNumero(snap) || 1;
+
+// FIX UNIDADES: forzar que la cantidad/unidades del pedido importado sea la del cálculo,
+// incluso si existe meta previa con otra cantidad.
+try{
+  qty = Math.max(1, parseFloat(String(qty).replace(",", ".")) || 1);
+
+  // Normaliza en el snapshot (para cualquier render/uso posterior)
+  snap.unidades = qty;
+  snap.cantidad = qty;
+  snap.units = qty;
+  snap.qty = qty;
+  snap.vars = snap.vars || {};
+  snap.vars.cantidad = qty;
+  snap.vars.unidades = qty;
+
+  // Si ya existía meta, la reescribimos con la cantidad actual
+  if (metaExist && typeof metaExist === "object") {
+    metaExist.unidades = qty;
+    metaExist.cantidad = qty;
+    metaExist.vars = metaExist.vars || {};
+    metaExist.vars.cantidad = qty;
+    metaExist.vars.unidades = qty;
+  }
+}catch(e){}
 
       let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
@@ -1971,14 +2022,14 @@ function guardarLinea(index) {
     return;
   }
 
-  stockMovements.push({ id: uuid(), matId: matIdReturn, type: 'in', qty: diff, date: new Date().toISOString() });
+  stockMovements.push({ id: uuid(), matId: check.matId, type: 'in', qty: diff, date: new Date().toISOString() });
   saveStockLocal();
 
   linea.aplicado_qty = yaAplicado + diff;
   guardarEstadoLocal();
 
   const newTotal = getStockQty(check.matId);
-  alert(`✅ Stock Actualizado.\nMaterial: ${matReturn.name}\nTotal: ${newTotal}`);
+  alert(`✅ Stock Actualizado.\nMaterial: ${check.mat.name}\nTotal: ${newTotal}`);
   renderTabla();
 }
 
