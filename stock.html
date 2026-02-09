@@ -29,6 +29,9 @@
   .btn:disabled{ opacity:0.5; cursor:not-allowed; transform:none; }
   .btn.primary{ background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.35); color: #7dd3fc; }
   .btn.danger{ background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.35); color: #fca5a5; }
+  .btn.warn{ background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.25); color:#fbbf24; }
+  .btn.warn:hover{ filter:brightness(1.08); }
+
   .btn.ghost{ background: transparent; border-color:transparent; } .btn.ghost:hover{ background: rgba(255,255,255,.05); border-color: var(--border); }
   .btn.icon{ width: 36px; height: 36px; justify-content:center; padding:0; }
 
@@ -244,6 +247,7 @@
     <div class="input-row"><div class="form-group" style="flex:1"><label>Unidad</label><input id="inpUnit" class="form-control" placeholder="ud" /></div><div class="form-group" style="flex:1"><label>Mínimo</label><input id="inpMin" type="number" class="form-control" placeholder="5" /></div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;">
       <button class="btn danger" id="btnDeleteMat" style="display:none" onclick="deleteMaterial()">🗑 Eliminar</button>
+      <button class="btn warn" id="btnResetQty" style="display:none" onclick="resetMaterialToZero()">↺ Reiniciar a 0</button>
       <div style="display:flex;gap:10px;margin-left:auto;"><button class="btn ghost" onclick="closeModal('modalMaterial')">Cancelar</button><button class="btn primary" id="btnSaveMat" onclick="saveMaterial()">Guardar</button></div>
     </div>
   </div>
@@ -643,7 +647,7 @@ function snoozeAlert(){ const d=parseInt($("snoozeDays").value); if(!d||d<1)retu
 /* --- ACTIONS --- */
 let edId=null, movId=null, movT=null;
 function openMaterialModal(){ edId=null; $("modalTitle").textContent="Nuevo"; $("btnDeleteMat").style.display="none"; $("inpName").value=""; $("inpUnit").value=""; $("inpMin").value=""; popSel(); $("modalMaterial").classList.add("show"); }
-function editMaterial(id){ const m=materials.find(x=>x.id===id); if(!m)return; edId=id; $("modalTitle").textContent="Editar"; $("btnDeleteMat").style.display="block"; popSel(m.cat,m.grp); $("inpName").value=m.name; $("inpUnit").value=m.unit; $("inpMin").value=m.min; $("modalMaterial").classList.add("show"); }
+function editMaterial(id){ const m=materials.find(x=>x.id===id); if(!m)return; edId=id; $("modalTitle").textContent="Editar"; $("btnDeleteMat").style.display="block"; $("btnResetQty").style.display="block"; popSel(m.cat,m.grp); $("inpName").value=m.name; $("inpUnit").value=m.unit; $("inpMin").value=m.min; $("modalMaterial").classList.add("show"); }
 
 function saveMaterial(){
   const btn = $("btnSaveMat"); if(btn.disabled) return;
@@ -692,6 +696,24 @@ function confMov(){
   if(type==='out' && q>getStock(movId)){ if(!confirm("⚠ El stock quedará en NEGATIVO.\n¿Continuar?")) return; }
   movements.push({id:uuid(),matId:movId,type:type,qty:q,date:new Date().toISOString()});
   saveData(); renderGrid(); closeModal('modalMove'); toast("Ajuste registrado"); checkAlerts();
+}
+
+
+function resetMaterialToZero(){
+  if(!edId){ toast("No hay material seleccionado"); return; }
+  const m = materials.find(x=>x.id===edId);
+  if(!m) return;
+  const s = getStock(edId);
+  if(s === 0){ toast("Ya está a 0"); return; }
+  if(!confirm(`⚠ Reiniciar a 0 la cantidad de "${m.name}" (stock actual: ${Number(s).toLocaleString("es-ES")}).
+Se registrará un ajuste automático.`)) return;
+  const type = s > 0 ? 'out' : 'in';
+  const qty = Math.abs(s);
+  movements.push({id:uuid(),matId:edId,type:type,qty:qty,date:new Date().toISOString()});
+  saveData();
+  renderGrid();
+  setTimeout(checkAlerts, 200);
+  toast("Reiniciado a 0");
 }
 
 function renameCategory(oldName){
