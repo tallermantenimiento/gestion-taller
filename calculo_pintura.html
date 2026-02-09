@@ -1547,25 +1547,29 @@ function configurarPendiente(idx){
 
   function devolverFactores(){
     try{
-      recalcularTotales();
+      // Asegura que los cálculos visibles (factores de abajo) estén actualizados
+      try{ recalcularTotales(); }catch(e){}
 
-      const manosRaw = (document.getElementById('manos')?.value || '1').replace(',', '.');
-      const manos = parseFloat(manosRaw) || 1;
+      const num = (v)=>{
+        if(v==null) return 0;
+        return parseFloat(String(v).trim().replace(',', '.')) || 0;
+      };
 
-      const idxSel = parseInt(document.getElementById('selectPintura')?.value || pinturaActualIndex || 0);
-      const factorP = (listaPinturas[idxSel] && typeof listaPinturas[idxSel].factor === 'number') ? listaPinturas[idxSel].factor : (listaPinturas[pinturaActualIndex]?.factor || 0);
-      const areaTotal = listaMateriales.reduce((acc, item) => acc + item.area, 0);
+      // FACTORES REALES mostrados abajo (junto a botones "Copiar")
+      const fBote = num(document.getElementById('fac-bote')?.innerText);
+      const fBidon = num(document.getElementById('fac-bidon')?.innerText);
 
-      const factorPorM2 = factorP * manos;
-      const factorDisPorM2 = factorPorM2 * PORCENTAJE_DISOLVENTE;
+      // Litros reales (por si Concepto los quiere usar)
+      const litrosP = num((document.getElementById('info-bote-litros')?.innerText || '').replace(/[^0-9,\.\-]/g,''));
+      const litrosD = num((document.getElementById('info-bidon-litros')?.innerText || '').replace(/[^0-9,\.\-]/g,''));
 
-      const pinturaPura = areaTotal * factorPorM2;
-      const disolvente = pinturaPura * PORCENTAJE_DISOLVENTE;
-const out = {
+      const out = {
         kind:'concept_pintura_out',
         ts: Date.now(),
-        factorPintura: Number(factorPorM2.toFixed(6)),
-        factorDisolvente: Number(factorDisPorM2.toFixed(6))
+        factorPintura: Number(fBote.toFixed(6)),
+        factorDisolvente: Number(fBidon.toFixed(6)),
+        litrosPintura: Number(litrosP.toFixed(6)),
+        litrosDisolvente: Number(litrosD.toFixed(6))
       };
 
       window.name = OUT_PREFIX + JSON.stringify(out);
@@ -1575,6 +1579,7 @@ const out = {
       alert('No se pudo devolver al concepto');
     }
   }
+
 
   function receiveInbox(){
     try{
