@@ -49,7 +49,10 @@
   /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .hidden { display:none !important; }
-  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
+  
+  /* Desactivado permanentemente: banner superior de focus */
+  .focus-banner{ display:none !important; }
+.section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
   /* TABLAS E INPUTS */
   table { width:100%; border-collapse:collapse; margin-top:6px; }
@@ -1460,19 +1463,19 @@ function marcarYabrirRef(ref){
   ref = (ref || '').trim();
   if(!ref) return;
 
-  // Banner superior (si existe)
+  // Banner superior (desactivado permanentemente)
   try{
     const b = document.getElementById('focusBanner');
     if(b){
-      b.style.display = 'flex';
+      b.style.display = 'none';
       const s = b.querySelector('.ref');
-      if(s) s.textContent = ref;
+      if(s) s.textContent = '';
       const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = () => abrirPedido(ref);
+      if(btn) btn.onclick = null;
     }
   }catch(e){}
 
-  const refNorm = normRef(ref);
+const refNorm = normRef(ref);
 
   const tryClick = (attempt) => {
     const list = document.getElementById('listaPedidos');
