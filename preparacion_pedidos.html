@@ -1596,6 +1596,11 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
         if(l.name==null && l.material!=null) l.name = l.material;
 
         // Cantidades legacy
+        // Compat: algunos generadores guardan 'pedido' (qty pedida) en vez de 'pedida/qty_pedida'
+        if(l.pedida==null && l.pedido!=null) l.pedida = l.pedido;
+        if(l.qty_pedida==null && l.pedido!=null) l.qty_pedida = l.pedido;
+        if(l.pedido==null && l.qty_pedida!=null) l.pedido = l.qty_pedida;
+
         if(l.pedida==null && l.qty_pedida!=null) l.pedida = l.qty_pedida;
         if(l.qty_pedida==null && l.pedida!=null) l.qty_pedida = l.pedida;
         if(l.recibida==null && l.qty_recibida!=null) l.recibida = l.qty_recibida;
