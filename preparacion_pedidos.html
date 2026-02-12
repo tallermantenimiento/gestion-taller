@@ -49,10 +49,7 @@
   /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .hidden { display:none !important; }
-  
-  /* Desactivado permanentemente: banner superior de focus */
-  .focus-banner{ display:none !important; }
-.section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
+  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
   /* TABLAS E INPUTS */
   table { width:100%; border-collapse:collapse; margin-top:6px; }
@@ -413,7 +410,11 @@
 ======================================================================================= */
 
 /* ========= CONSTANTES ========= */
-const LS = localStorage;
+const LS = {
+  getItem(k){ let v = localStorage.getItem(k); if(v===null) v = sessionStorage.getItem(k); return v; },
+  setItem(k,v){ try{ localStorage.setItem(k,v); }catch(e){ try{ sessionStorage.setItem(k,v); }catch(_e){} } },
+  removeItem(k){ try{ localStorage.removeItem(k); }catch(e){} try{ sessionStorage.removeItem(k); }catch(e){} },
+};
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
@@ -1299,12 +1300,12 @@ function saveLinkMap(){
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
 let ref = refBase;
-const existsAny = !!(LS.getItem(KP(refBase)) || sessionStorage.getItem(KP(refBase)) || LS.getItem(KM(refBase)) || sessionStorage.getItem(KM(refBase)));
+const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
 
 let metaExist = {};
 let existUid = "";
 if (existsAny) {
-  try { metaExist = JSON.parse((LS.getItem(KM(refBase)) || sessionStorage.getItem(KM(refBase)) || '{}')) || {}; } catch(e) { metaExist = {}; }
+  try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
   existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
 }
 
@@ -1463,19 +1464,19 @@ function marcarYabrirRef(ref){
   ref = (ref || '').trim();
   if(!ref) return;
 
-  // Banner superior (desactivado permanentemente)
+  // Banner superior (si existe)
   try{
     const b = document.getElementById('focusBanner');
     if(b){
-      b.style.display = 'none';
+      b.style.display = 'flex';
       const s = b.querySelector('.ref');
-      if(s) s.textContent = '';
+      if(s) s.textContent = ref;
       const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = null;
+      if(btn) btn.onclick = () => abrirPedido(ref);
     }
   }catch(e){}
 
-const refNorm = normRef(ref);
+  const refNorm = normRef(ref);
 
   const tryClick = (attempt) => {
     const list = document.getElementById('listaPedidos');
@@ -1581,7 +1582,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  estadoMateriales = JSON.parse((LS.getItem(KP(ref)) || sessionStorage.getItem(KP(ref)) || "[]"));
+  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
       // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
@@ -1596,15 +1597,15 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
         if(l.name==null && l.material!=null) l.name = l.material;
 
         // Cantidades legacy
-        // Compat: algunos generadores guardan 'pedido' (qty pedida) en vez de 'pedida/qty_pedida'
-        if(l.pedida==null && l.pedido!=null) l.pedida = l.pedido;
-        if(l.qty_pedida==null && l.pedido!=null) l.qty_pedida = l.pedido;
-        if(l.pedido==null && l.qty_pedida!=null) l.pedido = l.qty_pedida;
-
         if(l.pedida==null && l.qty_pedida!=null) l.pedida = l.qty_pedida;
         if(l.qty_pedida==null && l.pedida!=null) l.qty_pedida = l.pedida;
         if(l.recibida==null && l.qty_recibida!=null) l.recibida = l.qty_recibida;
         if(l.qty_recibida==null && l.recibida!=null) l.qty_recibida = l.recibida;
+
+        // Compat: algunos envíos usan 'pedido' en vez de 'pedida'
+        if(l.pedida==null && l.pedido!=null) l.pedida = l.pedido;
+        if(l.qty_pedida==null && l.pedido!=null) l.qty_pedida = l.pedido;
+        if(l.pedido==null && l.pedida!=null) l.pedido = l.pedida;
 
         // Normaliza vínculo a Stock (distintos formatos: stockLinkId/stockId/matId/linked_matId)
         if(l.stockLinkId==null && l.stockId!=null) l.stockLinkId = l.stockId;
