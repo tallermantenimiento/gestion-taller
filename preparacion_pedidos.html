@@ -1014,19 +1014,7 @@ function ldhHasDelivery(ref){
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
     if(!Array.isArray(db.deliveries)) return false;
-
-    const isClosed = (d)=>{
-      if(!d || typeof d!=='object') return false;
-      if(d.archived || d.archivedAt) return true;
-      const total = Number(d.total)||0;
-      const delivered = (d.history||[]).reduce((s,h)=>s+(Number(h.qty)||0),0);
-      if(total>0 && delivered>=total) return true;
-      const st = String(d.status||d.estado||"").toUpperCase();
-      if(st.includes("ENTREG") || st.includes("FINAL") || st.includes("CERR")) return true;
-      return false;
-    };
-
-    return db.deliveries.some(d => d && d.ref === ref && !isClosed(d));
+    return db.deliveries.some(d => d && d.ref === ref);
   }catch(e){ return false; }
 }
 
@@ -1311,12 +1299,12 @@ function saveLinkMap(){
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
 let ref = refBase;
-const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
+const existsAny = !!(LS.getItem(KP(refBase)) || sessionStorage.getItem(KP(refBase)) || LS.getItem(KM(refBase)) || sessionStorage.getItem(KM(refBase)));
 
 let metaExist = {};
 let existUid = "";
 if (existsAny) {
-  try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
+  try { metaExist = JSON.parse((LS.getItem(KM(refBase)) || sessionStorage.getItem(KM(refBase)) || '{}')) || {}; } catch(e) { metaExist = {}; }
   existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
 }
 
@@ -1593,7 +1581,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
+  estadoMateriales = JSON.parse((LS.getItem(KP(ref)) || sessionStorage.getItem(KP(ref)) || "[]"));
       // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
