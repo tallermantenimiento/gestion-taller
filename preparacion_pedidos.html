@@ -451,6 +451,32 @@ const LS = {
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
+
+// Cloud cache (Firestore): evita depender del localStorage para listar/abrir pedidos
+let CLOUD_PREP_CACHE = {}; // refNorm -> {refOriginal, meta, recepcion}
+let CLOUD_PREP_READY = false;
+
+async function cargarCloudPrepPedidos(){
+  try{
+    fbEnsure();
+    await fsLoginHidden();
+    if(!fbDb){ return; }
+    const snap = await fbDb.collection("prep_orders").get();
+    const cache = {};
+    snap.forEach(doc=>{
+      const d = doc.data() || {};
+      const refOriginal = (d.refOriginal || "").toString().trim();
+      const refN = normRef(refOriginal || doc.id);
+      if(!refN) return;
+      cache[refN] = { refOriginal, meta: d.meta || null, recepcion: d.recepcion || null, _docId: doc.id };
+    });
+    CLOUD_PREP_CACHE = cache;
+    CLOUD_PREP_READY = true;
+  }catch(e){
+    console.warn("cargarCloudPrepPedidos fallo:", e);
+    CLOUD_PREP_READY = false;
+  }
+}
 const KM = r => "prep_meta_" + r;
 
 const STOCK_DB_KEY = "taller_stock_v3_data";
@@ -1552,6 +1578,15 @@ const pushStorageKeys = (store) => {
 pushStorageKeys(localStorage);
 pushStorageKeys(sessionStorage);
 
+// Cloud: incluir pedidos guardados en Firestore aunque no existan como prep_recepcion_* local
+try{
+  if(CLOUD_PREP_CACHE && typeof CLOUD_PREP_CACHE === "object"){
+    Object.keys(CLOUD_PREP_CACHE).forEach(refN=>{
+      if(refN) keysSet.add("prep_recepcion_" + refN);
+    });
+  }
+}catch(e){}
+
 // Also include refs that have global "no asignado" debt even if prep_recepcion_* is missing
 // (so they don't disappear from Preparación while still deudor).
 try{
@@ -1569,8 +1604,13 @@ const keys = Array.from(keysSet);
 
   keys.reverse().forEach(k => {
     const ref = k.replace("prep_recepcion_", "");
-    const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
-    const lines = JSON.parse(LS.getItem(k) || "[]");
+    let meta = JSON.parse(LS.getItem(KM(ref)) || "null");
+    if(!meta || typeof meta !== "object") meta = {};
+    const refN = normRef(ref);
+    if((!meta || Object.keys(meta).length===0) && CLOUD_PREP_CACHE[refN] && CLOUD_PREP_CACHE[refN].meta) meta = CLOUD_PREP_CACHE[refN].meta;
+    let lines = JSON.parse(LS.getItem(k) || "[]");
+    const refN2 = normRef(ref);
+    if((!lines || !lines.length) && CLOUD_PREP_CACHE[refN2] && Array.isArray(CLOUD_PREP_CACHE[refN2].recepcion)) lines = CLOUD_PREP_CACHE[refN2].recepcion;
     const totalLines = lines.length;
 
     const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
@@ -2623,7 +2663,10 @@ async function init(){
     }
   }
 
-  cargarLista();
+      // Preparación desde nube (si existe)
+    await cargarCloudPrepPedidos();
+
+cargarLista();
   // si venimos desde el index con ?openRef=...
   autoAbrirDesdeQuery();
 }
