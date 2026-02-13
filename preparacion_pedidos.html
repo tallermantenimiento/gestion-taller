@@ -49,7 +49,10 @@
   /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .hidden { display:none !important; }
-  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
+  
+  /* Desactivado permanentemente: banner superior de focus */
+  .focus-banner{ display:none !important; }
+.section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
   /* TABLAS E INPUTS */
   table { width:100%; border-collapse:collapse; margin-top:6px; }
@@ -411,34 +414,6 @@
 
 /* ========= CONSTANTES ========= */
 const LS = localStorage;
-
-
-
-const SS = sessionStorage;
-// Leer una clave desde LocalStorage o SessionStorage (fallback)
-function getAny(key){
-  let v = null;
-  try{ v = LS.getItem(key); }catch(e){ v = null; }
-  if(v === null || v === undefined){
-    try{ v = SS.getItem(key); }catch(e){ v = null; }
-  }
-  return v;
-}
-function removeAny(key){
-  try{ LS.removeItem(key); }catch(e){}
-  try{ SS.removeItem(key); }catch(e){}
-}
-function forEachKeyWithPrefix(prefix, fn){
-  const stores = [LS, SS];
-  for(const S of stores){
-    try{
-      for(let i=0;i<S.length;i++){
-        const k = S.key(i);
-        if(k && k.startsWith(prefix)) fn(S, k);
-      }
-    }catch(e){}
-  }
-}
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
@@ -845,11 +820,13 @@ function findRefByPid(pid){
       }
     }
 
-    // 2) Mirar en metas locales de Preparación (prep_meta_*) en localStorage o sessionStorage
-    forEachKeyWithPrefix("prep_meta_", (S, key) => {
+    // 2) Mirar en metas locales de Preparación (prep_meta_*)
+    for(let i=0;i<LS.length;i++){
+      const key = LS.key(i);
+      if(!key || !key.startsWith("prep_meta_")) continue;
       try{
-        const meta = JSON.parse(S.getItem(key));
-        if(!meta) return;
+        const meta = JSON.parse(LS.getItem(key));
+        if(!meta) continue;
         const cands = [
           meta.pedido_uid, meta.pedidoUid, meta.pid,
           meta.pedido_id, meta.pedidoId, meta.id_pedido
@@ -865,7 +842,7 @@ function findRefByPid(pid){
 
     // 3) Intento final: si el PID parece una referencia textual simple, devolverlo
     if(pid.length < 80 && !pid.includes("/") && !pid.includes("http")){
-      if(getAny("prep_meta_" + pid)) return pid;
+      if(LS.getItem("prep_meta_" + pid)) return pid;
     }
 
     return null;
@@ -1037,7 +1014,19 @@ function ldhHasDelivery(ref){
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
     if(!Array.isArray(db.deliveries)) return false;
-    return db.deliveries.some(d => d && d.ref === ref);
+
+    const isClosed = (d)=>{
+      if(!d || typeof d!=='object') return false;
+      if(d.archived || d.archivedAt) return true;
+      const total = Number(d.total)||0;
+      const delivered = (d.history||[]).reduce((s,h)=>s+(Number(h.qty)||0),0);
+      if(total>0 && delivered>=total) return true;
+      const st = String(d.status||d.estado||"").toUpperCase();
+      if(st.includes("ENTREG") || st.includes("FINAL") || st.includes("CERR")) return true;
+      return false;
+    };
+
+    return db.deliveries.some(d => d && d.ref === ref && !isClosed(d));
   }catch(e){ return false; }
 }
 
@@ -1322,12 +1311,12 @@ function saveLinkMap(){
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
 let ref = refBase;
-const existsAny = !!(getAny(KP(refBase)) || getAny(KM(refBase)));
+const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
 
 let metaExist = {};
 let existUid = "";
 if (existsAny) {
-  try { metaExist = JSON.parse(getAny(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
+  try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
   existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
 }
 
@@ -1366,7 +1355,7 @@ try{
   }
 }catch(e){}
 
-      let metaParaGuardar = JSON.parse(getAny(KM(ref)) || "{}");
+      let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
       metaParaGuardar.pedido_uid = pedidoUid;
       // Pedido ID inmutable (para abrir ficha aunque cambie el nombre/ref)
@@ -1486,19 +1475,19 @@ function marcarYabrirRef(ref){
   ref = (ref || '').trim();
   if(!ref) return;
 
-  // Banner superior (si existe)
+  // Banner superior (desactivado permanentemente)
   try{
     const b = document.getElementById('focusBanner');
     if(b){
-      b.style.display = 'flex';
+      b.style.display = 'none';
       const s = b.querySelector('.ref');
-      if(s) s.textContent = ref;
+      if(s) s.textContent = '';
       const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = () => abrirPedido(ref);
+      if(btn) btn.onclick = null;
     }
   }catch(e){}
 
-  const refNorm = normRef(ref);
+const refNorm = normRef(ref);
 
   const tryClick = (attempt) => {
     const list = document.getElementById('listaPedidos');
@@ -1536,7 +1525,7 @@ function cargarLista() {
 
   keys.reverse().forEach(k => {
     const ref = k.replace("prep_recepcion_", "");
-    const meta = JSON.parse(getAny(KM(ref)) || "{}");
+    const meta = JSON.parse(LS.getItem(KM(ref)) || "{}");
     const lines = JSON.parse(LS.getItem(k) || "[]");
     const totalLines = lines.length;
 
@@ -1588,7 +1577,7 @@ function abrirPedido(ref) {
   document.getElementById("vistaLista").classList.add("hidden");
   document.getElementById("vistaDetalle").classList.remove("hidden");
 
-  metaActual = JSON.parse(getAny(KM(ref)) || "{}");
+  metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
 if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
 
   // Hidratación de "No asignado" desde registro global (por si el pedido viene de otro módulo)
@@ -1604,7 +1593,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  estadoMateriales = JSON.parse(getAny(KP(ref)) || "[]");
+  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
       // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
