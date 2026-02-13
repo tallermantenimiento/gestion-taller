@@ -453,7 +453,14 @@ function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
 
 // Cloud cache (Firestore): evita depender del localStorage para listar/abrir pedidos
-let CLOUD_PREP_CACHE = {}; // refNorm -> {refOriginal, meta, recepcion}
+let CLOUD_PREP_CACHE = {};
+function _cloudGetPrep(key){
+  try{
+    if(!CLOUD_PREP_CACHE) return null;
+    return CLOUD_PREP_CACHE[key] || CLOUD_PREP_CACHE[normRef(key)] || null;
+  }catch(e){ return null; }
+}
+ // refNorm -> {refOriginal, meta, recepcion}
 let CLOUD_PREP_READY = false;
 
 async function cargarCloudPrepPedidos(){
@@ -468,7 +475,7 @@ async function cargarCloudPrepPedidos(){
       const refOriginal = (d.refOriginal || "").toString().trim();
       const refN = normRef(refOriginal || doc.id);
       if(!refN) return;
-      cache[refN] = { refOriginal, meta: d.meta || null, recepcion: d.recepcion || null, _docId: doc.id };
+      cache[doc.id] = { refOriginal, meta: d.meta || null, recepcion: d.recepcion || null, _docId: doc.id };
     });
     CLOUD_PREP_CACHE = cache;
     CLOUD_PREP_READY = true;
@@ -1354,22 +1361,22 @@ function saveLinkMap(){
       const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
 
 // UID de pedido:
-// - Si el pedido ya existe con esa referencia, REUTILIZAMOS su UID para NO crear "#2".
-// - Si no existe, usamos el UID entrante o generamos uno nuevo.
+// - Si viene un UID (desde Index / nube), ese UID manda (evita colisiones).
+// - Si NO viene UID y ya existe algo con esa referencia base, generamos uno NUEVO para NO pisar el anterior.
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
-let ref = refBase;
-const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
+let ref = incomingUid || refBase;
+const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)) || _cloudGetPrep(refBase));
 
-let metaExist = {};
-let existUid = "";
-if (existsAny) {
-  try { metaExist = JSON.parse(LS.getItem(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
-  existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
+if (!incomingUid && existsAny) {
+  const ts = Date.now();
+  const rnd = Math.random().toString(36).slice(2,6);
+  ref = refBase + "_"+ts+"_"+rnd;
 }
 
+
 // UID FINAL: preferimos el UID existente (si lo hay), si no el entrante, si no uno nuevo.
-const pedidoUid = existUid || incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
+const pedidoUid = ref;
 
 // IMPORTANTE: al importar desde Cálculo queremos 1 solo pedido por referencia.
 // Si existe ya el pedido, lo sobreescribimos (NO generamos "#2").
@@ -1501,11 +1508,12 @@ function _getQueryParam(name){
 function getFocusRef(){
   try{
     const u = new URLSearchParams(window.location.search || '');
-    let ref = (u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
+    let ref = (u.get('openDoc') || u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
 
     if(!ref){
       const h = (window.location.hash || '').replace(/^#/, '');
-      if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
+      if(h.startsWith('openDoc=')) ref = decodeURIComponent(h.slice(8));
+      else if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
       else if(h.startsWith('openRef=')) ref = decodeURIComponent(h.slice(8));
     }
 
@@ -1581,9 +1589,7 @@ pushStorageKeys(sessionStorage);
 // Cloud: incluir pedidos guardados en Firestore aunque no existan como prep_recepcion_* local
 try{
   if(CLOUD_PREP_CACHE && typeof CLOUD_PREP_CACHE === "object"){
-    Object.keys(CLOUD_PREP_CACHE).forEach(refN=>{
-      if(refN) keysSet.add("prep_recepcion_" + refN);
-    });
+    Object.keys(CLOUD_PREP_CACHE).forEach(docId=>{ if(docId) keysSet.add("prep_recepcion_" + docId); });
   }
 }catch(e){}
 
@@ -1607,10 +1613,10 @@ const keys = Array.from(keysSet);
     let meta = JSON.parse(LS.getItem(KM(ref)) || "null");
     if(!meta || typeof meta !== "object") meta = {};
     const refN = normRef(ref);
-    if((!meta || Object.keys(meta).length===0) && CLOUD_PREP_CACHE[refN] && CLOUD_PREP_CACHE[refN].meta) meta = CLOUD_PREP_CACHE[refN].meta;
+    if((!meta || Object.keys(meta).length===0) && _cloudGetPrep(refN) && _cloudGetPrep(refN).meta) meta = _cloudGetPrep(refN).meta;
     let lines = JSON.parse(LS.getItem(k) || "[]");
     const refN2 = normRef(ref);
-    if((!lines || !lines.length) && CLOUD_PREP_CACHE[refN2] && Array.isArray(CLOUD_PREP_CACHE[refN2].recepcion)) lines = CLOUD_PREP_CACHE[refN2].recepcion;
+    if((!lines || !lines.length) && _cloudGetPrep(refN2) && Array.isArray(_cloudGetPrep(refN2).recepcion)) lines = _cloudGetPrep(refN2).recepcion;
     const totalLines = lines.length;
 
     const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
@@ -1681,8 +1687,8 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   // Cloud fallback: si no existe en local, cargar meta/recepción desde Firestore cache
   try{
     const refN = normRef(ref);
-    if((!metaActual || Object.keys(metaActual||{}).length===0) && CLOUD_PREP_CACHE && CLOUD_PREP_CACHE[refN] && CLOUD_PREP_CACHE[refN].meta){
-      metaActual = Object.assign({}, CLOUD_PREP_CACHE[refN].meta);
+    if((!metaActual || Object.keys(metaActual||{}).length===0) && CLOUD_PREP_CACHE && _cloudGetPrep(refN) && _cloudGetPrep(refN).meta){
+      metaActual = Object.assign({}, _cloudGetPrep(refN).meta);
       if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
     }
   }catch(e){}
@@ -1692,8 +1698,8 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   // Cloud fallback para líneas: si local está vacío, hidratar desde cache cloud
   try{
     const refN = normRef(ref);
-    if((!estadoMateriales || !estadoMateriales.length) && CLOUD_PREP_CACHE && CLOUD_PREP_CACHE[refN] && Array.isArray(CLOUD_PREP_CACHE[refN].recepcion)){
-      estadoMateriales = JSON.parse(JSON.stringify(CLOUD_PREP_CACHE[refN].recepcion)); // deep copy
+    if((!estadoMateriales || !estadoMateriales.length) && CLOUD_PREP_CACHE && _cloudGetPrep(refN) && Array.isArray(_cloudGetPrep(refN).recepcion)){
+      estadoMateriales = JSON.parse(JSON.stringify(_cloudGetPrep(refN).recepcion)); // deep copy
       // Intento de cachearlo en sessionStorage para no depender de la red en esta sesión
       try{ sessionStorage.setItem(KP(ref), JSON.stringify(estadoMateriales)); }catch(e){}
     }
@@ -2657,13 +2663,26 @@ function mandarAFabricacionAutoSiHaceFalta(){
 
 
 /* ========= ELIMINAR ========= */
-function eliminarPedido() {
-  if (confirm("⛔ ¿Eliminar?")) {
-    LS.removeItem(KP(refActual));
-    LS.removeItem(KM(refActual));
-    clearGlobalBorrow(refActual);
-    volverLista();
-  }
+async function eliminarPedido() {
+  if (!confirm("⛔ ¿Eliminar?")) return;
+  try{
+    // Si viene de nube, borrar también en Firestore (por docId = refActual cuando listamos desde nube)
+    const cloudEntry = _cloudGetPrep(refActual);
+    if(cloudEntry && cloudEntry._docId){
+      try{
+        fbEnsure();
+        await fsLoginHidden();
+        if(fbDb){
+          await fbDb.collection("prep_orders").doc(cloudEntry._docId).delete();
+        }
+      }catch(e){ console.warn("Eliminar en nube fallo:", e); }
+      try{ delete CLOUD_PREP_CACHE[cloudEntry._docId]; }catch(e){}
+    }
+  }catch(e){}
+  try{ LS.removeItem(KP(refActual)); }catch(e){}
+  try{ LS.removeItem(KM(refActual)); }catch(e){}
+  try{ clearGlobalBorrow(refActual); }catch(e){}
+  try{ volverLista(); }catch(e){}
 }
 
 /* ========= INIT ========= */
