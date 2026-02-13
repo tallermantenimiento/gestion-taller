@@ -450,7 +450,7 @@ const DEFAULT_LIB = {
 
 function loadAll(){
   // Cargamos la base de datos ANTIGUA para recuperar lo que tenías
-  try{ const raw = localStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
+  try{ const raw = localStorage.getItem(DB_KEY) || sessionStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
 
   if(!db || !Array.isArray(db.tools)) db = {tools:[],history:[], library:null};
   if(!db.library) db.library = JSON.parse(JSON.stringify(DEFAULT_LIB));
@@ -506,63 +506,38 @@ function syncFamilyOrder(){
     db.familyOrder = db.familyOrder.filter(k => currentKeys.includes(k) || k === "Sin familia");
 }
 
-function __isQuotaError(e){
-  const msg = String(e && (e.name || e.message || e) || "");
-  return (e && (e.name === "QuotaExceededError")) || /quota/i.test(msg) || /exceed/i.test(msg) || /DOM Exception 22/i.test(msg);
-}
-function __lsSetSafe(key, value){
-  try{
-    localStorage.setItem(key, value);
-    return true;
-  }catch(e){
-    if(__isQuotaError(e)) return false;
-    throw e;
-  }
-}
-function __shSetSafe(key, value){
-  try{
-    sessionStorage.setItem(key, value);
-    return true;
-  }catch(_){
-    return false;
-  }
-}
-
-/* ========= Persistencia (robusta) =========
-   - Evita que un QuotaExceededError silencie acciones como "Añadir herramienta"
-   - Si localStorage está lleno: recorta historial y, si aún falla, guarda en sessionStorage
-*/
 function saveAll(){
+  // Guardado robusto: si el navegador llega al límite (QuotaExceededError),
+  // evitamos que se rompa la lógica (p.ej. al crear una herramienta nueva).
+  // 1) Intentamos localStorage (persistente)
+  // 2) Si falla, salvamos en sessionStorage (temporal) y avisamos.
   const dbStr = JSON.stringify(db);
   const cfgStr = JSON.stringify(cfg);
 
-  // 1) Intento normal
-  if(__lsSetSafe(DB_KEY, dbStr) && __lsSetSafe(CFG_KEY, cfgStr)) return;
-
-  // 2) Primer plan B: recortar historial (suele ser lo que más crece)
   try{
-    if(Array.isArray(db.history) && db.history.length > 2000){
-      db.history = db.history.slice(-2000);
+    localStorage.setItem(DB_KEY, dbStr);
+    localStorage.setItem(CFG_KEY, cfgStr);
+    window.__SAVE_FALLBACK = false;
+    return true;
+  }catch(e){
+    // QuotaExceededError suele aparecer cuando hay muchos datos en localStorage
+    try{
+      sessionStorage.setItem(DB_KEY, dbStr);
+      sessionStorage.setItem(CFG_KEY, cfgStr);
+      window.__SAVE_FALLBACK = true;
+    }catch(_e2){
+      // Si también falla sessionStorage, al menos no reventar la app
+      window.__SAVE_FALLBACK = true;
     }
-  }catch(_){}
 
-  const dbStr2 = JSON.stringify(db);
-  if(__lsSetSafe(DB_KEY, dbStr2) && __lsSetSafe(CFG_KEY, cfgStr)) {
-    alert("⚠️ Almacenamiento casi lleno: he recortado el historial para poder guardar.
-
-Recomendación: exporta una copia y limpia almacenamiento de otras apps del taller si sigues al límite.");
-    return;
+    // Aviso controlado (no spamear)
+    const now = Date.now();
+    if(!window.__LAST_SAVE_ALERT || (now - window.__LAST_SAVE_ALERT) > 8000){
+      window.__LAST_SAVE_ALERT = now;
+      alert("⚠️ No se ha podido guardar en localStorage (memoria llena).\n\nSe mantiene en memoria (y/o sessionStorage) para esta sesión, pero para que quede fijo: \n- Exporta copia (botón Exportar)\n- Libera espacio borrando datos antiguos de otros módulos o limpiando el almacenamiento del sitio.");
+    }
+    return false;
   }
-
-  // 3) Último plan B: sessionStorage (para que al menos no se pierda en el acto)
-  __shSetSafe(DB_KEY, dbStr2);
-  __shSetSafe(CFG_KEY, cfgStr);
-
-  alert("⚠️ No he podido guardar en localStorage (casi seguro por límite de espacio).
-
-Se ha mantenido la sesión temporalmente, pero al cerrar el navegador podrías perder cambios.
-
-Solución: exporta/backup y limpia almacenamiento (localStorage) del dominio.");
 }
 
 function toolsInUseCount(t){ return (t.loans||[]).reduce((a,l)=>a + (l.qty||0), 0); }
