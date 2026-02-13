@@ -1677,8 +1677,29 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
+  
+  // Cloud fallback: si no existe en local, cargar meta/recepción desde Firestore cache
+  try{
+    const refN = normRef(ref);
+    if((!metaActual || Object.keys(metaActual||{}).length===0) && CLOUD_PREP_CACHE && CLOUD_PREP_CACHE[refN] && CLOUD_PREP_CACHE[refN].meta){
+      metaActual = Object.assign({}, CLOUD_PREP_CACHE[refN].meta);
+      if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
+    }
+  }catch(e){}
+
   estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
-      // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
+      
+  // Cloud fallback para líneas: si local está vacío, hidratar desde cache cloud
+  try{
+    const refN = normRef(ref);
+    if((!estadoMateriales || !estadoMateriales.length) && CLOUD_PREP_CACHE && CLOUD_PREP_CACHE[refN] && Array.isArray(CLOUD_PREP_CACHE[refN].recepcion)){
+      estadoMateriales = JSON.parse(JSON.stringify(CLOUD_PREP_CACHE[refN].recepcion)); // deep copy
+      // Intento de cachearlo en sessionStorage para no depender de la red en esta sesión
+      try{ sessionStorage.setItem(KP(ref), JSON.stringify(estadoMateriales)); }catch(e){}
+    }
+  }catch(e){}
+
+// Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
 
