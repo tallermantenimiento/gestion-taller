@@ -159,6 +159,8 @@
       <button class="btn" id="btnConfig">⚙️ Config</button>
       <button class="btn" id="btnExport">⬇ Exportar</button>
       <button class="btn" id="btnImport">⬆ Importar</button>
+      <button class="btn" id="btnCloudSave">☁️ Guardar nube</button>
+      <button class="btn" id="btnCloudLoad">☁️ Cargar nube</button>
     </div>
   </div>
 </header>
@@ -450,7 +452,7 @@ const DEFAULT_LIB = {
 
 function loadAll(){
   // Cargamos la base de datos ANTIGUA para recuperar lo que tenías
-  try{ const raw = localStorage.getItem(DB_KEY) || sessionStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
+  try{ const raw = localStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
 
   if(!db || !Array.isArray(db.tools)) db = {tools:[],history:[], library:null};
   if(!db.library) db.library = JSON.parse(JSON.stringify(DEFAULT_LIB));
@@ -507,37 +509,8 @@ function syncFamilyOrder(){
 }
 
 function saveAll(){
-  // Guardado robusto: si el navegador llega al límite (QuotaExceededError),
-  // evitamos que se rompa la lógica (p.ej. al crear una herramienta nueva).
-  // 1) Intentamos localStorage (persistente)
-  // 2) Si falla, salvamos en sessionStorage (temporal) y avisamos.
-  const dbStr = JSON.stringify(db);
-  const cfgStr = JSON.stringify(cfg);
-
-  try{
-    localStorage.setItem(DB_KEY, dbStr);
-    localStorage.setItem(CFG_KEY, cfgStr);
-    window.__SAVE_FALLBACK = false;
-    return true;
-  }catch(e){
-    // QuotaExceededError suele aparecer cuando hay muchos datos en localStorage
-    try{
-      sessionStorage.setItem(DB_KEY, dbStr);
-      sessionStorage.setItem(CFG_KEY, cfgStr);
-      window.__SAVE_FALLBACK = true;
-    }catch(_e2){
-      // Si también falla sessionStorage, al menos no reventar la app
-      window.__SAVE_FALLBACK = true;
-    }
-
-    // Aviso controlado (no spamear)
-    const now = Date.now();
-    if(!window.__LAST_SAVE_ALERT || (now - window.__LAST_SAVE_ALERT) > 8000){
-      window.__LAST_SAVE_ALERT = now;
-      alert("⚠️ No se ha podido guardar en localStorage (memoria llena).\n\nSe mantiene en memoria (y/o sessionStorage) para esta sesión, pero para que quede fijo: \n- Exporta copia (botón Exportar)\n- Libera espacio borrando datos antiguos de otros módulos o limpiando el almacenamiento del sitio.");
-    }
-    return false;
-  }
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
 }
 
 function toolsInUseCount(t){ return (t.loans||[]).reduce((a,l)=>a + (l.qty||0), 0); }
@@ -1791,6 +1764,107 @@ function boot(){
   setupFloatingDrag();
 }
 
+</script>
+
+<!-- ================= FIREBASE (Auth + Firestore) - Cloud Save Herramientas ================= -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDGIfICSG_KE6QzmKHj3CzgvYeHaUcgARo",
+    authDomain: "gestion-taller-2a439.firebaseapp.com",
+    projectId: "gestion-taller-2a439",
+    storageBucket: "gestion-taller-2a439.firebasestorage.app",
+    messagingSenderId: "498579673950",
+    appId: "1:498579673950:web:eb626781a5b509957db5cf"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window.__FIREBASE_TOOLS__ = { app, auth, db, onAuthStateChanged, doc, getDoc, setDoc, serverTimestamp };
+
+  async function ensureLoggedIn() {
+    // Firebase Auth persistence should carry over between pages in same origin if user signed in once.
+    const u = auth.currentUser;
+    if (u) return u;
+    return await new Promise((resolve) => {
+      const unsub = onAuthStateChanged(auth, (user) => {
+        unsub();
+        resolve(user || null);
+      });
+      setTimeout(() => resolve(auth.currentUser || null), 1500);
+    });
+  }
+
+  async function cloudSaveTools() {
+    const user = await ensureLoggedIn();
+    if (!user) {
+      alert("⚠️ No estás logueado en la nube. Abre el INDEX, inicia sesión y vuelve aquí.");
+      return;
+    }
+
+    // Guardamos solo las 2 claves del módulo (mínimo, sin tocar tu lógica)
+    const DB_KEY = window.DB_KEY || "tool_loans_db_v14_lib";
+    const CFG_KEY = window.CFG_KEY || "tool_loans_cfg_v14_lib";
+
+    const payload = {
+      [DB_KEY]: localStorage.getItem(DB_KEY) || "",
+      [CFG_KEY]: localStorage.getItem(CFG_KEY) || "",
+    };
+
+    const ref = doc(db, "backups", "tools_loans_v14");
+    await setDoc(ref, {
+      createdAt: serverTimestamp(),
+      byUid: user.uid,
+      keys: Object.keys(payload),
+      payload
+    }, { merge: true });
+
+    alert("✅ Guardado en nube OK (Herramientas/Préstamos).");
+  }
+
+  async function cloudLoadTools() {
+    const user = await ensureLoggedIn();
+    if (!user) {
+      alert("⚠️ No estás logueado en la nube. Abre el INDEX, inicia sesión y vuelve aquí.");
+      return;
+    }
+
+    const ref = doc(db, "backups", "tools_loans_v14");
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      alert("⚠️ No hay copia en nube para Herramientas/Préstamos todavía.");
+      return;
+    }
+    const data = snap.data() || {};
+    const payload = data.payload || {};
+    const keys = Object.keys(payload);
+
+    // Guardado seguro (no romper por cuota): si falla, avisamos y no machacamos a medias.
+    try {
+      for (const k of keys) {
+        if (typeof payload[k] === "string") localStorage.setItem(k, payload[k]);
+      }
+    } catch (e) {
+      console.error("CloudLoad localStorage error:", e);
+      alert("❌ No se pudo restaurar en localStorage (memoria llena). Limpia espacio del sitio y vuelve a intentar.");
+      return;
+    }
+
+    alert("✅ Cargado desde nube OK. Recarga la página para ver los datos.");
+  }
+
+  // Wire UI
+  window.addEventListener("DOMContentLoaded", () => {
+    const btnSave = document.getElementById("btnCloudSave");
+    const btnLoad = document.getElementById("btnCloudLoad");
+    if (btnSave) btnSave.addEventListener("click", cloudSaveTools);
+    if (btnLoad) btnLoad.addEventListener("click", cloudLoadTools);
+  });
 </script>
 </body>
 </html>
