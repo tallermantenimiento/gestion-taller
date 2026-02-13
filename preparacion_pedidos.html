@@ -419,6 +419,20 @@ function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
+// === Lectura robusta de prep_recepcion_* (soporta guardado en CHUNKS) ===
+function lsGet(key){
+  const CHUNK_MARK = "__CHUNKED__";
+  const v = localStorage.getItem(key);
+  if(v !== CHUNK_MARK) return v;
+  const n = parseInt(localStorage.getItem(key + "__chunks") || "0", 10) || 0;
+  if(!n) return null;
+  let out = "";
+  for(let i=0;i<n;i++){
+    out += (localStorage.getItem(key + "__c" + i) || "");
+  }
+  return out || null;
+}
+
 const STOCK_DB_KEY = "taller_stock_v3_data";
 const LINK_MAP_KEY = "prep_stock_linkmap_v1";
 const UNASSIGNED_GLOBAL_KEY = "unassigned_borrow_global_v1";
@@ -1014,19 +1028,7 @@ function ldhHasDelivery(ref){
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
     if(!Array.isArray(db.deliveries)) return false;
-
-    const isClosed = (d)=>{
-      if(!d || typeof d!=='object') return false;
-      if(d.archived || d.archivedAt) return true;
-      const total = Number(d.total)||0;
-      const delivered = (d.history||[]).reduce((s,h)=>s+(Number(h.qty)||0),0);
-      if(total>0 && delivered>=total) return true;
-      const st = String(d.status||d.estado||"").toUpperCase();
-      if(st.includes("ENTREG") || st.includes("FINAL") || st.includes("CERR")) return true;
-      return false;
-    };
-
-    return db.deliveries.some(d => d && d.ref === ref && !isClosed(d));
+    return db.deliveries.some(d => d && d.ref === ref);
   }catch(e){ return false; }
 }
 
@@ -1311,7 +1313,7 @@ function saveLinkMap(){
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
 let ref = refBase;
-const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
+const existsAny = !!(lsGet(KP(refBase)) || LS.getItem(KM(refBase)));
 
 let metaExist = {};
 let existUid = "";
@@ -1593,7 +1595,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
+  estadoMateriales = JSON.parse(lsGet(KP(ref)) || "[]");
       // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
