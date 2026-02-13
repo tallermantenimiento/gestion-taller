@@ -1539,7 +1539,29 @@ function autoAbrirDesdeQuery(){
 function cargarLista() {
   const lista = document.getElementById("lista");
   lista.innerHTML = "";
-  const keys = Object.keys(LS).filter(k => k.startsWith("prep_recepcion_"));
+  // Collect prep_recepcion_* keys from BOTH localStorage and sessionStorage (LS is a wrapper)
+const keysSet = new Set();
+const pushStorageKeys = (store) => {
+  try{
+    for(let i=0;i<store.length;i++){
+      const kk = store.key(i);
+      if(kk && kk.startsWith("prep_recepcion_")) keysSet.add(kk);
+    }
+  }catch(e){}
+};
+pushStorageKeys(localStorage);
+pushStorageKeys(sessionStorage);
+
+// Also include refs that have global "no asignado" debt even if prep_recepcion_* is missing
+// (so they don't disappear from Preparación while still deudor).
+try{
+  const gb = JSON.parse(LS.getItem(UNASSIGNED_GLOBAL_KEY) || "{}");
+  Object.keys(gb || {}).forEach(ref => {
+    if(ref) keysSet.add("prep_recepcion_" + ref);
+  });
+}catch(e){}
+
+const keys = Array.from(keysSet);
   if(keys.length === 0) {
     lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>";
     return;
