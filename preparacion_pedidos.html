@@ -413,25 +413,45 @@
 ======================================================================================= */
 
 /* ========= CONSTANTES ========= */
-const LS = localStorage;
+const LS = {
+  getItem: (k) => {
+    let v = null;
+    try { v = localStorage.getItem(k); } catch(e) {}
+    if (v == null) { try { v = sessionStorage.getItem(k); } catch(e) {} }
+    return v;
+  },
+  setItem: (k, v) => {
+    try {
+      localStorage.setItem(k, v);
+      return true;
+    } catch(e) {
+      // quota: purge only preparation scratch keys (keep current key)
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const kk = localStorage.key(i);
+          if (!kk || kk === k) continue;
+          if (kk.startsWith('prep_meta_') || kk.startsWith('prep_recepcion_') || kk.startsWith('prep_focus_') || kk.startsWith('prep_pedido_')) {
+            localStorage.removeItem(kk);
+          }
+        }
+        localStorage.setItem(k, v);
+        return true;
+      } catch(e2) {
+        // last resort: sessionStorage (works for current tab)
+        try { sessionStorage.setItem(k, v); } catch(e3) {}
+        return false;
+      }
+    }
+  },
+  removeItem: (k) => {
+    try { localStorage.removeItem(k); } catch(e) {}
+    try { sessionStorage.removeItem(k); } catch(e) {}
+  }
+};
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
-
-// === Lectura robusta de prep_recepcion_* (soporta guardado en CHUNKS) ===
-function lsGet(key){
-  const CHUNK_MARK = "__CHUNKED__";
-  const v = localStorage.getItem(key);
-  if(v !== CHUNK_MARK) return v;
-  const n = parseInt(localStorage.getItem(key + "__chunks") || "0", 10) || 0;
-  if(!n) return null;
-  let out = "";
-  for(let i=0;i<n;i++){
-    out += (localStorage.getItem(key + "__c" + i) || "");
-  }
-  return out || null;
-}
 
 const STOCK_DB_KEY = "taller_stock_v3_data";
 const LINK_MAP_KEY = "prep_stock_linkmap_v1";
@@ -1313,7 +1333,7 @@ function saveLinkMap(){
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
 let ref = refBase;
-const existsAny = !!(lsGet(KP(refBase)) || LS.getItem(KM(refBase)));
+const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)));
 
 let metaExist = {};
 let existUid = "";
@@ -1595,7 +1615,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  estadoMateriales = JSON.parse(lsGet(KP(ref)) || "[]");
+  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
       // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
@@ -2450,7 +2470,10 @@ function marcarTodoOk() {
   renderTabla();
   cargarLista();
 }
-function guardarEstadoLocal() { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales)); }
+function guardarEstadoLocal() {
+  const ok = LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
+  if(!ok) console.warn('[Prep] Estado guardado en sessionStorage (localStorage lleno)');
+}
 
 /* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
 function confirmarTodoRecepcion() {
