@@ -409,6 +409,37 @@
    - “Marcar en fabricación” eliminado (ya existe “Mandar a fabricación”).
 ======================================================================================= */
 
+
+
+/* ========= STORAGE HELPERS (localStorage + sessionStorage fallback) ========= */
+function getAny(key){
+  try{
+    const v = localStorage.getItem(key);
+    if(v !== null && v !== undefined) return v;
+  }catch(e){}
+  try{
+    const v2 = sessionStorage.getItem(key);
+    if(v2 !== null && v2 !== undefined) return v2;
+  }catch(e){}
+  return null;
+}
+function setAny(key, value){
+  // value must be string
+  try{
+    localStorage.setItem(key, value);
+    return 'local';
+  }catch(e){
+    try{
+      sessionStorage.setItem(key, value);
+      return 'session';
+    }catch(e2){
+      // rethrow original to preserve quota info
+      throw e;
+    }
+  }
+}
+/* ========================================================================= */
+
 /* ========= CONSTANTES ========= */
 const LS = localStorage;
 const SS = sessionStorage;
@@ -421,26 +452,12 @@ const getAny = (k)=>{
   }catch(_){ }
   try{ return SS.getItem(k); }catch(_){ return null; }
 };
-// Escribe en localStorage y, si falla por cuota/permiso, escribe en sessionStorage.
-// Devuelve true si se pudo persistir en alguno de los dos.
-const setAny = (k, v)=>{
-  const vv = (v===undefined) ? '' : String(v);
-  try{ LS.setItem(k, vv); return true; }catch(_){ }
-  try{ SS.setItem(k, vv); return true; }catch(_){ }
-  return false;
-};
 const removeAny = (k)=>{
   try{ LS.removeItem(k); }catch(_){ }
   try{ SS.removeItem(k); }catch(_){ }
 };
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
-
-function isPerfilUnit(u){
-  const uu = String(u||'').toLowerCase();
-  return (uu==='barra' || uu==='mm' || uu==='m' || uu==='metro' || uu==='metros');
-}
-console.log('[PREP] FIX hierro mm v2 cargado');
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
@@ -929,7 +946,7 @@ function devolverNoAsignadoLinea(lineIndex){
       return;
     }
   }else{
-    const check = _addToRealStock_byLinkedOrName(line, (isPerfilUnit(line.unit)? metaActual.tipo_hierro : null));
+    const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
     if(!check.success){
       alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
       return;
@@ -1975,7 +1992,7 @@ function renderTabla() {
       <td><input type="text" value="${linea.note || ''}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
     `;
 
-    if (isPerfilUnit(linea.unit)) { hasBarras = true; tbodyBarras.appendChild(tr); }
+    if ((linea.unit || "").toLowerCase() === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
     else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
   });
 
@@ -2026,7 +2043,7 @@ function guardarLinea(index) {
   if (diff <= 0) return;
 
   let tipoHierro = null;
-  if ((isPerfilUnit(linea.unit||""))) {
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2074,7 +2091,7 @@ function consumirDeStock(index){
   }
 
   let tipoHierro = null;
-  if ((isPerfilUnit(linea.unit||""))) {
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2231,7 +2248,7 @@ function consumirNoAsignado(index){
   }
 
   let tipoHierro = null;
-  if ((isPerfilUnit(linea.unit||""))) {
+  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2464,7 +2481,7 @@ function guardarEstadoLocal() { setAny(KP(refActual), JSON.stringify(estadoMater
 
 /* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
 function confirmarTodoRecepcion() {
-  const hayBarras = estadoMateriales.some(l => (isPerfilUnit(l.unit||"")));
+  const hayBarras = estadoMateriales.some(l => (String(l.unit||"").toLowerCase() === 'barra'));
   if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
 
   const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
