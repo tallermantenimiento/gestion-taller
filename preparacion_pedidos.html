@@ -1302,7 +1302,7 @@ function saveLinkMap(){
 
   // 2) localStorage (misma origin)
   if(!snap){
-    const snapRaw = getAny("latest_materials_v1") || getAny("pedido_en_preparacion") || getAny("prep_pedido_payload");
+    const snapRaw = getAny("latest_materials_v1") || getAny("pedido_en_preparacion") || getAny("prep_pedido_payload") || getAny("prep_materiales");
     if(snapRaw){
       try{ snap = JSON.parse(snapRaw); }catch(e){ snap = null; }
     }
@@ -1310,7 +1310,8 @@ function saveLinkMap(){
 
   if (snap) {
     try {
-      const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
+      const incomingRef = (typeof getFocusRef==="function") ? getFocusRef() : null;
+      const refBase = String((snap && (snap.referencia || snap.ref)) || incomingRef || ('SIN_REF_' + Date.now())).trim();
 
 // UID de pedido:
 // - Si el pedido ya existe con esa referencia, REUTILIZAMOS su UID para NO crear "#2".
