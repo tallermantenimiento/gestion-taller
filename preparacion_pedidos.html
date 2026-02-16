@@ -432,6 +432,7 @@ function isPerfilUnit(u){
   const uu = String(u||'').toLowerCase();
   return (uu==='barra' || uu==='mm' || uu==='m' || uu==='metro' || uu==='metros');
 }
+console.log('[PREP] FIX hierro mm v2 cargado');
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
@@ -920,7 +921,7 @@ function devolverNoAsignadoLinea(lineIndex){
       return;
     }
   }else{
-    const check = _addToRealStock_byLinkedOrName(line, (StringisPerfilUnit(line.unit)? metaActual.tipo_hierro : null));
+    const check = _addToRealStock_byLinkedOrName(line, (isPerfilUnit(line.unit)? metaActual.tipo_hierro : null));
     if(!check.success){
       alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
       return;
