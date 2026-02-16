@@ -1136,6 +1136,22 @@ onAuthStateChanged(auth, async (user) => {
 <script>
 /* ========= BACKUP / RESTORE LOCALSTORAGE <-> FIRESTORE ========= */
 
+
+// === Storage helper: prefer localStorage, fallback to sessionStorage (cuando la cuota está llena) ===
+function _getStoreItem(key){
+  try{
+    const v = localStorage.getItem(key);
+    if(v !== null && v !== undefined) return v;
+  }catch(e){}
+  try{ return sessionStorage.getItem(key); }catch(e){}
+  return null;
+}
+function _setStoreItem(key, val){
+  try{ localStorage.setItem(key, val); return true; }catch(e){}
+  try{ sessionStorage.setItem(key, val); return true; }catch(e){}
+  return false;
+}
+
 async function backupToFirestore(docId = "backup_main") {
 
   const fb = window.__FIREBASE__;
@@ -2033,7 +2049,7 @@ _fmtPartialStore(s){
     },
 
     loadData() {
-        const stored = localStorage.getItem('ldh_db');
+        const stored = _getStoreItem('ldh_db');
         if(stored) {
             this.state = JSON.parse(stored);
             // Asegurar campos nuevos (migración aditiva)
@@ -2132,7 +2148,7 @@ _fmtPartialStore(s){
 
 
 saveData() {
-        localStorage.setItem('ldh_db', JSON.stringify(this.state));
+        _setStoreItem('ldh_db', JSON.stringify(this.state));
     },
 
     router(viewName) {
@@ -4758,7 +4774,7 @@ function enviarAPreparacionPedido(){
 
   // Guardar meta para que Preparación construya el listado (prep_meta_*)
   localStorage.setItem(
-    "prep_meta_" + docIderencia,
+    "prep_meta_" + referencia,
     JSON.stringify({
       unidades: payload.unidades,
       vars: payload.vars,
@@ -4842,7 +4858,7 @@ function enviarAPreparacionPedido(){
       empresa: empresa || "", company: (empresa || ""), materiales: [], timestamp: Date.now(),
       unidades: __qty, cantidad: __qty, vars: { cantidad: __qty } };
     try{
-      const raw = localStorage.getItem("ldh_db");
+      const raw = _getStoreItem('ldh_db');
       if(!raw) return payload;
       const state = JSON.parse(raw);
       if(!state || !Array.isArray(state.purchases)) return payload;
@@ -4959,7 +4975,7 @@ window.irAPreparacion = function(){
     meta.fecha = Date.now();
     if(meta.en_fabricacion === undefined) meta.en_fabricacion = false;
     if(!meta.pedido_id) meta.pedido_id = 'pid_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
-    meta.pedido_uid = docId;
+    if(!meta.pedido_uid) meta.pedido_uid = 'P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
     localStorage.setItem(KM(ref), JSON.stringify(meta));
     localStorage.setItem(KP(ref), JSON.stringify(materiales));
   }catch(e){
@@ -5056,7 +5072,7 @@ function irAPreparacion(){
     return lineas;
   }
 
-  async function generarPedidoPreparacionEstable(){
+  function generarPedidoPreparacionEstable(){
     // Referencia
     let ref = "";
     const inputs = Array.from(document.querySelectorAll("input[type='text'], input:not([type])"))
@@ -5073,6 +5089,12 @@ function irAPreparacion(){
     }
 
     const concepto = document.getElementById("selConcepto")?.value || "";
+
+    if(localStorage.getItem("prep_meta_" + ref)){
+      const ok = confirm("Ya existe un pedido con esta referencia. ¿Quieres recrearlo desde cero?");
+      if(!ok) return;
+    }
+
     const lineas = extraerLineas();
     if(lineas.length === 0){
       alert("No se ha detectado material para enviar.");
@@ -5140,8 +5162,8 @@ function irAPreparacion(){
 
 if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
     const meta = {referencia:ref, concepto:concepto, concept:concepto, empresa:empresa, company:empresa, fecha:Date.now(), estado:"pendiente"};
-    const kMeta = "prep_meta_" + docId;
-    const kRec  = "prep_recepcion_" + docId;
+    const kMeta = "prep_meta_" + ref;
+    const kRec  = "prep_recepcion_" + ref;
 
     // Guardado robusto (opción B): seguimos usando localStorage, pero sin bloquear por cuota
     const toNum = (v)=>{ const n = parseFloat(String(v??"").replace(",", ".").trim()); return isFinite(n)?n:0; };
@@ -5190,40 +5212,6 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
       }
     };
 
-    
-    // === PREP CLOUD (evita cuota localStorage) ===
-    function _prepNormRef(ref){
-      return String(ref||"").trim().toLowerCase().replace(/\s+/g,' ').trim();
-    }
-    function _prepHash(str){
-      let h=5381;
-      for(let i=0;i<str.length;i++){ h=((h<<5)+h) ^ str.charCodeAt(i); }
-      return (h>>>0).toString(16);
-    }
-    function _prepDocId(ref){
-      const n=_prepNormRef(ref);
-      const base=n.replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || "pedido";
-      const ts = Date.now();
-      const rnd = Math.random().toString(36).slice(2,8);
-      return "PED_" + ts + "_" + rnd + "_" + base + "_" + _prepHash(n);
-    }
-    async function _cloudSavePrepPedido(ref, metaObj, slimLineas, docIdOverride){
-      try{
-        const FB = window.__FIREBASE__;
-        if(!FB || !FB.db) return {ok:false, reason:"no_firebase"};
-        if(!FB.auth || !FB.auth.currentUser) return {ok:false, reason:"no_auth"};
-        const docId = docIdOverride || _prepDocId(ref);
-        const payload = { refOriginal:String(ref||"").trim(), updatedAt:FB.serverTimestamp(), meta:metaObj||{}, recepcion:Array.isArray(slimLineas)?slimLineas:[] };
-        await FB.setDoc(FB.doc(FB.db, "prep_orders", docId), payload, {merge:true});
-        try{ sessionStorage.setItem("prep_cloud_doc_"+String(ref||""), docId); }catch(e){}
-        return {ok:true, docId};
-      }catch(e){
-        console.warn("Cloud save PREP fallo:", e);
-        return {ok:false, reason:"error"};
-      }
-    }
-    
-
     // Re-crear desde cero: borrar ambos antes de guardar
     try{ localStorage.removeItem(kMeta); }catch(_){}
     try{ localStorage.removeItem(kRec); }catch(_){}
@@ -5232,21 +5220,14 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
       alert("No se ha podido guardar el pedido (meta) por límite de almacenamiento. Limpia 'prep_*' en el navegador y reintenta.");
       return;
     }
-        // Guardado de RECEPCIÓN: primero nube (para evitar cuota localStorage). Si no hay nube, fallback local.
-    const docId = _prepDocId(ref);
-    const cloudRes = await _cloudSavePrepPedido(ref, meta, slimLineas, docId);
-    if(cloudRes && cloudRes.ok){
-      try{ localStorage.removeItem(kRec); }catch(e){}
-      try{ sessionStorage.removeItem(kRec); }catch(e){}
-    }else{
-      if(!safeSet(kRec, JSON.stringify(slimLineas))){
-        try{ localStorage.removeItem(kMeta); }catch(_){}
-        alert("No se ha podido guardar el material para Preparación (almacenamiento lleno).\n\nSolución: borra claves 'prep_*' en DevTools → Aplicación → Almacenamiento local, o usa 'Borrar datos de sitios'.");
-        return;
-      }
+    if(!safeSet(kRec, JSON.stringify(slimLineas))){
+      // rollback: evita dejar pedidos 'fantasma'
+      try{ localStorage.removeItem(kMeta); }catch(_){}
+      alert("No se ha podido guardar el material para Preparación (almacenamiento lleno).\n\nSolución: borra claves 'prep_*' en DevTools → Aplicación → Almacenamiento local, o usa 'Borrar datos de sitios'.");
+      return;
     }
-    
-    window.location.href = "preparacion_pedidos.html?openDoc=" + encodeURIComponent(docId) + "&openRef=" + encodeURIComponent(ref);
+
+    window.location.href = "preparacion_pedidos.html";
   }
 
   
@@ -5406,7 +5387,7 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
     // Esto evita depender del nombre exacto en Preparación.
     const norm = (s)=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[’'"]/g,'').replace(/×/g,'x');
     try{
-      const db = JSON.parse(localStorage.getItem('ldh_db')||'{}') || {};
+      const db = JSON.parse(_getStoreItem('ldh_db')||'{}') || {};
       const concepts = Array.isArray(db.concepts) ? db.concepts : [];
       const c = concepts.find(x => String(x && x.name || '') === String(concepto||''));
       const links = c && c.stockLinks ? c.stockLinks : null;
@@ -6189,7 +6170,7 @@ function patchUnassignedEverywhere(ref, matId, qty, forceClear){
 
   // 1) LDH_DB (trabajos / deliveries)
   try{
-    const raw = localStorage.getItem("ldh_db");
+    const raw = _getStoreItem('ldh_db');
     if(raw){
       const db = JSON.parse(raw);
       let changed = false;
@@ -6225,13 +6206,13 @@ function patchUnassignedEverywhere(ref, matId, qty, forceClear){
           if(t.meta && apply(t.meta.unassignedBorrow)) changed = true;
         });
       });
-      if(changed) localStorage.setItem("ldh_db", JSON.stringify(db));
+      if(changed) _setStoreItem('ldh_db', JSON.stringify(db));
     }
   }catch(e){}
 
   // 2) prep_meta_{ref}
   try{
-    const k = "prep_meta_" + docIdKey;
+    const k = "prep_meta_" + refKey;
     const rawM = localStorage.getItem(k);
     if(rawM){
       const meta = JSON.parse(rawM);
@@ -6948,8 +6929,8 @@ window.ejecutarDevolucion = function(matId, maxQty){
 
       // Limpieza de claves antiguas que causaban estado 'completo' o duplicados
       try{
-        localStorage.removeItem("prep_meta_" + docId);
-        localStorage.removeItem("prep_recepcion_" + docId);
+        localStorage.removeItem("prep_meta_" + ref);
+        localStorage.removeItem("prep_recepcion_" + ref);
         localStorage.removeItem("prep_pedido_payload");
         localStorage.removeItem("latest_materials_v1");
       }catch(_){}
