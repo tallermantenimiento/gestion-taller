@@ -5196,6 +5196,30 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
       };
     }).filter(x=>x.material);
 
+
+    const purgeLargeNonCritical = ()=>{
+      // Libera espacio de caches grandes regenerables (cortes/plantillas/etc.) para evitar QuotaExceededError
+      try{
+        const keys = Object.keys(localStorage);
+        const killPrefixes = [
+          "cortes_by_concept_", "cutSheets_", "cutTemplates_", "concept_plans_", "concept_plans_parking",
+          "cutTemplate:", "cutTemplates:", "cutSheets:", "cortes:", "cortes_by_concept:"
+        ];
+        const killExact = new Set([
+          "cortes_by_concept_v1","cutSheets_v1","cutTemplates_v1","concept_plans_parking",
+          "cutTemplate:concepto:sheet1","cutTemplate:sheet1","cutTemplate:pedido_de_mat"
+        ]);
+        // Borra también backups antiguos que crecen mucho
+        keys.forEach(k=>{
+          const isBackup = k.startsWith("TallerFlowDB_BACKUP_") || k.startsWith("TallerFlowDB_BACKUP__");
+          const isKill = killExact.has(k) || killPrefixes.some(p=>k.startsWith(p));
+          if(isBackup || isKill){
+            try{ localStorage.removeItem(k); }catch(_){}
+          }
+        });
+      }catch(_){}
+    };
+
     const cleanupPrepKeys = ()=>{
       try{
         const keys = Object.keys(localStorage);
@@ -5211,6 +5235,7 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
       try{ localStorage.setItem(k, v); return true; }catch(e){
         const msg = String(e&&e.message||e||"");
         if(msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("exceed")){
+          purgeLargeNonCritical();
           cleanupPrepKeys();
           try{ localStorage.setItem(k, v); return true; }catch(_2){ return false; }
         }
