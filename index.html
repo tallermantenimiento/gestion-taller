@@ -5190,13 +5190,57 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
       };
     }).filter(x=>x.material);
 
-    const cleanupPrepKeys = ()=>{
+        const cleanupPrepKeys = ()=>{
       try{
-        const keys = Object.keys(localStorage);
-        keys.forEach(k=>{
-          if(k.startsWith("prep_recepcion_") || k.startsWith("prep_meta_") || k === "prep_pedido_payload" || k === "prep_focus_ref" || k === "prep_referencia"){
-            try{ localStorage.removeItem(k); }catch(_){}
+        const metas = [];
+        // recoger metas (solo prep_meta_)
+        for(let i=0;i<localStorage.length;i++){
+          const k = localStorage.key(i);
+          if(!k) continue;
+          if(!k.startsWith("prep_meta_")) continue;
+          const v = localStorage.getItem(k);
+          if(!v) continue;
+          try{
+            const meta = JSON.parse(v);
+            metas.push({k, meta});
+          }catch(_){}
+        }
+
+        const isKeep = (meta)=>{
+          const st = String(meta?.estado||meta?.state||"").toLowerCase();
+          if(st.includes("pend")) return true;
+          if(st.includes("deud")) return true;
+          if(st.includes("fab")) return true;      // en fabricación
+          if(st.includes("almac")) return true;    // en almacén / pendiente
+          return false;
+        };
+        const isRemove = (meta)=>{
+          const st = String(meta?.estado||meta?.state||"").toLowerCase();
+          if(st.includes("entreg")) return true;
+          if(st.includes("complet")) return true;
+          if(st.includes("cerr")) return true;
+          if(st.includes("final")) return true;
+          if(st.includes("archiv")) return true;
+          // si está muy viejo y no es pendiente/deudor/fabricación/almacén, se puede purgar
+          const t = Number(meta?.fecha||meta?.ts||meta?.time||0);
+          const ageDays = t>0 ? (Date.now()-t)/(1000*60*60*24) : 0;
+          if(!isKeep(meta) && ageDays>30) return true;
+          return false;
+        };
+
+        // 1) borrar solo los cerrados/entregados/completos/archivados (y muy viejos)
+        metas.forEach(({k, meta})=>{
+          if(isRemove(meta)){
+            const ref = String(meta?.referencia||meta?.ref||"").trim();
+            localStorage.removeItem(k);
+            if(ref) localStorage.removeItem("prep_recepcion_" + ref);
           }
+        });
+
+        // 2) además, limpiar snapshots/temporales grandes si existen
+        ["latest_material_snapshot","last_snapshot","last_snapshot_v2","latest_snapshot","LDH_PREP_SESSION","LDH_PREP_TMP"].forEach(x=>{
+          try{ localStorage.removeItem(x); }catch(_){}
+          try{ sessionStorage.removeItem(x); }catch(_){}
         });
       }catch(_){}
     };
@@ -5216,15 +5260,19 @@ if(empresa) try{ localStorage.setItem('calc_empresa_last', empresa); }catch(_){}
     try{ localStorage.removeItem(kMeta); }catch(_){}
     try{ localStorage.removeItem(kRec); }catch(_){}
 
-    if(!safeSet(kMeta, JSON.stringify(meta))){
-      alert("No se ha podido guardar el pedido (meta) por límite de almacenamiento. Limpia 'prep_*' en el navegador y reintenta.");
-      return;
+        if(!safeSet(kMeta, JSON.stringify(meta))){
+      // Fallback de sesión (no persistente) si no queda cuota en localStorage
+      try{
+        sessionStorage.setItem(kMeta, JSON.stringify(meta));
+        sessionStorage.setItem("LDH_PREP_SESSION_ACTIVE","1");
+      }catch(_){}
     }
-    if(!safeSet(kRec, JSON.stringify(slimLineas))){
-      // rollback: evita dejar pedidos 'fantasma'
-      try{ localStorage.removeItem(kMeta); }catch(_){}
-      alert("No se ha podido guardar el material para Preparación (almacenamiento lleno).\n\nSolución: borra claves 'prep_*' en DevTools → Aplicación → Almacenamiento local, o usa 'Borrar datos de sitios'.");
-      return;
+        if(!safeSet(kRec, JSON.stringify(payloadSlim))){
+      // Fallback de sesión (no persistente) si no queda cuota en localStorage
+      try{
+        sessionStorage.setItem(kRec, JSON.stringify(payloadSlim));
+        sessionStorage.setItem("LDH_PREP_SESSION_ACTIVE","1");
+      }catch(_){}
     }
 
     window.location.href = "preparacion_pedidos.html";
