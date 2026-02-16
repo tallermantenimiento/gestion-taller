@@ -49,10 +49,7 @@
   /* LAYOUT */
   .card { background:linear-gradient(180deg,#0f172a,#020617); border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
   .hidden { display:none !important; }
-  
-  /* Desactivado permanentemente: banner superior de focus */
-  .focus-banner{ display:none !important; }
-.section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
+  .section-title { margin:18px 0 6px 0; font-size:13px; color:#9fb0c8; letter-spacing:.08em; font-weight: 700; text-transform: uppercase; }
 
   /* TABLAS E INPUTS */
   table { width:100%; border-collapse:collapse; margin-top:6px; }
@@ -413,77 +410,22 @@
 ======================================================================================= */
 
 /* ========= CONSTANTES ========= */
-const LS = {
-  getItem: (k) => {
-    let v = null;
-    try { v = localStorage.getItem(k); } catch(e) {}
-    if (v == null) { try { v = sessionStorage.getItem(k); } catch(e) {} }
-    return v;
-  },
-  setItem: (k, v) => {
-    try {
-      localStorage.setItem(k, v);
-      return true;
-    } catch(e) {
-      // quota: purge only preparation scratch keys (keep current key)
-      try {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const kk = localStorage.key(i);
-          if (!kk || kk === k) continue;
-          if (kk.startsWith('prep_meta_') || kk.startsWith('prep_recepcion_') || kk.startsWith('prep_focus_') || kk.startsWith('prep_pedido_')) {
-            localStorage.removeItem(kk);
-          }
-        }
-        localStorage.setItem(k, v);
-        return true;
-      } catch(e2) {
-        // last resort: sessionStorage (works for current tab)
-        try { sessionStorage.setItem(k, v); } catch(e3) {}
-        return false;
-      }
-    }
-  },
-  removeItem: (k) => {
-    try { localStorage.removeItem(k); } catch(e) {}
-    try { sessionStorage.removeItem(k); } catch(e) {}
-  }
-};
+const LS = localStorage;
+  const SS = sessionStorage;
+
+  // Lee de localStorage y, si no está o falla, de sessionStorage (fallback cuando la cuota está llena)
+  const getAny = (k)=>{
+    try{ const v = getAny(k); if(v!==null && v!==undefined) return v; }catch(_){}
+    try{ return SS.getItem(k); }catch(_){ return null; }
+  };
+  const removeAny = (k)=>{
+    try{ removeAny(k); }catch(_){}
+    try{ SS.removeItem(k); }catch(_){}
+  };
+
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
-
-// Cloud cache (Firestore): evita depender del localStorage para listar/abrir pedidos
-let CLOUD_PREP_CACHE = {};
-function _cloudGetPrep(key){
-  try{
-    if(!CLOUD_PREP_CACHE) return null;
-    return CLOUD_PREP_CACHE[key] || CLOUD_PREP_CACHE[normRef(key)] || null;
-  }catch(e){ return null; }
-}
- // refNorm -> {refOriginal, meta, recepcion}
-let CLOUD_PREP_READY = false;
-
-async function cargarCloudPrepPedidos(){
-  try{
-    fbEnsure();
-    await fsLoginHidden();
-    if(!fbDb){ return; }
-    const snap = await fbDb.collection("prep_orders").get();
-    const cache = {};
-    snap.forEach(doc=>{
-      const d = doc.data() || {};
-      const refOriginal = (d.refOriginal || "").toString().trim();
-      const refN = normRef(refOriginal || doc.id);
-      if(!refN) return;
-      cache[doc.id] = { refOriginal, meta: d.meta || null, recepcion: d.recepcion || null, _docId: doc.id };
-    });
-    CLOUD_PREP_CACHE = cache;
-    CLOUD_PREP_READY = true;
-  }catch(e){
-    console.warn("cargarCloudPrepPedidos fallo:", e);
-    CLOUD_PREP_READY = false;
-  }
-}
 const KM = r => "prep_meta_" + r;
 
 const STOCK_DB_KEY = "taller_stock_v3_data";
@@ -713,7 +655,7 @@ function _autoLinkPaintLinesForCurrentPedido(){
     }
   });
   if(changed){
-    try { LS.setItem(KP(refActual), JSON.stringify(estadoMateriales||[])); } catch(e){}
+    try { setAny(KP(refActual), JSON.stringify(estadoMateriales||[])); } catch(e){}
     // Auto-vincular líneas de pintura al abrir pedido
   try{ autoLinkPaintLines(); }catch(e){ console.warn('autoLinkPaintLines error', e); }
 
@@ -862,7 +804,7 @@ function findRefByPid(pid){
     // 1) Lectura directa de LDH_DB (todas las bolsas posibles)
     let db = {};
     try{
-      const raw = LS.getItem("ldh_db");
+      const raw = getAny("ldh_db");
       if(raw) db = JSON.parse(raw);
     }catch(e){ db = {}; }
 
@@ -888,11 +830,10 @@ function findRefByPid(pid){
     }
 
     // 2) Mirar en metas locales de Preparación (prep_meta_*)
-    for(let i=0;i<LS.length;i++){
-      const key = LS.key(i);
+    for(const key of [...Object.keys(LS), ...Object.keys(SS)]){
       if(!key || !key.startsWith("prep_meta_")) continue;
       try{
-        const meta = JSON.parse(LS.getItem(key));
+        const meta = JSON.parse(getAny(key));
         if(!meta) continue;
         const cands = [
           meta.pedido_uid, meta.pedidoUid, meta.pid,
@@ -909,7 +850,7 @@ function findRefByPid(pid){
 
     // 3) Intento final: si el PID parece una referencia textual simple, devolverlo
     if(pid.length < 80 && !pid.includes("/") && !pid.includes("http")){
-      if(LS.getItem("prep_meta_" + pid)) return pid;
+      if(getAny("prep_meta_" + pid)) return pid;
     }
 
     return null;
@@ -993,7 +934,7 @@ function devolverNoAsignadoLinea(lineIndex){
   if(metaActual.unassignedBorrow.items.length===0){
     delete metaActual.unassignedBorrow;
   }
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  setAny(KM(refActual), JSON.stringify(metaActual));
 
   alert(`✅ Devuelto material no asignado.
 Material: ${matReturn.name}
@@ -1024,11 +965,11 @@ function unassignedTotals(ub){
 }
 
 function _loadUnassignedGlobalMap(){
-  try { return JSON.parse(LS.getItem(UNASSIGNED_GLOBAL_KEY) || "{}") || {}; }
+  try { return JSON.parse(getAny(UNASSIGNED_GLOBAL_KEY) || "{}") || {}; }
   catch(e){ return {}; }
 }
 function _saveUnassignedGlobalMap(map){
-  LS.setItem(UNASSIGNED_GLOBAL_KEY, JSON.stringify(map || {}));
+  setAny(UNASSIGNED_GLOBAL_KEY, JSON.stringify(map || {}));
 }
 function getGlobalBorrow(ref){
   const map = _loadUnassignedGlobalMap();
@@ -1059,25 +1000,25 @@ function saveMetaActual(){
     clearGlobalBorrow(refActual);
   }
 
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  setAny(KM(refActual), JSON.stringify(metaActual));
   mirrorUnassignedToLdhDb();
 }
 function mirrorUnassignedToLdhDb(){
   try{
-    const rawDb = LS.getItem("ldh_db");
+    const rawDb = getAny("ldh_db");
     if(!rawDb) return;
     const db = JSON.parse(rawDb) || {};
     if(!Array.isArray(db.deliveries)) return;
     const idx = db.deliveries.findIndex(d => d && d.ref === refActual);
     if(idx < 0) return;
     db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-    LS.setItem("ldh_db", JSON.stringify(db));
+    setAny("ldh_db", JSON.stringify(db));
   }catch(e){ /* silent */ }
 }
 
 function ldhHasDelivery(ref){
   try{
-    const rawDb = LS.getItem("ldh_db");
+    const rawDb = getAny("ldh_db");
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
     if(!Array.isArray(db.deliveries)) return false;
@@ -1205,7 +1146,7 @@ async function fsLoadOnceToLocal(){
   if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return false;
 
   ignoreNextLocalSave = true;
-  LS.setItem(STOCK_DB_KEY, JSON.stringify({
+  setAny(STOCK_DB_KEY, JSON.stringify({
     materials: data.materials || [],
     movements: data.movements || [],
     categoryOrder: data.categoryOrder || []
@@ -1225,7 +1166,7 @@ function fsStartRealtimeListener(){
     if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
 
     ignoreNextLocalSave = true;
-    LS.setItem(STOCK_DB_KEY, JSON.stringify({
+    setAny(STOCK_DB_KEY, JSON.stringify({
       materials: data.materials || [],
       movements: data.movements || [],
       categoryOrder: data.categoryOrder || []
@@ -1261,14 +1202,14 @@ function scheduleFsSaveStock(){
 
 /* ========= STOCK local ========= */
 function loadStockLocal(){
-  const raw = LS.getItem(STOCK_DB_KEY);
+  const raw = getAny(STOCK_DB_KEY);
   const db = raw ? JSON.parse(raw) : { materials:[], movements:[], categoryOrder:[] };
   stockMaterials = Array.isArray(db.materials) ? db.materials : [];
   stockMovements = Array.isArray(db.movements) ? db.movements : [];
   stockCategoryOrder = Array.isArray(db.categoryOrder) ? db.categoryOrder : [];
 }
 function saveStockLocal(){
-  LS.setItem(STOCK_DB_KEY, JSON.stringify({
+  setAny(STOCK_DB_KEY, JSON.stringify({
     materials: stockMaterials,
     movements: stockMovements,
     categoryOrder: stockCategoryOrder
@@ -1286,11 +1227,11 @@ function getMatById(id){
 
 /* ========= LINKMAP ========= */
 function loadLinkMap(){
-  try { linkMap = JSON.parse(LS.getItem(LINK_MAP_KEY) || "{}") || {}; }
+  try { linkMap = JSON.parse(getAny(LINK_MAP_KEY) || "{}") || {}; }
   catch(e){ linkMap = {}; }
 }
 function saveLinkMap(){
-  LS.setItem(LINK_MAP_KEY, JSON.stringify(linkMap || {}));
+  setAny(LINK_MAP_KEY, JSON.stringify(linkMap || {}));
 }
 
 /* ========= IMPORTACIÓN DE DATOS DESDE CALCULO/OTROS ========= */
@@ -1350,7 +1291,7 @@ function saveLinkMap(){
 
   // 2) localStorage (misma origin)
   if(!snap){
-    const snapRaw = LS.getItem("latest_materials_v1") || LS.getItem("pedido_en_preparacion") || LS.getItem("prep_pedido_payload");
+    const snapRaw = getAny("latest_materials_v1") || getAny("pedido_en_preparacion") || getAny("prep_pedido_payload");
     if(snapRaw){
       try{ snap = JSON.parse(snapRaw); }catch(e){ snap = null; }
     }
@@ -1361,22 +1302,22 @@ function saveLinkMap(){
       const refBase = String(snap.referencia || snap.ref || ('SIN_REF_' + Date.now())).trim();
 
 // UID de pedido:
-// - Si viene un UID (desde Index / nube), ese UID manda (evita colisiones).
-// - Si NO viene UID y ya existe algo con esa referencia base, generamos uno NUEVO para NO pisar el anterior.
+// - Si el pedido ya existe con esa referencia, REUTILIZAMOS su UID para NO crear "#2".
+// - Si no existe, usamos el UID entrante o generamos uno nuevo.
 const incomingUid = String(snap.pedido_uid || snap.pedidoUid || snap.uid || snap.pedidoId || '').trim();
 
-let ref = incomingUid || refBase;
-const existsAny = !!(LS.getItem(KP(refBase)) || LS.getItem(KM(refBase)) || _cloudGetPrep(refBase));
+let ref = refBase;
+const existsAny = !!(getAny(KP(refBase)) || getAny(KM(refBase)));
 
-if (!incomingUid && existsAny) {
-  const ts = Date.now();
-  const rnd = Math.random().toString(36).slice(2,6);
-  ref = refBase + "_"+ts+"_"+rnd;
+let metaExist = {};
+let existUid = "";
+if (existsAny) {
+  try { metaExist = JSON.parse(getAny(KM(refBase)) || '{}') || {}; } catch(e) { metaExist = {}; }
+  existUid = String(metaExist.pedido_uid || metaExist.pedidoUid || metaExist.uid || '').trim();
 }
 
-
 // UID FINAL: preferimos el UID existente (si lo hay), si no el entrante, si no uno nuevo.
-const pedidoUid = ref;
+const pedidoUid = existUid || incomingUid || ('P'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
 
 // IMPORTANTE: al importar desde Cálculo queremos 1 solo pedido por referencia.
 // Si existe ya el pedido, lo sobreescribimos (NO generamos "#2").
@@ -1410,7 +1351,7 @@ try{
   }
 }catch(e){}
 
-      let metaParaGuardar = JSON.parse(LS.getItem(KM(ref)) || "{}");
+      let metaParaGuardar = JSON.parse(getAny(KM(ref)) || "{}");
       metaParaGuardar.referencia = ref;
       metaParaGuardar.pedido_uid = pedidoUid;
       // Pedido ID inmutable (para abrir ficha aunque cambie el nombre/ref)
@@ -1435,7 +1376,7 @@ try{
       if (!metaParaGuardar.tipo_hierro) metaParaGuardar.tipo_hierro = "";
       if (metaParaGuardar.en_fabricacion === undefined) metaParaGuardar.en_fabricacion = false;
 
-      LS.setItem(KM(ref), JSON.stringify(metaParaGuardar));
+      setAny(KM(ref), JSON.stringify(metaParaGuardar));
 
       // ADAPTADOR DE VÍNCULOS (desde Cálculo/Configuración de conceptos)
       // Preparación trabaja con `linked_matId`. Sin este adaptador, si el cálculo
@@ -1480,11 +1421,11 @@ try{
         return l;
       });
 
-      LS.setItem(KP(ref), JSON.stringify(materialesImport));
-      try{ LS.setItem("prep_last_import_ref", ref); }catch(_){ }
-LS.removeItem("latest_materials_v1");
-      LS.removeItem("pedido_en_preparacion");
-      LS.removeItem("prep_pedido_payload");
+      setAny(KP(ref), JSON.stringify(materialesImport));
+      try{ setAny("prep_last_import_ref", ref); }catch(_){ }
+removeAny("latest_materials_v1");
+      removeAny("pedido_en_preparacion");
+      removeAny("prep_pedido_payload");
     } catch (e) { console.error("Error importando:", e); }
   }
 })();
@@ -1508,20 +1449,19 @@ function _getQueryParam(name){
 function getFocusRef(){
   try{
     const u = new URLSearchParams(window.location.search || '');
-    let ref = (u.get('openDoc') || u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
+    let ref = (u.get('ref') || u.get('openRef') || u.get('referencia') || '').trim();
 
     if(!ref){
       const h = (window.location.hash || '').replace(/^#/, '');
-      if(h.startsWith('openDoc=')) ref = decodeURIComponent(h.slice(8));
-      else if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
+      if(h.startsWith('ref=')) ref = decodeURIComponent(h.slice(4));
       else if(h.startsWith('openRef=')) ref = decodeURIComponent(h.slice(8));
     }
 
-    if(!ref) ref = (LS.getItem('prep_focus_ref') || LS.getItem('prep_focus_hash_ref') || '').trim();
+    if(!ref) ref = (getAny('prep_focus_ref') || getAny('prep_focus_hash_ref') || '').trim();
 
     // limpiar para no bloquear futuros clicks
-    LS.removeItem('prep_focus_ref');
-    LS.removeItem('prep_focus_hash_ref');
+    removeAny('prep_focus_ref');
+    removeAny('prep_focus_hash_ref');
 
     return ref || '';
   }catch(e){ return ''; }
@@ -1531,19 +1471,19 @@ function marcarYabrirRef(ref){
   ref = (ref || '').trim();
   if(!ref) return;
 
-  // Banner superior (desactivado permanentemente)
+  // Banner superior (si existe)
   try{
     const b = document.getElementById('focusBanner');
     if(b){
-      b.style.display = 'none';
+      b.style.display = 'flex';
       const s = b.querySelector('.ref');
-      if(s) s.textContent = '';
+      if(s) s.textContent = ref;
       const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = null;
+      if(btn) btn.onclick = () => abrirPedido(ref);
     }
   }catch(e){}
 
-const refNorm = normRef(ref);
+  const refNorm = normRef(ref);
 
   const tryClick = (attempt) => {
     const list = document.getElementById('listaPedidos');
@@ -1573,36 +1513,7 @@ function autoAbrirDesdeQuery(){
 function cargarLista() {
   const lista = document.getElementById("lista");
   lista.innerHTML = "";
-  // Collect prep_recepcion_* keys from BOTH localStorage and sessionStorage (LS is a wrapper)
-const keysSet = new Set();
-const pushStorageKeys = (store) => {
-  try{
-    for(let i=0;i<store.length;i++){
-      const kk = store.key(i);
-      if(kk && kk.startsWith("prep_recepcion_")) keysSet.add(kk);
-    }
-  }catch(e){}
-};
-pushStorageKeys(localStorage);
-pushStorageKeys(sessionStorage);
-
-// Cloud: incluir pedidos guardados en Firestore aunque no existan como prep_recepcion_* local
-try{
-  if(CLOUD_PREP_CACHE && typeof CLOUD_PREP_CACHE === "object"){
-    Object.keys(CLOUD_PREP_CACHE).forEach(docId=>{ if(docId) keysSet.add("prep_recepcion_" + docId); });
-  }
-}catch(e){}
-
-// Also include refs that have global "no asignado" debt even if prep_recepcion_* is missing
-// (so they don't disappear from Preparación while still deudor).
-try{
-  const gb = JSON.parse(LS.getItem(UNASSIGNED_GLOBAL_KEY) || "{}");
-  Object.keys(gb || {}).forEach(ref => {
-    if(ref) keysSet.add("prep_recepcion_" + ref);
-  });
-}catch(e){}
-
-const keys = Array.from(keysSet);
+  const keys = Array.from(new Set([...Object.keys(LS), ...Object.keys(SS)].filter(k => k.startsWith("prep_recepcion_"))));
   if(keys.length === 0) {
     lista.innerHTML = "<div style='opacity:0.5; padding:20px'>No hay pedidos en preparación.</div>";
     return;
@@ -1610,13 +1521,8 @@ const keys = Array.from(keysSet);
 
   keys.reverse().forEach(k => {
     const ref = k.replace("prep_recepcion_", "");
-    let meta = JSON.parse(LS.getItem(KM(ref)) || "null");
-    if(!meta || typeof meta !== "object") meta = {};
-    const refN = normRef(ref);
-    if((!meta || Object.keys(meta).length===0) && _cloudGetPrep(refN) && _cloudGetPrep(refN).meta) meta = _cloudGetPrep(refN).meta;
-    let lines = JSON.parse(LS.getItem(k) || "[]");
-    const refN2 = normRef(ref);
-    if((!lines || !lines.length) && _cloudGetPrep(refN2) && Array.isArray(_cloudGetPrep(refN2).recepcion)) lines = _cloudGetPrep(refN2).recepcion;
+    const meta = JSON.parse(getAny(KM(ref)) || "{}");
+    const lines = JSON.parse(getAny(k) || "[]");
     const totalLines = lines.length;
 
     const completeLines = lines.filter(l => (toNum(l.qty_recibida)) >= (toNum(l.qty_pedida))).length;
@@ -1667,7 +1573,7 @@ function abrirPedido(ref) {
   document.getElementById("vistaLista").classList.add("hidden");
   document.getElementById("vistaDetalle").classList.remove("hidden");
 
-  metaActual = JSON.parse(LS.getItem(KM(ref)) || "{}");
+  metaActual = JSON.parse(getAny(KM(ref)) || "{}");
 if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
 
   // Hidratación de "No asignado" desde registro global (por si el pedido viene de otro módulo)
@@ -1683,29 +1589,8 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
   metaActual.unassignedBorrow = gBorrow;
 }
 
-  
-  // Cloud fallback: si no existe en local, cargar meta/recepción desde Firestore cache
-  try{
-    const refN = normRef(ref);
-    if((!metaActual || Object.keys(metaActual||{}).length===0) && CLOUD_PREP_CACHE && _cloudGetPrep(refN) && _cloudGetPrep(refN).meta){
-      metaActual = Object.assign({}, _cloudGetPrep(refN).meta);
-      if (metaActual.en_fabricacion === undefined) metaActual.en_fabricacion = false;
-    }
-  }catch(e){}
-
-  estadoMateriales = JSON.parse(LS.getItem(KP(ref)) || "[]");
-      
-  // Cloud fallback para líneas: si local está vacío, hidratar desde cache cloud
-  try{
-    const refN = normRef(ref);
-    if((!estadoMateriales || !estadoMateriales.length) && CLOUD_PREP_CACHE && _cloudGetPrep(refN) && Array.isArray(_cloudGetPrep(refN).recepcion)){
-      estadoMateriales = JSON.parse(JSON.stringify(_cloudGetPrep(refN).recepcion)); // deep copy
-      // Intento de cachearlo en sessionStorage para no depender de la red en esta sesión
-      try{ sessionStorage.setItem(KP(ref), JSON.stringify(estadoMateriales)); }catch(e){}
-    }
-  }catch(e){}
-
-// Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
+  estadoMateriales = JSON.parse(getAny(KP(ref)) || "[]");
+      // Normaliza líneas antiguas (compatibilidad): algunos guardados usan 'material' en vez de 'mat'
       estadoMateriales = (Array.isArray(estadoMateriales)?estadoMateriales:[]).map(l=>{
         if(!l || typeof l!=='object') return l;
 
@@ -1783,7 +1668,7 @@ if(gBorrow && typeof gBorrow === "object" && Array.isArray(gBorrow.items) && gBo
           }catch(_){}
         });
         if(changed){
-          try{ LS.setItem(KP(ref), JSON.stringify(estadoMateriales)); }catch(_){}
+          try{ setAny(KP(ref), JSON.stringify(estadoMateriales)); }catch(_){}
         }
       }
     }
@@ -1801,7 +1686,7 @@ return l;
   // Fallback: si el pedido ya existe en ldh_db, re-hidratar empresa (sin ligar a concepto)
   if(!(metaActual.empresa || "").trim()){
     try{
-      const rawDb = LS.getItem("ldh_db");
+      const rawDb = getAny("ldh_db");
       if(rawDb){
         const db = JSON.parse(rawDb) || {};
         const d = (db.deliveries||[]).find(x=>x && x.ref === ref);
@@ -1809,7 +1694,7 @@ return l;
         if(emp){
           metaActual.empresa = emp;
           metaActual.company = emp;
-          LS.setItem(KM(refActual), JSON.stringify(metaActual));
+          setAny(KM(refActual), JSON.stringify(metaActual));
         }
       }
     }catch(e){}
@@ -1829,13 +1714,13 @@ return l;
 function guardarUnidadesManual() {
   const val = parseFloat(document.getElementById("inputUnidades").value) || 1;
   metaActual.unidades = val;
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  setAny(KM(refActual), JSON.stringify(metaActual));
 }
 function guardarTipoHierro(){
   const radios=document.getElementsByName("th");
   let val=""; radios.forEach(r=>{if(r.checked)val=r.value});
   metaActual.tipo_hierro=val;
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  setAny(KM(refActual), JSON.stringify(metaActual));
 }
 
 /* ========= AUTO-CIERRE POR RECEPCIÓN (AHORA: ENVÍA A FABRICACIÓN ANTES) ========= */
@@ -1867,8 +1752,8 @@ function autoCerrarSiCompletoPorRecepcion(){
     }
 
     // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
-    LS.removeItem(KP(refActual));
-    LS.removeItem(KM(refActual));
+    removeAny(KP(refActual));
+    removeAny(KM(refActual));
     alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
     volverLista();
   }
@@ -2559,10 +2444,7 @@ function marcarTodoOk() {
   renderTabla();
   cargarLista();
 }
-function guardarEstadoLocal() {
-  const ok = LS.setItem(KP(refActual), JSON.stringify(estadoMateriales));
-  if(!ok) console.warn('[Prep] Estado guardado en sessionStorage (localStorage lleno)');
-}
+function guardarEstadoLocal() { setAny(KP(refActual), JSON.stringify(estadoMateriales)); }
 
 /* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
 function confirmarTodoRecepcion() {
@@ -2580,7 +2462,7 @@ function confirmarTodoRecepcion() {
 function mandarAFabricacion(unidadesFinal, withAlert) {
   if (!refActual) return;
 
-  const rawDb = LS.getItem("ldh_db");
+  const rawDb = getAny("ldh_db");
   let db = { deliveries: [] };
   if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
 
@@ -2625,11 +2507,11 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
     });
   }
 
-  LS.setItem("ldh_db", JSON.stringify(db));
+  setAny("ldh_db", JSON.stringify(db));
 
   metaActual.en_fabricacion = true;
   metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
-  LS.setItem(KM(refActual), JSON.stringify(metaActual));
+  setAny(KM(refActual), JSON.stringify(metaActual));
 
   document.getElementById("pillFab").classList.remove("hidden");
   if(withAlert){
@@ -2652,7 +2534,7 @@ function mandarAFabricacionAutoSiHaceFalta(){
   if(ldhHasDelivery(refActual)){
     metaActual.en_fabricacion = true;
     metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
-    LS.setItem(KM(refActual), JSON.stringify(metaActual));
+    setAny(KM(refActual), JSON.stringify(metaActual));
     mirrorUnassignedToLdhDb();
     return;
   }
@@ -2663,26 +2545,13 @@ function mandarAFabricacionAutoSiHaceFalta(){
 
 
 /* ========= ELIMINAR ========= */
-async function eliminarPedido() {
-  if (!confirm("⛔ ¿Eliminar?")) return;
-  try{
-    // Si viene de nube, borrar también en Firestore (por docId = refActual cuando listamos desde nube)
-    const cloudEntry = _cloudGetPrep(refActual);
-    if(cloudEntry && cloudEntry._docId){
-      try{
-        fbEnsure();
-        await fsLoginHidden();
-        if(fbDb){
-          await fbDb.collection("prep_orders").doc(cloudEntry._docId).delete();
-        }
-      }catch(e){ console.warn("Eliminar en nube fallo:", e); }
-      try{ delete CLOUD_PREP_CACHE[cloudEntry._docId]; }catch(e){}
-    }
-  }catch(e){}
-  try{ LS.removeItem(KP(refActual)); }catch(e){}
-  try{ LS.removeItem(KM(refActual)); }catch(e){}
-  try{ clearGlobalBorrow(refActual); }catch(e){}
-  try{ volverLista(); }catch(e){}
+function eliminarPedido() {
+  if (confirm("⛔ ¿Eliminar?")) {
+    removeAny(KP(refActual));
+    removeAny(KM(refActual));
+    clearGlobalBorrow(refActual);
+    volverLista();
+  }
 }
 
 /* ========= INIT ========= */
@@ -2703,10 +2572,7 @@ async function init(){
     }
   }
 
-      // Preparación desde nube (si existe)
-    await cargarCloudPrepPedidos();
-
-cargarLista();
+  cargarLista();
   // si venimos desde el index con ?openRef=...
   autoAbrirDesdeQuery();
 }
