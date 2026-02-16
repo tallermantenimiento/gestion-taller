@@ -1026,7 +1026,7 @@ tr.ent-group-header.ref-group:hover td{
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
   // Firebase config (tu proyecto)
   const firebaseConfig = {
@@ -1040,7 +1040,13 @@ tr.ent-group-header.ref-group:hover td{
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db = getFirestore(app);
+  let db;
+  try {
+    db = initializeFirestore(app, { experimentalForceLongPolling: true });
+  } catch (e) {
+    console.warn("[FIREBASE] initializeFirestore(forceLongPolling) falló, usando getFirestore()", e);
+    db = getFirestore(app);
+  }
 
   // GLOBAL: accesible para TODO el programa
   window.__FIREBASE__ = {
