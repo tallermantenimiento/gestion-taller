@@ -411,18 +411,20 @@
 
 /* ========= CONSTANTES ========= */
 const LS = localStorage;
-  const SS = sessionStorage;
+const SS = sessionStorage;
 
-  // Lee de localStorage y, si no está o falla, de sessionStorage (fallback cuando la cuota está llena)
-  const getAny = (k)=>{
-    try{ const v = getAny(k); if(v!==null && v!==undefined) return v; }catch(_){}
-    try{ return SS.getItem(k); }catch(_){ return null; }
-  };
-  const removeAny = (k)=>{
-    try{ removeAny(k); }catch(_){}
-    try{ SS.removeItem(k); }catch(_){}
-  };
-
+// Lee de localStorage y, si no está o falla, de sessionStorage (fallback cuando la cuota está llena)
+const getAny = (k)=>{
+  try{
+    const v = LS.getItem(k);
+    if(v !== null && v !== undefined) return v;
+  }catch(_){ }
+  try{ return SS.getItem(k); }catch(_){ return null; }
+};
+const removeAny = (k)=>{
+  try{ LS.removeItem(k); }catch(_){ }
+  try{ SS.removeItem(k); }catch(_){ }
+};
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
 const KP = r => "prep_recepcion_" + r;
