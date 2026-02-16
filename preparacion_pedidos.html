@@ -1496,40 +1496,19 @@ function getFocusRef(){
 }
 
 function marcarYabrirRef(ref){
-  ref = (ref || '').trim();
-  if(!ref) return;
-
-  // Banner superior (si existe)
-  try{
-    const b = document.getElementById('focusBanner');
-    if(b){
-      b.style.display = 'flex';
-      const s = b.querySelector('.ref');
-      if(s) s.textContent = ref;
-      const btn = document.getElementById('btnAbrirFocus');
-      if(btn) btn.onclick = () => abrirPedido(ref);
-    }
-  }catch(e){}
-
-  const refNorm = normRef(ref);
-
-  const tryClick = (attempt) => {
-    const list = document.getElementById('listaPedidos');
-    if(list){
-      const items = Array.from(list.querySelectorAll('.item'));
-      const el = items.find(n => (n.dataset && (n.dataset.refNorm || normRef(n.dataset.ref))) === refNorm)
-              || items.find(n => normRef(n.textContent).includes(refNorm));
-      if(el){
-        try{ el.classList.add('focus-target'); }catch(e){}
-        try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
-        // Marcar visualmente y centrar en lista (sin auto-abrir)
+  try { setFocusRef(ref); } catch(e){}
+  // Enfoque: abrir directamente la ficha del pedido (sin banner redundante)
+  const tryOpen = (n=0) => {
+    try {
+      if (typeof abrirPedido === 'function') {
+        abrirPedido(ref);
+        try { clearFocusRef(); } catch(e){}
         return;
       }
-    }
-    if(attempt < 12) setTimeout(()=>tryClick(attempt+1), 180);
+    } catch(e){}
+    if (n < 30) setTimeout(() => tryOpen(n+1), 150);
   };
-
-  tryClick(0);
+  tryOpen(0);
 }
 
 function autoAbrirDesdeQuery(){
