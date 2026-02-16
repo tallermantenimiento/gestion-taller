@@ -1495,12 +1495,25 @@ function getFocusRef(){
 }
 
 function marcarYabrirRef(ref){
-  try { setFocusRef(ref); } catch(e){}
   // Enfoque: abrir directamente la ficha del pedido (sin banner redundante)
+  let r = (ref == null ? '' : String(ref)).trim();
+
+  // Si nos llega un PID (PED-...) o un SIN_REF, o no existen keys para esa ref,
+  // resolvemos la ref real buscando en metas (mapeo pedidoId -> ref).
+  try {
+    const noExiste = (!r) ? true : (!localStorage.getItem(KM(r)) && !localStorage.getItem(KP(r)));
+    if (r && (r.startsWith('PED-') || r.startsWith('SIN_REF_') || noExiste)) {
+      const rr = (typeof findRefByPid === 'function') ? findRefByPid(r) : null;
+      if (rr) r = String(rr).trim();
+    }
+  } catch(e){}
+
+  try { setFocusRef(r); } catch(e){}
+
   const tryOpen = (n=0) => {
     try {
-      if (typeof abrirPedido === 'function') {
-        abrirPedido(ref);
+      if (r && typeof abrirPedido === 'function') {
+        abrirPedido(r);
         try { clearFocusRef(); } catch(e){}
         return;
       }
