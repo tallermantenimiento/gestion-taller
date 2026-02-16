@@ -199,7 +199,10 @@
   </div>
   <h2 style="margin:0">Preparación</h2>
 
-  </div>
+<div id="focusBanner" class="focus-banner" style="display:none">
+  <div>⚠️ Pedido con <b>material no asignado</b>: <span class="ref"></span></div>
+  <button class="btn" id="btnAbrirFocus">Abrir ficha</button>
+</div>
 
 </div>
 
@@ -1498,18 +1501,43 @@ function marcarYabrirRef(ref){
 
   // Banner superior (si existe)
   try{
-    const b = document.getElfunction marcarYabrirRef(ref) {
-      // Nuevo enfoque: si hay referencia "en foco" (p.ej. al devolver material no asignado desde otra fase),
-      // abrimos DIRECTO la ficha del pedido, sin banner redundante.
-      if (!ref) return;
-      try {
-        const r = String(ref).trim();
-        if (!r) return;
-        abrirPedido(r);
-      } catch (e) {
-        console.warn('No se pudo abrir ficha por foco:', e);
+    const b = document.getElementById('focusBanner');
+    if(b){
+      b.style.display = 'flex';
+      const s = b.querySelector('.ref');
+      if(s) s.textContent = ref;
+      const btn = document.getElementById('btnAbrirFocus');
+      if(btn) btn.onclick = () => abrirPedido(ref);
+    }
+  }catch(e){}
+
+  const refNorm = normRef(ref);
+
+  const tryClick = (attempt) => {
+    const list = document.getElementById('listaPedidos');
+    if(list){
+      const items = Array.from(list.querySelectorAll('.item'));
+      const el = items.find(n => (n.dataset && (n.dataset.refNorm || normRef(n.dataset.ref))) === refNorm)
+              || items.find(n => normRef(n.textContent).includes(refNorm));
+      if(el){
+        try{ el.classList.add('focus-target'); }catch(e){}
+        try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+        // Marcar visualmente y centrar en lista (sin auto-abrir)
+        return;
       }
-    }) ========= */
+    }
+    if(attempt < 12) setTimeout(()=>tryClick(attempt+1), 180);
+  };
+
+  tryClick(0);
+}
+
+function autoAbrirDesdeQuery(){
+  const ref = getFocusRef();
+  if(ref) marcarYabrirRef(ref);
+}
+
+/* ========= LISTA DE PEDIDOS (pill por RECEPCIÓN) ========= */
 function cargarLista() {
   const lista = document.getElementById("lista");
   lista.innerHTML = "";
