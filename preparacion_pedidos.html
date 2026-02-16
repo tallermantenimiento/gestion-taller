@@ -1311,7 +1311,16 @@ function saveLinkMap(){
   if (snap) {
     try {
       const incomingRef = (typeof getFocusRef==="function") ? getFocusRef() : null;
-      const refBase = String((snap && (snap.referencia || snap.ref)) || incomingRef || ('SIN_REF_' + Date.now())).trim();
+      const refCandidate = String((snap && (snap.referencia || snap.ref)) || incomingRef || '').trim();
+      if (!refCandidate) {
+        console.warn('[PREP] Snap sin referencia: se ignora para evitar pedidos SIN_REF.');
+        try { removeAny("prep_open_ts"); } catch(_) {}
+        try { removeAny("prep_materiales"); } catch(_) {}
+        try { removeAny("prep_stock_linkmap_v1"); } catch(_) {}
+        try { removeAny("prep_estado_actual"); } catch(_) {}
+        return;
+      }
+      const refBase = refCandidate;
 
 // UID de pedido:
 // - Si el pedido ya existe con esa referencia, REUTILIZAMOS su UID para NO crear "#2".
@@ -1436,8 +1445,13 @@ try{
       setAny(KP(ref), JSON.stringify(materialesImport));
       try{ setAny("prep_last_import_ref", ref); }catch(_){ }
 removeAny("latest_materials_v1");
-      removeAny("pedido_en_preparacion");
-      removeAny("prep_pedido_payload");
+          removeAny("pedido_en_preparacion");
+          removeAny("prep_pedido_payload");
+          // limpiar snapshot legacy para evitar re-import y pedidos SIN_REF
+          removeAny("prep_open_ts");
+          removeAny("prep_materiales");
+          removeAny("prep_stock_linkmap_v1");
+          removeAny("prep_estado_actual");
     } catch (e) { console.error("Error importando:", e); }
   }
 })();
