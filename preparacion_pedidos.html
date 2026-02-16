@@ -445,13 +445,7 @@ const LS = localStorage;
 const SS = sessionStorage;
 
 // Lee de localStorage y, si no está o falla, de sessionStorage (fallback cuando la cuota está llena)
-const getAny = (k)=>{
-  try{
-    const v = LS.getItem(k);
-    if(v !== null && v !== undefined) return v;
-  }catch(_){ }
-  try{ return SS.getItem(k); }catch(_){ return null; }
-};
+/* getAny duplicado eliminado */
 const removeAny = (k)=>{
   try{ LS.removeItem(k); }catch(_){ }
   try{ SS.removeItem(k); }catch(_){ }
@@ -1465,6 +1459,7 @@ removeAny("latest_materials_v1");
 
 /* ========= NAVEGACIÓN ========= */
 function volverIndex(){ location.href = "index.html"; }
+window.volverIndexIndex = volverIndex;
 function volverLista(){
   document.getElementById("vistaDetalle").classList.add("hidden");
   document.getElementById("vistaLista").classList.remove("hidden");
