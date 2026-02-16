@@ -427,6 +427,11 @@ const removeAny = (k)=>{
 };
 
 function normRef(s){ return (s||'').toString().trim().toLowerCase(); }
+
+function isPerfilUnit(u){
+  const uu = String(u||'').toLowerCase();
+  return (uu==='barra' || uu==='mm' || uu==='m' || uu==='metro' || uu==='metros');
+}
 const KP = r => "prep_recepcion_" + r;
 const KM = r => "prep_meta_" + r;
 
@@ -915,7 +920,7 @@ function devolverNoAsignadoLinea(lineIndex){
       return;
     }
   }else{
-    const check = _addToRealStock_byLinkedOrName(line, (String(line.unit||'').toLowerCase()==='barra'? metaActual.tipo_hierro : null));
+    const check = _addToRealStock_byLinkedOrName(line, (StringisPerfilUnit(line.unit)? metaActual.tipo_hierro : null));
     if(!check.success){
       alert('No se pudo identificar el material en Stock para devolver. Vincula primero el material.');
       return;
@@ -1961,7 +1966,7 @@ function renderTabla() {
       <td><input type="text" value="${linea.note || ''}" onchange="updateNote(${index}, this.value)" style="width:100%"></td>
     `;
 
-    if ((linea.unit || "").toLowerCase() === 'barra') { hasBarras = true; tbodyBarras.appendChild(tr); }
+    if (isPerfilUnit(linea.unit)) { hasBarras = true; tbodyBarras.appendChild(tr); }
     else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
   });
 
@@ -2012,7 +2017,7 @@ function guardarLinea(index) {
   if (diff <= 0) return;
 
   let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
+  if ((isPerfilUnit(linea.unit||""))) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2060,7 +2065,7 @@ function consumirDeStock(index){
   }
 
   let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
+  if ((isPerfilUnit(linea.unit||""))) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2217,7 +2222,7 @@ function consumirNoAsignado(index){
   }
 
   let tipoHierro = null;
-  if ((String(linea.unit||"").toLowerCase() === 'barra')) {
+  if ((isPerfilUnit(linea.unit||""))) {
     tipoHierro = metaActual.tipo_hierro;
     if (!tipoHierro) {
       alert("⚠️ Selecciona el tipo de perfilería (Galvanizado/Negro) arriba.");
@@ -2450,7 +2455,7 @@ function guardarEstadoLocal() { setAny(KP(refActual), JSON.stringify(estadoMater
 
 /* ========= MANDAR A FABRICACIÓN (MANUAL) ========= */
 function confirmarTodoRecepcion() {
-  const hayBarras = estadoMateriales.some(l => (String(l.unit||"").toLowerCase() === 'barra'));
+  const hayBarras = estadoMateriales.some(l => (isPerfilUnit(l.unit||"")));
   if (hayBarras && !metaActual.tipo_hierro) { alert("⚠️ Selecciona el tipo de perfilería."); return; }
 
   const val = parseFloat(document.getElementById("inputUnidades").value) || metaActual.unidades || 0;
