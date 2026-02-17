@@ -389,7 +389,7 @@
    PREPARACIÓN DE PEDIDOS (vNEXT)
    - Pill Pendiente/Parcial/Completo: por RECEPCIÓN (qty_recibida).
    - Auto-cierra cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
-   - En este ajuste: auto-cierre => auto-mandar a fabricación antes de eliminar de Preparación.
+   - En este ajuste: NO se envía automáticamente a Fabricación (solo con botón).
    - “Marcar en fabricación” eliminado (ya existe “Mandar a fabricación”).
 ======================================================================================= */
 
@@ -1023,6 +1023,7 @@ function mirrorUnassignedToLdhDb(){
     // Pools de FABRICACIÓN (nuevos + compat)
     if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
     if(!Array.isArray(db.fab)) db.fab = [];
+    if(!Array.isArray(db.trabajos)) db.trabajos = [];
 
     const payload = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
 
@@ -1034,6 +1035,7 @@ function mirrorUnassignedToLdhDb(){
     };
     upsert(db.fabricacion);
     upsert(db.fab);
+    upsert(db.trabajos);
 
     setAny("ldh_db", JSON.stringify(db));
   }catch(e){ /* silent */ }
@@ -1047,7 +1049,8 @@ function ldhHasDelivery(ref){
     const db = JSON.parse(rawDb) || {};
     const pools = []
       .concat(Array.isArray(db.fabricacion)?db.fabricacion:[])
-      .concat(Array.isArray(db.fab)?db.fab:[]);
+      .concat(Array.isArray(db.fab)?db.fab:[])
+      .concat(Array.isArray(db.trabajos)?db.trabajos:[]);
     return pools.some(d => d && d.ref === ref);
   }catch(e){ return false; }
 }
@@ -1768,31 +1771,33 @@ function autoCerrarSiCompletoPorRecepcion(){
   ).length;
 
   if(completeLines === totalLines){
-    // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
-    mandarAFabricacionAutoSiHaceFalta();
+    // IMPORTANTE:
+    // - NO se envía automáticamente a Fabricación.
+    // - El pedido se mantiene en Preparación aunque esté completo.
+    // - Solo se envía cuando el usuario pulsa “Mandar a fabricación”.
 
-    // 2) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
-    //    Así la alerta no desaparece y queda "bloqueado" hasta devolverlo.
+    // Si hay material NO asignado pendiente, mantenemos la alerta (pill roja) igual.
     const ub = (metaActual && metaActual.unassignedBorrow) ? metaActual.unassignedBorrow : (getGlobalBorrow(refActual) || { items: [] });
     const t = unassignedTotals(ub);
-    if(t.lines > 0){
+
+    if(!metaActual.recepcion_completa){
       metaActual.recepcion_completa = true;
-      metaActual.unassignedBorrow = ensureUnassigned(metaActual);
-      // nos aseguramos de persistirlo también en global
-      saveMetaActual();
-      alert("⚠️ Pedido completo (material recibido), pero hay MATERIAL NO ASIGNADO pendiente de devolver.\n\nEl pedido se mantiene en Preparación hasta que lo devuelvas desde la pill roja.");
-      updateNoAsigPill();
-      cargarLista();
-      return;
+      // no tocamos en_fabricacion aquí
+      setAny(KM(refActual), JSON.stringify(metaActual));
     }
 
-    // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
-    removeAny(KP(refActual));
-    removeAny(KM(refActual));
-    alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
-    volverLista();
+    // Si hay no-asignado, seguimos igual (solo persistimos meta)
+    if(t.lines > 0){
+      // Persistimos para que no desaparezca aunque cambie de fase
+      saveMetaActual();
+      updateNoAsigPill();
+    }
+
+    // Nada más: no borrar de Preparación, no mandar a fabricación.
+    cargarLista();
   }
 }
+
 
 /* ========= VINCULACIÓN ========= */
 function getLinkedMatIdForLine(line){
@@ -2504,6 +2509,7 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   // Pools FABRICACIÓN (principal + compat). NO usamos deliveries (Almacén) para evitar que se vaya directo allí.
   if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
   if(!Array.isArray(db.fab)) db.fab = [];
+  if(!Array.isArray(db.trabajos)) db.trabajos = [];
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
@@ -2552,6 +2558,7 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   upsert(db.fabricacion);
   // En db.fab guardamos el mismo registro (compatibilidad con index antiguos)
   upsert(db.fab);
+  upsert(db.trabajos);
 
   setAny("ldh_db", JSON.stringify(db));
 
