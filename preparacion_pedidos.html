@@ -1817,12 +1817,16 @@ function autoCerrarSiCompletoPorRecepcion(){
       cargarLista();
       return;
     }
+    // 3) NO retirar automáticamente de Preparación aunque esté completo.
+    //    Fabricación SOLO debe recibir el pedido cuando el usuario pulsa "Mandar a fabricación".
+    metaActual.recepcion_completa = true;
+    saveMetaActual();
+    alert("✅ Pedido completo (material recibido).
 
-    // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
-    removeAny(KP(refActual));
-    removeAny(KM(refActual));
-    alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
-    volverLista();
+No se envía automáticamente a Fabricación. Pulsa 'Mandar a fabricación' cuando quieras.");
+    updateNoAsigPill();
+    cargarLista();
+    return;
   }
 }
 
