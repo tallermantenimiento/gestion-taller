@@ -1020,20 +1020,33 @@ function mirrorUnassignedToLdhDb(){
     if(!rawDb) return;
     const db = JSON.parse(rawDb) || {};
 
-    // Pools de FABRICACIÓN (nuevos + compat)
-    if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
-    if(!Array.isArray(db.fab)) db.fab = [];
-
     const payload = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+    const t = unassignedTotals(payload);
 
-    const upsert = (arr)=>{
+    // Pools que leen otros módulos (Fabricación usa deliveries)
+    const poolNames = ["deliveries","trabajos","fabricacion","fab"];
+
+    const applyTo = (arr)=>{
       const i = arr.findIndex(d => d && d.ref === refActual);
-      if(i >= 0){
+      if(i < 0) return;
+
+      if(t.lines > 0){
+        // Normal: mantener deuda no-asignada visible en cualquier fase
         arr[i].unassignedBorrow = payload;
+        arr[i].unassigned_borrow = payload; // compat
+      }else{
+        // Importante: si ya no queda nada pendiente, NO dejamos objetos vacíos (evita "deudor" fantasma)
+        try{ delete arr[i].unassignedBorrow; }catch(_){}
+        try{ delete arr[i].unassigned_borrow; }catch(_){}
+        try{ delete arr[i].noAsignado; }catch(_){}
+        try{ delete arr[i].materialNoAsignado; }catch(_){}
       }
     };
-    upsert(db.fabricacion);
-    upsert(db.fab);
+
+    for(const k of poolNames){
+      if(!Array.isArray(db[k])) continue;
+      applyTo(db[k]);
+    }
 
     setAny("ldh_db", JSON.stringify(db));
   }catch(e){ /* silent */ }
@@ -1138,7 +1151,15 @@ function devolverNoAsignado(matId, maxQty){
   metaActual.unassignedBorrow = ub;
   saveMetaActual();
 
+  const _tAfter = unassignedTotals(metaActual.unassignedBorrow || {items:[]});
+  const _noAsigEmpty = (_tAfter.lines <= 0);
+
   alert(`✅ Devuelto material NO asignado.\nCantidad: ${q}\nStock actual: ${getStockQty(matId)}`);
+  if(_noAsigEmpty){
+    try{ cerrarModalNoAsignado(); }catch(_){}
+    try{ volverLista(); }catch(_){}
+    return;
+  }
   updateNoAsigPill();
   renderModalNoAsignado();
   renderTabla();
@@ -1742,7 +1763,18 @@ return l;
   const radios = document.getElementsByName("th");
   radios.forEach(r => r.checked = (r.value === metaActual.tipo_hierro));
 
-  renderTabla();
+  
+  // Si llegamos aquí desde Fabricación solo para devolver NO ASIGNADO y ya está todo a 0,
+  // evitamos dejar el pedido abierto en blanco en Preparación.
+  try{
+    const _t = unassignedTotals(ensureUnassigned(metaActual));
+    const _hasLines = Array.isArray(estadoMateriales) && estadoMateriales.length>0;
+    if(!_hasLines && _t.lines<=0){
+      volverLista();
+      return;
+    }
+  }catch(_){}
+renderTabla();
 }
 
 /* ========= GUARDADOS META ========= */
