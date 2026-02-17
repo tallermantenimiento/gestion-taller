@@ -1019,21 +1019,37 @@ function mirrorUnassignedToLdhDb(){
     const rawDb = getAny("ldh_db");
     if(!rawDb) return;
     const db = JSON.parse(rawDb) || {};
-    if(!Array.isArray(db.deliveries)) return;
-    const idx = db.deliveries.findIndex(d => d && d.ref === refActual);
-    if(idx < 0) return;
-    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-    setAny("ldh_db", JSON.stringify(db));
+
+    // pool fabricación (preferido)
+    if(Array.isArray(db.fabricacion)){
+      const idx = db.fabricacion.findIndex(d => d && d.ref === refActual);
+      if(idx >= 0){
+        db.fabricacion[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+        setAny("ldh_db", JSON.stringify(db));
+        return;
+      }
+    }
+
+    // compat: pool alternativo
+    if(Array.isArray(db.fab)){
+      const idx2 = db.fab.findIndex(d => d && d.ref === refActual);
+      if(idx2 >= 0){
+        db.fab[idx2].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+        setAny("ldh_db", JSON.stringify(db));
+        return;
+      }
+    }
   }catch(e){ /* silent */ }
 }
 
 function ldhHasDelivery(ref){
+  // Compat: algunos index usan db.fabricacion / db.fab como pool de fabricación.
   try{
     const rawDb = getAny("ldh_db");
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
-    if(!Array.isArray(db.deliveries)) return false;
-    return db.deliveries.some(d => d && d.ref === ref);
+    const fab = Array.isArray(db.fabricacion) ? db.fabricacion : (Array.isArray(db.fab) ? db.fab : []);
+    return fab.some(d => d && (d.ref === ref || (d.meta && d.meta.ref === ref)));
   }catch(e){ return false; }
 }
 
@@ -2481,50 +2497,81 @@ function confirmarTodoRecepcion() {
 function mandarAFabricacion(unidadesFinal, withAlert) {
   if (!refActual) return;
 
+  // IMPORTANTE: "Mandar a fabricación" debe insertar/actualizar en el pool de FABRICACIÓN,
+  // no en Almacén/Entregas. En esta base usamos ldh_db.fabricacion (compat: ldh_db.fab).
   const rawDb = getAny("ldh_db");
-  let db = { deliveries: [] };
-  if (rawDb) { try { db = JSON.parse(rawDb); if (!Array.isArray(db.deliveries)) db.deliveries = []; } catch (e) {} }
+  let db = { fabricacion: [] };
+  if (rawDb) {
+    try {
+      db = JSON.parse(rawDb) || {};
+    } catch (e) { db = {}; }
+  }
+  if (!Array.isArray(db.fabricacion)) db.fabricacion = [];
+  if (!Array.isArray(db.fab)) db.fab = []; // compat: por si el index lee 'fab'
 
-  const idx = db.deliveries.findIndex(d => d.ref === refActual);
+  // Si el pedido existe en ambos pools, priorizamos fabricacion.
+  const idx = db.fabricacion.findIndex(d => d && d.ref === refActual);
+  const idxAlt = (idx < 0) ? db.fab.findIndex(d => d && d.ref === refActual) : -1;
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
   const empresaFinal = String(metaActual.empresa || metaActual.company || "").trim();
 
-  if (idx >= 0) {
-    db.deliveries[idx].total = unidadesFinal;
-    // Mantener empresa por pedido en ldh_db
-    if(empresaFinal){
-      db.deliveries[idx].company = empresaFinal;
-      db.deliveries[idx].empresa  = empresaFinal;
+  const buildRec = () => ({
+    unassignedBorrow: ((metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() })),
+    id: "PED-" + Date.now(),
+    client: "Taller / Interno",
+    ref: refActual,
+    company: empresaFinal || "",
+    empresa: empresaFinal || "",
+    concept: metaActual.concepto || "Sin concepto",
+    datePed: new Date().toISOString().split('T')[0],
+    datePrev: new Date().toISOString().split('T')[0],
+    status: "pendiente",
+    priority: "normal",
+    total: unidadesFinal,
+    delivered: 0,
+    history: [],
+    notes: notasFinales
+  });
+
+  const upsertInto = (arr, i) => {
+    if (i >= 0) {
+      arr[i].total = unidadesFinal;
+      // Mantener empresa por pedido en ldh_db
+      if (empresaFinal) {
+        arr[i].company = empresaFinal;
+        arr[i].empresa = empresaFinal;
+      } else {
+        if (!arr[i].company && arr[i].empresa) arr[i].company = arr[i].empresa;
+        if (!arr[i].empresa && arr[i].company) arr[i].empresa = arr[i].company;
+      }
+      arr[i].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+      if (!arr[i].notes) arr[i].notes = "";
+      if (!arr[i].notes.includes("Enviado desde Preparación")) {
+        arr[i].notes = (arr[i].notes ? (arr[i].notes + "
+") : "") + notasFinales;
+      }
     } else {
-      if(!db.deliveries[idx].company && db.deliveries[idx].empresa) db.deliveries[idx].company = db.deliveries[idx].empresa;
-      if(!db.deliveries[idx].empresa && db.deliveries[idx].company) db.deliveries[idx].empresa = db.deliveries[idx].company;
+      arr.push(buildRec());
     }
-    db.deliveries[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-    if (!db.deliveries[idx].notes) db.deliveries[idx].notes = "";
-    if (!db.deliveries[idx].notes.includes("Enviado desde Preparación")) {
-      db.deliveries[idx].notes = (db.deliveries[idx].notes ? (db.deliveries[idx].notes + "\n") : "") + notasFinales;
-    }
-  } else {
-    db.deliveries.push({
-      unassignedBorrow: ((metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() })),
-      id: "PED-" + Date.now(),
-      client: "Taller / Interno",
-      ref: refActual,
-      company: empresaFinal || "",
-      empresa: empresaFinal || "",
-      concept: metaActual.concepto || "Sin concepto",
-      datePed: new Date().toISOString().split('T')[0],
-      datePrev: new Date().toISOString().split('T')[0],
-      status: "pendiente",
-      priority: "normal",
-      total: unidadesFinal,
-      delivered: 0,
-      history: [],
-      notes: notasFinales
-    });
+  };
+
+  if (idx >= 0) upsertInto(db.fabricacion, idx);
+  else if (idxAlt >= 0) upsertInto(db.fab, idxAlt);
+  else {
+    // insertamos en ambos pools para compat con index antiguos (solo lectura de uno u otro)
+    const rec = buildRec();
+    db.fabricacion.push(rec);
+    db.fab.push(JSON.parse(JSON.stringify(rec)));
   }
+
+  // Si estaba en Almacén por error, lo retiramos de ahí para que no aparezca duplicado.
+  try {
+    if (Array.isArray(db.almacen)) db.almacen = db.almacen.filter(x => !(x && x.ref === refActual));
+    if (Array.isArray(db.store)) db.store = db.store.filter(x => !(x && x.ref === refActual));
+    if (Array.isArray(db.deliveries)) db.deliveries = db.deliveries.filter(x => !(x && x.ref === refActual));
+  } catch (e) {}
 
   setAny("ldh_db", JSON.stringify(db));
 
@@ -2534,7 +2581,10 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
   document.getElementById("pillFab").classList.remove("hidden");
   if(withAlert){
-    alert(`✅ Enviado a Fabricación.\nUds: ${unidadesFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
+    alert(`✅ Enviado a Fabricación.
+Uds: ${unidadesFinal}
+
+(Queda en Preparación hasta completar recepción.)`);
   }
   cargarLista();
 }
