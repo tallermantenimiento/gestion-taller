@@ -2501,7 +2501,10 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   let db = {};
   if (rawDb) { try { db = JSON.parse(rawDb) || {}; } catch (e) { db = {}; } }
 
-  // Pools FABRICACIÓN (principal + compat). NO usamos deliveries (Almacén) para evitar que se vaya directo allí.
+  // Pools FABRICACIÓN:
+  // - Este módulo de Fabricación lee de ldh_db.deliveries (agenda de fabricación) y gestiona el flujo fab→pintura→almacén.
+  // - Además mantenemos compatibilidad con claves antiguas (fabricacion / fab) y el pool trabajos.
+  if(!Array.isArray(db.deliveries)) db.deliveries = [];
   if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
   if(!Array.isArray(db.fab)) db.fab = [];
 
@@ -2550,6 +2553,9 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   };
 
   upsert(db.fabricacion);
+
+  // Pool principal que usa el módulo de Fabricación (agenda)
+  upsert(db.deliveries);
   // En db.fab guardamos el mismo registro (compatibilidad con index antiguos)
   upsert(db.fab);
 
