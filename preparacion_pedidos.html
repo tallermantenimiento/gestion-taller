@@ -1020,38 +1020,38 @@ function mirrorUnassignedToLdhDb(){
     if(!rawDb) return;
     const db = JSON.parse(rawDb) || {};
 
-    // pool fabricación (preferido)
-    if(Array.isArray(db.fabricacion)){
-      const idx = db.fabricacion.findIndex(d => d && d.ref === refActual);
-      if(idx >= 0){
-        db.fabricacion[idx].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-        setAny("ldh_db", JSON.stringify(db));
-        return;
-      }
-    }
+    // Pools de FABRICACIÓN (nuevos + compat)
+    if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
+    if(!Array.isArray(db.fab)) db.fab = [];
 
-    // compat: pool alternativo
-    if(Array.isArray(db.fab)){
-      const idx2 = db.fab.findIndex(d => d && d.ref === refActual);
-      if(idx2 >= 0){
-        db.fab[idx2].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-        setAny("ldh_db", JSON.stringify(db));
-        return;
+    const payload = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
+
+    const upsert = (arr)=>{
+      const i = arr.findIndex(d => d && d.ref === refActual);
+      if(i >= 0){
+        arr[i].unassignedBorrow = payload;
       }
-    }
+    };
+    upsert(db.fabricacion);
+    upsert(db.fab);
+
+    setAny("ldh_db", JSON.stringify(db));
   }catch(e){ /* silent */ }
 }
 
+
 function ldhHasDelivery(ref){
-  // Compat: algunos index usan db.fabricacion / db.fab como pool de fabricación.
   try{
     const rawDb = getAny("ldh_db");
     if(!rawDb) return false;
     const db = JSON.parse(rawDb) || {};
-    const fab = Array.isArray(db.fabricacion) ? db.fabricacion : (Array.isArray(db.fab) ? db.fab : []);
-    return fab.some(d => d && (d.ref === ref || (d.meta && d.meta.ref === ref)));
+    const pools = []
+      .concat(Array.isArray(db.fabricacion)?db.fabricacion:[])
+      .concat(Array.isArray(db.fab)?db.fab:[]);
+    return pools.some(d => d && d.ref === ref);
   }catch(e){ return false; }
 }
+
 
 function updateNoAsigPill(){
   const ub = ensureUnassigned(metaActual);
@@ -2497,29 +2497,21 @@ function confirmarTodoRecepcion() {
 function mandarAFabricacion(unidadesFinal, withAlert) {
   if (!refActual) return;
 
-  // IMPORTANTE: "Mandar a fabricación" debe insertar/actualizar en el pool de FABRICACIÓN,
-  // no en Almacén/Entregas. En esta base usamos ldh_db.fabricacion (compat: ldh_db.fab).
   const rawDb = getAny("ldh_db");
-  let db = { fabricacion: [] };
-  if (rawDb) {
-    try {
-      db = JSON.parse(rawDb) || {};
-    } catch (e) { db = {}; }
-  }
-  if (!Array.isArray(db.fabricacion)) db.fabricacion = [];
-  if (!Array.isArray(db.fab)) db.fab = []; // compat: por si el index lee 'fab'
+  let db = {};
+  if (rawDb) { try { db = JSON.parse(rawDb) || {}; } catch (e) { db = {}; } }
 
-  // Si el pedido existe en ambos pools, priorizamos fabricacion.
-  const idx = db.fabricacion.findIndex(d => d && d.ref === refActual);
-  const idxAlt = (idx < 0) ? db.fab.findIndex(d => d && d.ref === refActual) : -1;
+  // Pools FABRICACIÓN (principal + compat). NO usamos deliveries (Almacén) para evitar que se vaya directo allí.
+  if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
+  if(!Array.isArray(db.fab)) db.fab = [];
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
   const empresaFinal = String(metaActual.empresa || metaActual.company || "").trim();
 
-  const buildRec = () => ({
+  const record = {
     unassignedBorrow: ((metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() })),
-    id: "PED-" + Date.now(),
+    id: metaActual.pedido_uid || ("PED-" + Date.now()),
     client: "Taller / Interno",
     ref: refActual,
     company: empresaFinal || "",
@@ -2533,45 +2525,33 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
     delivered: 0,
     history: [],
     notes: notasFinales
-  });
+  };
 
-  const upsertInto = (arr, i) => {
-    if (i >= 0) {
-      arr[i].total = unidadesFinal;
-      // Mantener empresa por pedido en ldh_db
-      if (empresaFinal) {
-        arr[i].company = empresaFinal;
-        arr[i].empresa = empresaFinal;
-      } else {
-        if (!arr[i].company && arr[i].empresa) arr[i].company = arr[i].empresa;
-        if (!arr[i].empresa && arr[i].company) arr[i].empresa = arr[i].company;
+  const upsert = (arr)=>{
+    const idx = arr.findIndex(d => d && d.ref === refActual);
+    if (idx >= 0) {
+      arr[idx].total = unidadesFinal;
+      if(empresaFinal){
+        arr[idx].company = empresaFinal;
+        arr[idx].empresa = empresaFinal;
+      }else{
+        if(!arr[idx].company && arr[idx].empresa) arr[idx].company = arr[idx].empresa;
+        if(!arr[idx].empresa && arr[idx].company) arr[idx].empresa = arr[idx].company;
       }
-      arr[i].unassignedBorrow = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
-      if (!arr[i].notes) arr[i].notes = "";
-      if (!arr[i].notes.includes("Enviado desde Preparación")) {
-        arr[i].notes = (arr[i].notes ? (arr[i].notes + "
-") : "") + notasFinales;
+      arr[idx].unassignedBorrow = record.unassignedBorrow;
+
+      if (!arr[idx].notes) arr[idx].notes = "";
+      if (!arr[idx].notes.includes("Enviado desde Preparación")) {
+        arr[idx].notes = (arr[idx].notes ? (arr[idx].notes + "\n") : "") + notasFinales;
       }
     } else {
-      arr.push(buildRec());
+      arr.push(record);
     }
   };
 
-  if (idx >= 0) upsertInto(db.fabricacion, idx);
-  else if (idxAlt >= 0) upsertInto(db.fab, idxAlt);
-  else {
-    // insertamos en ambos pools para compat con index antiguos (solo lectura de uno u otro)
-    const rec = buildRec();
-    db.fabricacion.push(rec);
-    db.fab.push(JSON.parse(JSON.stringify(rec)));
-  }
-
-  // Si estaba en Almacén por error, lo retiramos de ahí para que no aparezca duplicado.
-  try {
-    if (Array.isArray(db.almacen)) db.almacen = db.almacen.filter(x => !(x && x.ref === refActual));
-    if (Array.isArray(db.store)) db.store = db.store.filter(x => !(x && x.ref === refActual));
-    if (Array.isArray(db.deliveries)) db.deliveries = db.deliveries.filter(x => !(x && x.ref === refActual));
-  } catch (e) {}
+  upsert(db.fabricacion);
+  // En db.fab guardamos el mismo registro (compatibilidad con index antiguos)
+  upsert(db.fab);
 
   setAny("ldh_db", JSON.stringify(db));
 
@@ -2581,13 +2561,11 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
   document.getElementById("pillFab").classList.remove("hidden");
   if(withAlert){
-    alert(`✅ Enviado a Fabricación.
-Uds: ${unidadesFinal}
-
-(Queda en Preparación hasta completar recepción.)`);
+    alert(`✅ Enviado a Fabricación.\nUds: ${unidadesFinal}\n\n(Queda en Preparación hasta completar recepción.)`);
   }
   cargarLista();
 }
+
 
 /* ========= AUTO: ENVIAR A FABRICACIÓN SI HACE FALTA ========= */
 function mandarAFabricacionAutoSiHaceFalta(){
