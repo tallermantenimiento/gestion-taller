@@ -953,6 +953,7 @@ Cantidad: ${qty}
 Stock actual: ${getStockQty(matIdReturn)}`);
   renderTabla();
   cargarLista();
+  try{ autoCerrarSiCompletoPorRecepcion(); }catch(e){}
 }
 
 /* ========= NO ASIGNADO (material prestado) =========
@@ -1800,10 +1801,9 @@ function autoCerrarSiCompletoPorRecepcion(){
   ).length;
 
   if(completeLines === totalLines){
-    // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
-    /* auto-envío a fabricación DESHABILITADO: solo manual por botón */
+    // Auto-envío a fabricación DESHABILITADO: solo manual por botón.
 
-    // 2) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
+    // 1) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
     //    Así la alerta no desaparece y queda "bloqueado" hasta devolverlo.
     const ub = (metaActual && metaActual.unassignedBorrow) ? metaActual.unassignedBorrow : (getGlobalBorrow(refActual) || { items: [] });
     const t = unassignedTotals(ub);
@@ -1817,16 +1817,26 @@ function autoCerrarSiCompletoPorRecepcion(){
       cargarLista();
       return;
     }
-    // 3) NO retirar automáticamente de Preparación aunque esté completo.
-    //    Fabricación SOLO debe recibir el pedido cuando el usuario pulsa "Mandar a fabricación".
-    metaActual.recepcion_completa = true;
-    saveMetaActual();
-    alert("✅ Pedido completo (material recibido).
 
-No se envía automáticamente a Fabricación. Pulsa 'Mandar a fabricación' cuando quieras.");
-    updateNoAsigPill();
-    cargarLista();
-    return;
+    // 2) Si NO está aún en Fabricación, NO lo retiramos de Preparación.
+    //    Debe enviarse SOLO cuando pulses el botón “Mandar a fabricación”.
+    if(!(metaActual && metaActual.en_fabricacion)){
+      const wasNotified = !!(metaActual && metaActual._notified_complete);
+      metaActual.recepcion_completa = true;
+      metaActual._notified_complete = true;
+      saveMetaActual();
+      if(!wasNotified){
+        alert("✅ Pedido completo (material recibido).\n\nPara que aparezca en Fabricación, pulsa “Mandar a fabricación”.");
+      }
+      cargarLista();
+      return;
+    }
+
+    // 3) Retirar de Preparación SOLO si ya está en Fabricación y NO hay no-asignado pendiente
+    removeAny(KP(refActual));
+    removeAny(KM(refActual));
+    alert("✅ Pedido completo (material recibido) y ya está en Fabricación: retirado de Preparación.");
+    volverLista();
   }
 }
 
