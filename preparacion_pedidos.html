@@ -389,7 +389,7 @@
    PREPARACIÓN DE PEDIDOS (vNEXT)
    - Pill Pendiente/Parcial/Completo: por RECEPCIÓN (qty_recibida).
    - Auto-cierra cuando TODO está RECIBIDO (qty_recibida>=qty_pedida).
-   - En este ajuste: NO se envía automáticamente a Fabricación (solo con botón).
+   - En este ajuste: auto-cierre => auto-mandar a fabricación antes de eliminar de Preparación.
    - “Marcar en fabricación” eliminado (ya existe “Mandar a fabricación”).
 ======================================================================================= */
 
@@ -1023,7 +1023,6 @@ function mirrorUnassignedToLdhDb(){
     // Pools de FABRICACIÓN (nuevos + compat)
     if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
     if(!Array.isArray(db.fab)) db.fab = [];
-    if(!Array.isArray(db.trabajos)) db.trabajos = [];
 
     const payload = (metaActual.unassignedBorrow || getGlobalBorrow(refActual) || { items: [], updatedAt: Date.now() });
 
@@ -1035,7 +1034,6 @@ function mirrorUnassignedToLdhDb(){
     };
     upsert(db.fabricacion);
     upsert(db.fab);
-    upsert(db.trabajos);
 
     setAny("ldh_db", JSON.stringify(db));
   }catch(e){ /* silent */ }
@@ -1049,8 +1047,7 @@ function ldhHasDelivery(ref){
     const db = JSON.parse(rawDb) || {};
     const pools = []
       .concat(Array.isArray(db.fabricacion)?db.fabricacion:[])
-      .concat(Array.isArray(db.fab)?db.fab:[])
-      .concat(Array.isArray(db.trabajos)?db.trabajos:[]);
+      .concat(Array.isArray(db.fab)?db.fab:[]);
     return pools.some(d => d && d.ref === ref);
   }catch(e){ return false; }
 }
@@ -1771,33 +1768,31 @@ function autoCerrarSiCompletoPorRecepcion(){
   ).length;
 
   if(completeLines === totalLines){
-    // IMPORTANTE:
-    // - NO se envía automáticamente a Fabricación.
-    // - El pedido se mantiene en Preparación aunque esté completo.
-    // - Solo se envía cuando el usuario pulsa “Mandar a fabricación”.
+    // 1) Asegurar que queda enviado a fabricación antes de eliminar de Preparación
+    /* auto-envío a fabricación DESHABILITADO: solo manual por botón */
 
-    // Si hay material NO asignado pendiente, mantenemos la alerta (pill roja) igual.
+    // 2) Si hay material NO asignado pendiente, NO retiramos el pedido de Preparación.
+    //    Así la alerta no desaparece y queda "bloqueado" hasta devolverlo.
     const ub = (metaActual && metaActual.unassignedBorrow) ? metaActual.unassignedBorrow : (getGlobalBorrow(refActual) || { items: [] });
     const t = unassignedTotals(ub);
-
-    if(!metaActual.recepcion_completa){
-      metaActual.recepcion_completa = true;
-      // no tocamos en_fabricacion aquí
-      setAny(KM(refActual), JSON.stringify(metaActual));
-    }
-
-    // Si hay no-asignado, seguimos igual (solo persistimos meta)
     if(t.lines > 0){
-      // Persistimos para que no desaparezca aunque cambie de fase
+      metaActual.recepcion_completa = true;
+      metaActual.unassignedBorrow = ensureUnassigned(metaActual);
+      // nos aseguramos de persistirlo también en global
       saveMetaActual();
+      alert("⚠️ Pedido completo (material recibido), pero hay MATERIAL NO ASIGNADO pendiente de devolver.\n\nEl pedido se mantiene en Preparación hasta que lo devuelvas desde la pill roja.");
       updateNoAsigPill();
+      cargarLista();
+      return;
     }
 
-    // Nada más: no borrar de Preparación, no mandar a fabricación.
-    cargarLista();
+    // 3) Retirar de Preparación (solo si NO hay no-asignado pendiente)
+    removeAny(KP(refActual));
+    removeAny(KM(refActual));
+    alert("✅ Pedido completo (material recibido): enviado a Fabricación y retirado de Preparación.");
+    volverLista();
   }
 }
-
 
 /* ========= VINCULACIÓN ========= */
 function getLinkedMatIdForLine(line){
@@ -2509,7 +2504,6 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   // Pools FABRICACIÓN (principal + compat). NO usamos deliveries (Almacén) para evitar que se vaya directo allí.
   if(!Array.isArray(db.fabricacion)) db.fabricacion = [];
   if(!Array.isArray(db.fab)) db.fab = [];
-  if(!Array.isArray(db.trabajos)) db.trabajos = [];
 
   const notaHierro = metaActual.tipo_hierro ? `[PERFILERÍA: ${metaActual.tipo_hierro.toUpperCase()}] ` : "";
   const notasFinales = notaHierro + "Enviado desde Preparación.";
@@ -2558,7 +2552,27 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
   upsert(db.fabricacion);
   // En db.fab guardamos el mismo registro (compatibilidad con index antiguos)
   upsert(db.fab);
-  upsert(db.trabajos);
+
+  // Pool TRABAJOS: muchos listados de Fabricación leen significa "Ver trabajos".
+  if(!Array.isArray(db.trabajos)) db.trabajos = [];
+  const upsertTrabajos = (arr)=>{
+    const idx = arr.findIndex(d => d && d.ref === refActual);
+    const base = {
+      ...record,
+      // campos típicos usados en listados antiguos
+      estado: "pendiente",
+      fase: "fabricacion",
+      tipo: "fabricacion",
+      unidades: unidadesFinal,
+      cantidad: unidadesFinal
+    };
+    if(idx >= 0){
+      arr[idx] = { ...arr[idx], ...base };
+    }else{
+      arr.push(base);
+    }
+  };
+  upsertTrabajos(db.trabajos);
 
   setAny("ldh_db", JSON.stringify(db));
 
@@ -2576,25 +2590,8 @@ function mandarAFabricacion(unidadesFinal, withAlert) {
 
 /* ========= AUTO: ENVIAR A FABRICACIÓN SI HACE FALTA ========= */
 function mandarAFabricacionAutoSiHaceFalta(){
-  // Evitar re-enviar (y duplicar notas/acciones) cuando ya existe en Fabricación.
-  // Esto es importante porque al devolver NO-ASIGNADO puede dispararse el auto-cierre de recepción.
-  if(!refActual) return;
-
-  if(metaActual && metaActual.en_fabricacion && ldhHasDelivery(refActual)){
-    // Aseguramos mirror de no-asignado por si cambió
-    mirrorUnassignedToLdhDb();
-    return;
-  }
-  if(ldhHasDelivery(refActual)){
-    metaActual.en_fabricacion = true;
-    metaActual.fabricacion_ts = metaActual.fabricacion_ts || Date.now();
-    setAny(KM(refActual), JSON.stringify(metaActual));
-    mirrorUnassignedToLdhDb();
-    return;
-  }
-
-  const unidadesFinal = (parseFloat(document.getElementById("inputUnidades")?.value) || metaActual.unidades || 1);
-  mandarAFabricacion(unidadesFinal, false);
+  // Auto-envío deshabilitado: Fabricación solo debe recibir pedidos cuando el usuario pulsa el botón.
+  return;
 }
 
 
