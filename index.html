@@ -2157,7 +2157,94 @@ saveData() {
         _setStoreItem('ldh_db', JSON.stringify(this.state));
     },
 
+    // === FIX: limpiar 'No asignado' fantasma en el estado del Index ===
+    // Si en alguna BD LDH (ldh_db / LDH_DB*) ya no quedan pendientes, eliminamos los flags
+    // en el item cacheado para que Fabricación/Entregas no lo siga mostrando.
+    syncUnassignedFromLdhStores() {
+        try{
+            const norm = s => String(s||'').trim();
+            const idKey = (o) => {
+                if(!o) return '';
+                return norm(o.id || o.pedidoId || o.pedido_id || o.ref);
+            };
+            const hasDebt = (o) => {
+                if(!o) return false;
+                const ub = o.unassignedBorrow || o.unassigned_borrow || o.noAsignado || o.materialNoAsignado;
+                if(!ub) return false;
+                const items = Array.isArray(ub.items) ? ub.items : (Array.isArray(ub) ? ub : []);
+                return items.some(x => Number(x && (x.qtyPending ?? x.pending ?? x.qty ?? x.cantidad ?? 0)) > 0);
+            };
+            const clearDebtFlags = (o) => {
+                if(!o || typeof o !== 'object') return false;
+                let c = false;
+                if(o.unassignedBorrow){ try{ delete o.unassignedBorrow; }catch(_){ o.unassignedBorrow = null; } c = true; }
+                if(o.unassigned_borrow){ try{ delete o.unassigned_borrow; }catch(_){ o.unassigned_borrow = null; } c = true; }
+                if(o.noAsignado){ try{ delete o.noAsignado; }catch(_){ o.noAsignado = null; } c = true; }
+                if(o.materialNoAsignado){ try{ delete o.materialNoAsignado; }catch(_){ o.materialNoAsignado = null; } c = true; }
+                return c;
+            };
+
+            // 1) Construir índice "sin deuda" a partir de todas las BDs LDH disponibles
+            const ok = Object.create(null); // idKey/ref -> true si en alguna BD ya NO hay deuda
+            const keys = Object.keys(localStorage).filter(k => k === 'ldh_db' || /^LDH_DB/i.test(k));
+            keys.forEach(k=>{
+                try{
+                    const raw = _getStoreItem(k);
+                    if(!raw) return;
+                    const db = JSON.parse(raw)||{};
+                    const pools = [];
+                    if(Array.isArray(db.deliveries)) pools.push(db.deliveries);
+                    if(Array.isArray(db.fabricacion)) pools.push(db.fabricacion);
+                    if(Array.isArray(db.preparacion)) pools.push(db.preparacion);
+                    if(Array.isArray(db.almacen)) pools.push(db.almacen);
+                    pools.forEach(arr=>{
+                        arr.forEach(it=>{
+                            const key = idKey(it);
+                            if(!key) return;
+                            // Si NO hay deuda en este registro, lo marcamos como "limpio"
+                            if(!hasDebt(it)) ok[key] = true;
+                        });
+                    });
+                }catch(e){}
+            });
+
+            // 2) Limpiar en el estado del Index donde se dibujan las pills
+            const poolsState = [
+                this.state && this.state.deliveries,
+                this.state && this.state.fabricacion,
+                this.state && this.state.preparacion,
+                this.state && this.state.almacen
+            ].filter(Array.isArray);
+
+            let changed = false;
+
+            poolsState.forEach(arr=>{
+                arr.forEach(it=>{
+                    if(!it) return;
+                    if(!hasDebt(it)) return; // ya limpio
+                    const key = idKey(it);
+                    if(!key) return;
+
+                    // Si alguna BD dice que está limpio, quitamos flags aquí
+                    if(ok[key]){
+                        if(clearDebtFlags(it)) changed = true;
+                    } else {
+                        // fallback: algunos registros solo casan por ref
+                        const r = norm(it.ref);
+                        if(r && ok[r]){
+                            if(clearDebtFlags(it)) changed = true;
+                        }
+                    }
+                });
+            });
+
+            if(changed) this.saveData();
+        }catch(e){}
+    },
+
     router(viewName) {
+        // Reconciliar 'No asignado' antes de pintar cualquier vista
+        this.syncUnassignedFromLdhStores();
         // Resolver vista destino
         const viewEl = document.getElementById('view-' + viewName);
         if(!viewEl){
@@ -2171,8 +2258,6 @@ saveData() {
         viewEl.classList.add('active');
 
         if(viewName==='ubicaciones' && window.Ubicaciones){ Ubicaciones.render(); }
-        // Reconciliar "No asignado" antes de renderizar (evita deudor fantasma al volver desde Preparación)
-        try{ this.syncUnassignedFromLdhDb(); }catch(e){}
         // Renderizar datos específicos
         if(viewName === 'mini_agenda') this.renderMiniAgenda();
         if(viewName === 'entregas') this.renderDeliveries();
@@ -2940,157 +3025,6 @@ saveData() {
             return '<span class="badge-pending" style="background:#e2e8f0; color:#0f172a">En proceso</span>';
         }
         return '';
-    },
-
-    // --- Sync: limpiar "No asignado" en la BD principal (ldh_db / TallerFlowDB) usando ldh_db como verdad ---
-    // Motivo: si el usuario devuelve el material NO asignado desde preparacion_pedidos.html, allí se limpia en ldh_db,
-    // pero la vista Fabricación de este index puede seguir mostrando "deudor" si aquí quedó cacheado el campo unassignedBorrow.
-    syncUnassignedFromLdhDb(){
-        // Reconciliación: si "No asignado" ya se devolvió en Preparación (y se limpió en alguna BD LDH),
-        // quitamos los flags de deuda en la caché del index (TallerFlowDB / App.state.*).
-        try{
-            const norm = s => String(s||'').trim();
-
-            // Soportar varias keys históricas/alternativas de BD (según módulo / versión)
-            // Incluye: 'ldh_db' y cualquier 'LDH_DB*' existente en localStorage.
-            const candidateKeys = Array.from(new Set(
-              ['ldh_db']
-                .concat(Object.keys(localStorage||{}).filter(k=>/^LDH_DB/i.test(k)))
-            ));
-
-            // Indexar deliveries de todas las BDs por varios identificadores (id/pedidoId/ref) para evitar desajustes
-            const idx = new Map(); // key -> delivery record
-            const addKey = (k, rec) => { k = norm(k); if(!k) return; if(!idx.has(k)) idx.set(k, rec); };
-
-            for(const k of candidateKeys){
-                try{
-                    const raw = _getStoreItem(k);
-                    if(!raw) continue;
-                    const db = JSON.parse(raw)||{};
-                    const arr = Array.isArray(db.deliveries) ? db.deliveries : [];
-                    for(const rec of arr){
-                        addKey(rec && (rec.id || rec.pedidoId || rec.pedido_id), rec);
-                        addKey(rec && rec.ref, rec);
-                    }
-                }catch(e){}
-            }
-            if(!idx.size) return;
-
-            const uaObj = (it) => (it && (it.unassignedBorrow || it.unassigned_borrow || it.noAsignado || it.materialNoAsignado)) || null;
-
-            const uaHasPending = (it) => {
-                const ub = uaObj(it);
-                const arr = (ub && Array.isArray(ub.items)) ? ub.items : [];
-                for(const x of arr){
-                    const q = Number(x?.qtyPending ?? x?.pending ?? x?.qty ?? 0) || 0;
-                    if(q > 0) return true;
-                }
-                return false;
-            };
-
-            const uaClear = (it) => {
-                let changed = false;
-                if(it && ('unassignedBorrow' in it)){ try{ delete it.unassignedBorrow; changed = true; }catch(_e){} }
-                if(it && ('unassigned_borrow' in it)){ try{ delete it.unassigned_borrow; changed = true; }catch(_e){} }
-                if(it && ('noAsignado' in it)){ try{ delete it.noAsignado; changed = true; }catch(_e){} }
-                if(it && ('materialNoAsignado' in it)){ try{ delete it.materialNoAsignado; changed = true; }catch(_e){} }
-                return changed;
-            };
-
-            const findTwin = (it) => {
-                if(!it) return null;
-                const k1 = norm(it.id || it.pedidoId || it.pedido_id);
-                if(k1 && idx.has(k1)) return idx.get(k1);
-                const k2 = norm(it.ref);
-                if(k2 && idx.has(k2)) return idx.get(k2);
-                return null;
-            };
-
-            const applyPool = (arr) => {
-                if(!Array.isArray(arr) || !arr.length) return false;
-                let changed = false;
-                for(const it of arr){
-                    if(!uaHasPending(it)) continue; // ya está limpio
-                    const twin = findTwin(it);
-                    if(!twin) continue; // no podemos decidir
-                    // Si en la BD LDH ya NO hay pendientes, limpiamos flags en caché del index
-                    if(!uaHasPending(twin)){
-                        if(uaClear(it)) changed = true;
-                    }
-                }
-                return changed;
-            };
-
-            let changed = false;
-
-            // Pools típicos donde se renderizan pills/contadores de no-asignado
-            changed = applyPool(this.state?.deliveries) || changed;
-            changed = applyPool(this.state?.fabricacion) || changed;
-            changed = applyPool(this.state?.almacen) || changed;
-            changed = applyPool(this.state?.preparacion) || changed;
-
-            if(changed) this.saveData(); // persiste en TallerFlowDB (state)
-        }catch(e){}
-    }catch(e){}
-            }
-            if(!ldhDelAll.length) return;
-
-            const uaObj = (it) => (it && (it.unassignedBorrow || it.unassigned_borrow || it.noAsignado || it.materialNoAsignado)) || null;
-
-            const uaHasPending = (it) => {
-                const ub = uaObj(it);
-                const arr = (ub && Array.isArray(ub.items)) ? ub.items : [];
-                for(const x of arr){
-                    const q = Number(x?.qtyPending ?? x?.pending ?? x?.qty ?? 0);
-                    if(q > 0) return true;
-                }
-                return false;
-            };
-
-            const uaClear = (it) => {
-                if(!it) return false;
-                let touched = false;
-                if('unassignedBorrow' in it){ try{ delete it.unassignedBorrow; touched = true; }catch(e){} }
-                if('unassigned_borrow' in it){ try{ delete it.unassigned_borrow; touched = true; }catch(e){} }
-                if('noAsignado' in it){ try{ delete it.noAsignado; touched = true; }catch(e){} }
-                if('materialNoAsignado' in it){ try{ delete it.materialNoAsignado; touched = true; }catch(e){} }
-                return touched;
-            };
-
-            // Map por REF (último gana). Es suficiente porque solo queremos saber si hay pendientes o no.
-            const ldhMap = new Map();
-            for(const d of ldhDelAll){
-                const r = norm(d?.ref);
-                if(r) ldhMap.set(r, d);
-            }
-
-            const applyPool = (arr) => {
-                if(!Array.isArray(arr) || !arr.length) return false;
-                let changed = false;
-                for(const it of arr){
-                    const ref = norm(it?.ref);
-                    if(!ref) continue;
-                    const twin = ldhMap.get(ref);
-                    if(!twin) continue;
-
-                    // Si en la BD LDH ya NO hay pendientes, limpiamos flags en caché del index
-                    if(!uaHasPending(twin) && uaHasPending(it)){
-                        if(uaClear(it)) changed = true;
-                    }
-                }
-                return changed;
-            };
-
-            let changed = false;
-
-            // Pools típicos donde se renderizan pills/contadores de no-asignado
-            changed = applyPool(this.state?.deliveries) || changed;
-            changed = applyPool(this.state?.fabricacion) || changed;
-            changed = applyPool(this.state?.almacen) || changed;
-            changed = applyPool(this.state?.preparacion) || changed;
-
-            if(changed) this.saveData(); // persiste en TallerFlowDB (state)
-        }catch(e){}
     },
 
     // ===== Material NO asignado (devolución pendiente) =====
