@@ -2173,7 +2173,7 @@ saveData() {
         if(viewName==='ubicaciones' && window.Ubicaciones){ Ubicaciones.render(); }
         // Renderizar datos específicos
         if(viewName === 'mini_agenda') this.renderMiniAgenda();
-        if(viewName === 'entregas') this.renderDeliveries();
+        if(viewName === 'entregas'){ try{ this.syncUnassignedFromLdhDb(); }catch(e){} this.renderDeliveries(); }
         if(viewName === 'almacen') this.renderAlmacen();
         if(viewName === 'preparacion') this.renderPurchases();
         if(viewName === 'config') this.renderConfigList();
@@ -2938,6 +2938,53 @@ saveData() {
             return '<span class="badge-pending" style="background:#e2e8f0; color:#0f172a">En proceso</span>';
         }
         return '';
+    },
+
+    // --- Sync: limpiar "No asignado" en la BD principal (ldh_db / TallerFlowDB) usando ldh_db como verdad ---
+    // Motivo: si el usuario devuelve el material NO asignado desde preparacion_pedidos.html, allí se limpia en ldh_db,
+    // pero la vista Fabricación de este index puede seguir mostrando "deudor" si aquí quedó cacheado el campo unassignedBorrow.
+    syncUnassignedFromLdhDb(){
+        try{
+            const raw = _getStoreItem('ldh_db');
+            if(!raw) return;
+
+            const db = JSON.parse(raw)||{};
+            const ldhDel = Array.isArray(db.deliveries) ? db.deliveries : [];
+
+            const norm = s => String(s||'').trim();
+
+            const hasDebt = (it) => {
+                if(!it) return false;
+                const ub = it.unassignedBorrow || it.unassigned_borrow || it.noAsignado || it.materialNoAsignado || null;
+                const items = (ub && Array.isArray(ub.items)) ? ub.items : [];
+                return items.some(x => Number(x && (x.qtyPending ?? x.pending ?? x.qty ?? 0)) > 0);
+            };
+
+            let changed = false;
+
+            (this.state.deliveries||[]).forEach(it=>{
+                const ref = norm(it && it.ref);
+                if(!ref) return;
+
+                const twin = ldhDel.find(x => norm(x && x.ref) === ref);
+                if(!twin) return;
+
+                // Si en ldh_db ya no hay deuda, limpiamos también en el item cacheado (para que Fabricación no marque "deudor")
+                if(!hasDebt(twin) && hasDebt(it)){
+                    try{ delete it.unassignedBorrow; }catch(e){}
+                    try{ delete it.unassigned_borrow; }catch(e){}
+                    try{ delete it.noAsignado; }catch(e){}
+                    try{ delete it.materialNoAsignado; }catch(e){}
+                    changed = true;
+                }
+            });
+
+            if(changed){
+                this.saveData();
+                // refrescar badges si la vista ya está montada
+                try{ this._updateNavUnassignedBadges(); }catch(e){}
+            }
+        }catch(e){}
     },
 
     // ===== Material NO asignado (devolución pendiente) =====
