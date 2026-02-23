@@ -2957,15 +2957,81 @@ saveData() {
               ['ldh_db']
                 .concat(Object.keys(localStorage||{}).filter(k=>/^LDH_DB/i.test(k)))
             ));
-            const ldhDelAll = [];
+
+            // Indexar deliveries de todas las BDs por varios identificadores (id/pedidoId/ref) para evitar desajustes
+            const idx = new Map(); // key -> delivery record
+            const addKey = (k, rec) => { k = norm(k); if(!k) return; if(!idx.has(k)) idx.set(k, rec); };
+
             for(const k of candidateKeys){
                 try{
                     const raw = _getStoreItem(k);
                     if(!raw) continue;
                     const db = JSON.parse(raw)||{};
                     const arr = Array.isArray(db.deliveries) ? db.deliveries : [];
-                    if(arr.length) ldhDelAll.push(...arr);
+                    for(const rec of arr){
+                        addKey(rec && (rec.id || rec.pedidoId || rec.pedido_id), rec);
+                        addKey(rec && rec.ref, rec);
+                    }
                 }catch(e){}
+            }
+            if(!idx.size) return;
+
+            const uaObj = (it) => (it && (it.unassignedBorrow || it.unassigned_borrow || it.noAsignado || it.materialNoAsignado)) || null;
+
+            const uaHasPending = (it) => {
+                const ub = uaObj(it);
+                const arr = (ub && Array.isArray(ub.items)) ? ub.items : [];
+                for(const x of arr){
+                    const q = Number(x?.qtyPending ?? x?.pending ?? x?.qty ?? 0) || 0;
+                    if(q > 0) return true;
+                }
+                return false;
+            };
+
+            const uaClear = (it) => {
+                let changed = false;
+                if(it && ('unassignedBorrow' in it)){ try{ delete it.unassignedBorrow; changed = true; }catch(_e){} }
+                if(it && ('unassigned_borrow' in it)){ try{ delete it.unassigned_borrow; changed = true; }catch(_e){} }
+                if(it && ('noAsignado' in it)){ try{ delete it.noAsignado; changed = true; }catch(_e){} }
+                if(it && ('materialNoAsignado' in it)){ try{ delete it.materialNoAsignado; changed = true; }catch(_e){} }
+                return changed;
+            };
+
+            const findTwin = (it) => {
+                if(!it) return null;
+                const k1 = norm(it.id || it.pedidoId || it.pedido_id);
+                if(k1 && idx.has(k1)) return idx.get(k1);
+                const k2 = norm(it.ref);
+                if(k2 && idx.has(k2)) return idx.get(k2);
+                return null;
+            };
+
+            const applyPool = (arr) => {
+                if(!Array.isArray(arr) || !arr.length) return false;
+                let changed = false;
+                for(const it of arr){
+                    if(!uaHasPending(it)) continue; // ya está limpio
+                    const twin = findTwin(it);
+                    if(!twin) continue; // no podemos decidir
+                    // Si en la BD LDH ya NO hay pendientes, limpiamos flags en caché del index
+                    if(!uaHasPending(twin)){
+                        if(uaClear(it)) changed = true;
+                    }
+                }
+                return changed;
+            };
+
+            let changed = false;
+
+            // Pools típicos donde se renderizan pills/contadores de no-asignado
+            changed = applyPool(this.state?.deliveries) || changed;
+            changed = applyPool(this.state?.fabricacion) || changed;
+            changed = applyPool(this.state?.almacen) || changed;
+            changed = applyPool(this.state?.preparacion) || changed;
+
+            if(changed) this.saveData(); // persiste en TallerFlowDB (state)
+        }catch(e){}
+    }catch(e){}
             }
             if(!ldhDelAll.length) return;
 
