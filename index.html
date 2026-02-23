@@ -2171,9 +2171,10 @@ saveData() {
         viewEl.classList.add('active');
 
         if(viewName==='ubicaciones' && window.Ubicaciones){ Ubicaciones.render(); }
+        // Reconciliar "No asignado" antes de renderizar (evita deudor fantasma al volver desde Preparación)
+        try{ this.syncUnassignedFromLdhDb(); }catch(e){}
         // Renderizar datos específicos
         if(viewName === 'mini_agenda') this.renderMiniAgenda();
-        try{ this.syncUnassignedFromLdhDb(); }catch(e){}
         if(viewName === 'entregas') this.renderDeliveries();
         if(viewName === 'almacen') this.renderAlmacen();
         if(viewName === 'preparacion') this.renderPurchases();
@@ -2951,7 +2952,11 @@ saveData() {
             const norm = s => String(s||'').trim();
 
             // Soportar varias keys históricas/alternativas de BD (según módulo / versión)
-            const candidateKeys = ['ldh_db','LDH_DB','LDH_DB_v2'];
+            // Incluye: 'ldh_db' y cualquier 'LDH_DB*' existente en localStorage.
+            const candidateKeys = Array.from(new Set(
+              ['ldh_db']
+                .concat(Object.keys(localStorage||{}).filter(k=>/^LDH_DB/i.test(k)))
+            ));
             const ldhDelAll = [];
             for(const k of candidateKeys){
                 try{
