@@ -2945,17 +2945,24 @@ saveData() {
     // Motivo: si el usuario devuelve el material NO asignado desde preparacion_pedidos.html, allí se limpia en ldh_db,
     // pero la vista Fabricación de este index puede seguir mostrando "deudor" si aquí quedó cacheado el campo unassignedBorrow.
     syncUnassignedFromLdhDb(){
-        // Reconciliación: si Preparación ya devolvió "No asignado" y lo limpió en ldh_db,
+        // Reconciliación: si "No asignado" ya se devolvió en Preparación (y se limpió en alguna BD LDH),
         // quitamos los flags de deuda en la caché del index (TallerFlowDB / App.state.*).
         try{
-            const raw = _getStoreItem('ldh_db');
-            if(!raw) return;
-
-            const db = JSON.parse(raw)||{};
-            const ldhDel = Array.isArray(db.deliveries) ? db.deliveries : [];
-            if(!ldhDel.length) return;
-
             const norm = s => String(s||'').trim();
+
+            // Soportar varias keys históricas/alternativas de BD (según módulo / versión)
+            const candidateKeys = ['ldh_db','LDH_DB','LDH_DB_v2'];
+            const ldhDelAll = [];
+            for(const k of candidateKeys){
+                try{
+                    const raw = _getStoreItem(k);
+                    if(!raw) continue;
+                    const db = JSON.parse(raw)||{};
+                    const arr = Array.isArray(db.deliveries) ? db.deliveries : [];
+                    if(arr.length) ldhDelAll.push(...arr);
+                }catch(e){}
+            }
+            if(!ldhDelAll.length) return;
 
             const uaObj = (it) => (it && (it.unassignedBorrow || it.unassigned_borrow || it.noAsignado || it.materialNoAsignado)) || null;
 
@@ -2979,8 +2986,9 @@ saveData() {
                 return touched;
             };
 
+            // Map por REF (último gana). Es suficiente porque solo queremos saber si hay pendientes o no.
             const ldhMap = new Map();
-            for(const d of ldhDel){
+            for(const d of ldhDelAll){
                 const r = norm(d?.ref);
                 if(r) ldhMap.set(r, d);
             }
@@ -2994,7 +3002,7 @@ saveData() {
                     const twin = ldhMap.get(ref);
                     if(!twin) continue;
 
-                    // Si ldh_db ya NO tiene pendientes, pero el index sí, limpiamos en index.
+                    // Si en la BD LDH ya NO hay pendientes, limpiamos flags en caché del index
                     if(!uaHasPending(twin) && uaHasPending(it)){
                         if(uaClear(it)) changed = true;
                     }
