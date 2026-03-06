@@ -213,7 +213,10 @@
             </div>
         </div>
       </div>
-      <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn" onclick="copiarListaCompras()">📋 Copiar a compras</button>
+        <button class="btn btn-success" onclick="marcarTodoOk()">✓ OK Todo</button>
+      </div>
   </div>
 
   <div id="panelHierro" class="hidden control-panel">
@@ -229,6 +232,7 @@
     <div class="section-title">PERFILERÍA · BARRAS</div>
     <table>
       <thead><tr>
+        <th width="60" title="Marcar para pedir a compras"><div style="display:flex; flex-direction:column; align-items:center; gap:4px;"><span style="font-size:11px; opacity:0.85;">Pedir</span><input type="checkbox" id="chkAllBuyBarras" onchange="togglePedirAll('barra', this.checked)" title="Seleccionar/Deseleccionar todo"></div></th>
         <th width="30">OK</th>
         <th>Material</th>
         <th>Pedida</th>
@@ -244,6 +248,7 @@
     <div class="section-title">ACCESORIOS · UNIDADES</div>
     <table>
       <thead><tr>
+        <th width="60" title="Marcar para pedir a compras"><div style="display:flex; flex-direction:column; align-items:center; gap:4px;"><span style="font-size:11px; opacity:0.85;">Pedir</span><input type="checkbox" id="chkAllBuyUnidades" onchange="togglePedirAll('ud', this.checked)" title="Seleccionar/Deseleccionar todo"></div></th>
         <th width="30">OK</th>
         <th>Material</th>
         <th>Pedida</th>
@@ -1968,6 +1973,7 @@ function renderTabla() {
 
   let hasBarras = false;
   let hasUnidades = false;
+  let _dirtyBuyDefaults = false; // auto-check inicial para Compras
 
   document.getElementById("pillFab").classList.toggle("hidden", !metaActual.en_fabricacion);
 
@@ -1975,6 +1981,19 @@ function renderTabla() {
     const pedida = toNum(linea.qty_pedida);
     const recibida = toNum(linea.qty_recibida);
     const yaAplicada = toNum(linea.aplicado_qty);
+
+    // ====== COMPRAS: selección para copiar ======
+    // Necesario para comprar = lo que falta por recibir (pedida - recibida) y lo comparamos con stock.
+    try{
+      const _need = Math.max(0, pedida - recibida);
+      const _sInfo = (typeof _getStockInfoForCompra==="function") ? _getStockInfoForCompra(linea) : { stockKnown:false, stock:0 };
+      const _stock = _sInfo.stockKnown ? toNum(_sInfo.stock) : 0;
+      const _toBuy = _sInfo.stockKnown ? Math.max(0, _need - _stock) : _need;
+      if(linea.toBuy === undefined){
+        linea.toBuy = (_toBuy > 0);
+        _dirtyBuyDefaults = true;
+      }
+    }catch(e){}
 
     const isComplete = linea.ok || (pedida > 0 && recibida >= pedida);
     const rowClass = isComplete ? "ok" : "";
@@ -2027,6 +2046,7 @@ function renderTabla() {
     tr.className = rowClass;
 
     tr.innerHTML = `
+      <td><input type="checkbox" ${linea.toBuy ? "checked" : ""} onchange="togglePedir(${index}, this.checked)" title="Pedir a compras"></td>
       <td><input type="checkbox" ${linea.ok ? "checked" : ""} onchange="toggleOk(${index}, this.checked)"></td>
       <td>
         <div style="font-weight:700; color:#fff;">${linea.mat}</div>
@@ -2046,12 +2066,18 @@ function renderTabla() {
     else { hasUnidades = true; tbodyUnidades.appendChild(tr); }
   });
 
+  // Persistir auto-selección inicial de compras (solo 1 vez por pedido)
+  if(_dirtyBuyDefaults){
+    try{ guardarEstadoLocal(); }catch(e){}
+  }
+
   document.getElementById("bloqueBarras").classList.toggle("hidden", !hasBarras);
   document.getElementById("bloqueUnidades").classList.toggle("hidden", !hasUnidades);
   document.getElementById("panelHierro").classList.toggle("hidden", !hasBarras);
 
   autoCerrarSiCompletoPorRecepcion();
   updateNoAsigPill();
+  try{ if(typeof updateBuyHeaderChecks==="function") updateBuyHeaderChecks(); }catch(e){}
 }
 
 
@@ -2486,6 +2512,289 @@ function guardarNuevoMaterial() {
 }
 
 /* ========= OTROS HELPERS ========= */
+/* --- COMPRAS: selección + copiar al portapapeles --- */
+function _unitIsBarra(unit){
+  return String(unit||'').trim().toLowerCase()==='barra';
+}
+function _fmtNum(n){
+  const x = Number(n);
+  if(!isFinite(x)) return "0";
+  const r = Math.round(x*100)/100;
+  if(Math.abs(r - Math.round(r)) < 1e-9) return String(Math.round(r));
+  return String(r);
+}
+function _fmtUnit(unit, qty){
+  const u = String(unit||"ud").trim();
+  const low = u.toLowerCase();
+  const q = Math.abs(Number(qty));
+  if(low==="barra" || low==="barras") return (q===1 ? "barra" : "barras");
+  if(low==="ud" || low==="uds" || low==="unidad" || low==="unidades") return (q===1 ? "ud" : "uds");
+  return u;
+}
+
+function _getStockInfoForCompra(linea){
+  try{
+    const isBar = _unitIsBarra(linea.unit);
+    const ironType = isBar ? (metaActual && metaActual.tipo_hierro) : null;
+    const check = _addToRealStock_byLinkedOrName(linea, ironType);
+    if(check && check.success){
+      return {
+        stockKnown: true,
+        matId: check.matId,
+        mat: check.mat,
+        stock: toNum(getStockQty(check.matId))
+      };
+    }
+  }catch(e){}
+  return { stockKnown:false, matId:null, mat:null, stock:0 };
+}
+
+function _needForCompra(linea){
+  // Lo que falta por recibir (lo que realmente "queda por pedir" para este pedido)
+  try{
+    const ped = toNum(linea.qty_pedida);
+    const rec = toNum(linea.qty_recibida);
+    return Math.max(0, ped - rec);
+  }catch(e){
+    return 0;
+  }
+}
+
+function togglePedir(index, isChecked){
+  const linea = estadoMateriales[index];
+  linea.toBuy = !!isChecked;
+  guardarEstadoLocal();
+  try{ updateBuyHeaderChecks(); }catch(e){}
+}
+
+function togglePedirAll(group, isChecked){
+  const wantBar = String(group||"").toLowerCase()==="barra";
+  estadoMateriales.forEach(l=>{
+    const isBar = _unitIsBarra(l.unit);
+    if(wantBar ? isBar : !isBar){
+      l.toBuy = !!isChecked;
+    }
+  });
+  guardarEstadoLocal();
+  renderTabla();
+  cargarLista();
+}
+
+function updateBuyHeaderChecks(){
+  const bars = (estadoMateriales||[]).filter(l => _unitIsBarra(l.unit));
+  const units = (estadoMateriales||[]).filter(l => !_unitIsBarra(l.unit));
+
+  const set = (id, arr)=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    const total = arr.length;
+    const checked = arr.filter(l => !!l.toBuy).length;
+    el.indeterminate = (checked>0 && checked<total);
+    el.checked = (total>0 && checked===total);
+  };
+  set("chkAllBuyBarras", bars);
+  set("chkAllBuyUnidades", units);
+}
+
+async function _copyTextToClipboard(txt, html){
+  // Clipboard API (https/localhost). Si no, fallback con execCommand (file:// a veces funciona).
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      // Si nos pasan HTML y el navegador soporta ClipboardItem, copiamos RICH (mantiene negritas).
+      if(html && typeof ClipboardItem !== 'undefined'){
+        const item = new ClipboardItem({
+          'text/plain': new Blob([txt], { type: 'text/plain' }),
+          'text/html' : new Blob([html], { type: 'text/html' })
+        });
+        await navigator.clipboard.write([item]);
+        return true;
+      }
+      // Fallback seguro: solo texto
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  }catch(e){}
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){
+    return false;
+  }
+}
+
+
+
+function abrirModalCompras(txt){
+  const modal = document.getElementById("modalCompras");
+  const ta = document.getElementById("txtCompras");
+  if(!modal || !ta){
+    // Último recurso
+    alert(txt);
+    return;
+  }
+  ta.value = txt || "";
+  modal.classList.add("active");
+  modal.setAttribute("aria-hidden","false");
+  setTimeout(()=>{
+    try{ ta.focus(); ta.select(); }catch(e){}
+  }, 50);
+}
+
+function cerrarModalCompras(){
+  const modal = document.getElementById("modalCompras");
+  if(modal){
+    modal.classList.remove("active");
+    modal.setAttribute("aria-hidden","true");
+  }
+}
+
+function seleccionarTextoCompras(){
+  const ta = document.getElementById("txtCompras");
+  if(!ta) return;
+  try{ ta.focus(); ta.select(); }catch(e){}
+}
+
+async function copiarDesdeModalCompras(){
+  const ta = document.getElementById("txtCompras");
+  if(!ta) return;
+  const txt = ta.value || "";
+  const ok = await _copyTextToClipboard(txt);
+  if(ok){
+    alert("✅ Lista copiada al portapapeles.");
+    cerrarModalCompras();
+  }else{
+    seleccionarTextoCompras();
+    alert("⚠️ No se pudo copiar automáticamente. Usa Ctrl+C / ⌘C.");
+  }
+}
+
+function _buildCompraLines(lines){
+  // Agrupa por material para no duplicar (muy importante cuando hay varias líneas del mismo material)
+  const map = {};
+  (lines||[]).forEach(line=>{
+    const needed = _needForCompra(line);
+    const unit = String(line.unit || 'ud').trim() || 'ud';
+    const s = _getStockInfoForCompra(line);
+    const isBar = _unitIsBarra(unit);
+    const ironType = isBar ? String((metaActual && metaActual.tipo_hierro) || '').trim() : '';
+    const key = (s.stockKnown && s.matId)
+      ? ('id:' + s.matId)
+      : ('n:' + normName(line.mat) + '|' + normName(unit) + (ironType ? ('|th:' + normName(ironType)) : ''));
+
+    if(!map[key]){
+      let name = String(line.mat || '').trim() || (s.mat && s.mat.name ? String(s.mat.name).trim() : 'Material');
+      // Para perfilería, añade el tipo si existe y no aparece en el nombre
+      if(isBar && ironType){
+        const lowName = name.toLowerCase();
+        const lowType = ironType.toLowerCase();
+        if(!lowName.includes(lowType)){
+          name = name + ' (' + ironType + ')';
+        }
+      }
+      map[key] = {
+        name,
+        unit,
+        needed: 0,
+        stockKnown: !!s.stockKnown,
+        stock: s.stockKnown ? toNum(s.stock) : null
+      };
+    }
+    map[key].needed += needed;
+  });
+
+  const items = Object.values(map).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  return items.map(it=>{
+    const need = toNum(it.needed);
+    if(it.stockKnown){
+      const st = toNum(it.stock);
+      const pedirNum = Math.max(0, need - st);
+
+      // REGLA: si el stock SUPERA lo necesario, en vez de "pedir 0" mostramos "PEDIR ?".
+      // (Solo cuando need>0, para no marcar como duda cosas ya completadas)
+      if(need > 0 && st > need){
+        const uQ = _fmtUnit(it.unit, 2); // plural por defecto ("barras"/"uds")
+        return `${it.name} - necesarias ${_fmtNum(need)} ${_fmtUnit(it.unit, need)} / en stock ${_fmtNum(st)} ${_fmtUnit(it.unit, st)} / PEDIR ? ${uQ}`;
+      }
+
+      return `${it.name} - necesarias ${_fmtNum(need)} ${_fmtUnit(it.unit, need)} / en stock ${_fmtNum(st)} ${_fmtUnit(it.unit, st)} / pedir ${_fmtNum(pedirNum)} ${_fmtUnit(it.unit, pedirNum)}`;
+    }else{
+      const pedir = Math.max(0, need);
+      return `${it.name} - necesarias ${_fmtNum(need)} ${_fmtUnit(it.unit, need)} / en stock N/D / pedir ${_fmtNum(pedir)} ${_fmtUnit(it.unit, pedir)}`;
+    }
+  });
+}
+
+async function copiarListaCompras(){
+  if(!refActual){
+    alert('No hay pedido abierto.');
+    return;
+  }
+  const selected = (estadoMateriales || []).filter(l => l && !!l.toBuy);
+  if(selected.length === 0){
+    alert('No hay materiales marcados para pedir.\nMarca la columna 🛒 y vuelve a pulsar.');
+    return;
+  }
+
+  const barras = selected.filter(l => _unitIsBarra(l.unit));
+  const unidades = selected.filter(l => !_unitIsBarra(l.unit));
+
+  // Texto PLANO (siempre)
+  const outLines = [];
+  if(barras.length){
+    outLines.push('perfileria:');
+    outLines.push(..._buildCompraLines(barras));
+  }
+  if(unidades.length){
+    if(outLines.length) outLines.push(''); // línea en blanco entre bloques
+    outLines.push('accesorios:');
+    outLines.push(..._buildCompraLines(unidades));
+  }
+
+  const txt = outLines.join("\n").trim();
+
+  // HTML (si el navegador/portapapeles lo admite) para poder poner el "?" en negrita.
+  const esc = (s)=>String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+
+  const htmlLines = outLines.map(l=>{
+    if(l === '') return '<div><br></div>';
+    const isTitle = /:\s*$/.test(l) && (/^perfileria:/i.test(l) || /^accesorios:/i.test(l));
+    let h = esc(l);
+    // Negrita SOLO al interrogante de "PEDIR ?"
+    h = h.replace(/PEDIR \?/g, 'PEDIR <b>?</b>');
+    if(isTitle){
+      return `<div style="font-weight:800; text-transform:uppercase; margin-top:6px;">${h}</div>`;
+    }
+    return `<div>${h}</div>`;
+  }).join('');
+
+  const ok = await _copyTextToClipboard(txt, htmlLines);
+
+  if(ok){
+    alert('✅ Lista copiada al portapapeles.');
+  }else{
+    // Fallback: mostrar la lista en un modal para copiar manualmente
+    abrirModalCompras(txt);
+  }
+}
+
+/* --- FIN COMPRAS --- */
+
 function toggleOk(index, isChecked) {
   const linea = estadoMateriales[index];
   linea.ok = isChecked;
@@ -2970,6 +3279,28 @@ init();
 })();
 </script>
 
+
+
+<!-- MODAL COPIAR COMPRAS (fallback) -->
+<div id="modalCompras" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-box" style="max-width:760px;">
+      <div class="modal-title">
+        <span>Lista para Compras</span>
+        <button class="btn" style="background:transparent;border:none;color:#9fb0c8;" onclick="cerrarModalCompras()">✕</button>
+      </div>
+
+      <div class="modal-info" style="margin-top:6px;">
+          Si no se copia automáticamente, selecciona el texto y pulsa <strong>Ctrl+C</strong> (o <strong>⌘C</strong>).
+      </div>
+
+      <textarea id="txtCompras" spellcheck="false" style="width:100%; height:260px; margin-top:10px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; border-radius:10px; padding:10px; box-sizing:border-box; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;"></textarea>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+          <button class="btn" onclick="seleccionarTextoCompras()">Seleccionar</button>
+          <button class="btn btn-success" onclick="copiarDesdeModalCompras()">Copiar</button>
+      </div>
+  </div>
+</div>
 
 <div id="paintBorrowPicker" aria-hidden="true">
   <div class="pbp-backdrop"></div>
