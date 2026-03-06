@@ -185,6 +185,8 @@
   <div style="display:flex;gap:10px">
     <button class="btn" onclick="volverIndex()">← Volver al index</button>
     <button class="btn" onclick="volverLista()">← Volver a pedidos</button>
+    <button class="btn" onclick="cloudSaveNow()">☁ Guardar nube</button>
+    <button class="btn" onclick="cloudLoadNow()">☁ Cargar nube</button>
   </div>
   <h2 style="margin:0">Preparación</h2>
 
@@ -2903,6 +2905,48 @@ init();
       boot();
     }
   }, 500);
+
+  // ====== API MANUAL (botones Guardar/Cargar nube) ======
+  window.cloudSaveNow = async function(){
+    try{
+      if(!ensureFb()){
+        alert("☁ Nube no disponible (Firebase no inicializado).");
+        return;
+      }
+      await ensureAuth();
+      await backupAll("manual_save");
+      alert("☁✅ Guardado en nube.");
+    }catch(e){
+      console.warn("cloudSaveNow error:", e);
+      alert("❌ No se pudo guardar en la nube.");
+    }
+  };
+
+  window.cloudLoadNow = async function(){
+    try{
+      if(!ensureFb()){
+        alert("☁ Nube no disponible (Firebase no inicializado).");
+        return;
+      }
+      const ok = confirm("⛔ Cargar nube reemplazará los datos locales de este dispositivo por los de la nube.\n\n¿Continuar?");
+      if(!ok) return;
+
+      await ensureAuth();
+      applyingRemote = true;
+      try{
+        await restoreAll();
+      }finally{
+        applyingRemote = false;
+      }
+
+      alert("☁✅ Datos cargados. Se recargará la página.");
+      setTimeout(()=>location.reload(), 250);
+    }catch(e){
+      console.warn("cloudLoadNow error:", e);
+      alert("❌ No se pudo cargar desde la nube.");
+    }
+  };
+
 })();
 </script>
 
