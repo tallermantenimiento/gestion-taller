@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Ferretería</title>
-  <!-- PATCH_VERSION: 2026-01-08 OPS+STOCK FIRESTORE_SYNC -->
+  <!-- PATCH_VERSION: 2026-01-08 OPS+STOCK FIRESTORE_SYNC + ADD_MATERIAL -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -67,7 +67,6 @@
     .tag.zero{background:#4a0f23;border:1px solid #ff5a7a66}
     .tag.low{background:#4a3a0f;border:1px solid #ffcc6666}
     .list{display:flex;flex-direction:column;gap:12px;max-height:52vh;overflow:auto;padding-right:6px}
-
     .groupHdr{
       background:linear-gradient(90deg, #102a52, #0d1b38);
       border:1px solid #ffffff33; border-radius:16px; padding:16px;
@@ -80,7 +79,6 @@
     .groupHdr.open .arrow{transform:rotate(180deg)}
     .groupBody{display:none; flex-direction:column; gap:12px; padding:6px 0 16px 12px; border-left:2px solid #ffffff11; margin-left:12px}
     .groupBody.show{display:flex}
-
     .item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#07162f88;border-radius:16px;padding:14px}
     .item .left{display:flex;flex-direction:column;gap:6px;min-width:0}
     .item .name{font-weight:900;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -88,6 +86,7 @@
     .item .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
     .miniBtn{height:52px;min-width:120px;border-radius:14px;border:1px solid #ffffff22;background:#0b2346;color:var(--txt);font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px}
     .miniBtn.sel{background:linear-gradient(180deg,#0b4a73,#083252);border-color:#49c2ff88}
+    .miniBtn.in{background:linear-gradient(180deg,#0c4f33,#083220);border-color:#2bd67188}
     .miniBtn.disabled{opacity:.35;pointer-events:none}
     .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#081a33ee;border:1px solid #49c2ff44;border-radius:16px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:var(--shadow);max-width:min(720px, calc(100vw - 20px));z-index:99}
     .toast.show{display:flex}
@@ -129,15 +128,9 @@
   const OPS_KEY  = "tablet_ops_ferreteria_v3_clean";
   const HIST_KEY = "tablet_hist_ferreteria_v3_clean";
   const HIST_LIMIT = 500;
-
-  // STOCK cache local (misma key que stock.html)
   const STOCK_DB_KEY = "taller_stock_v3_data";
-
-  // FIRESTORE stock: MISMO DOC que Hierro
   const USE_FIRESTORE_STOCK = true;
   const FIRESTORE_STOCK_DOC = { col: "taller_stock", doc: "main" };
-
-  // FIRESTORE operarios: doc dedicado
   const USE_FIRESTORE_OPS = true;
   const OPS_DOC_PATH = { col: "taller_ops", doc: "ferreteria" };
 
@@ -153,7 +146,6 @@
   let fbApp=null, fbAuth=null, fbDb=null;
   let fsReady=false;
   let fsUnsub=null;
-
   let opsReady=false;
   let opsUnsub=null;
   let ignoreLocalOpsSave=false;
@@ -176,7 +168,6 @@
     }
   }
 
-  // -------- Stock DB local helpers
   function loadStockDB(){
     try{
       const raw = localStorage.getItem(STOCK_DB_KEY);
@@ -186,7 +177,6 @@
       return db;
     }catch(e){ return null; }
   }
-  function saveStockDB(db){ localStorage.setItem(STOCK_DB_KEY, JSON.stringify(db)); }
   function getStockFromDB(db, matId){
     return (db.movements||[]).filter(m=>m.matId===matId).reduce((a,m)=> (m.type==='in'? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
   }
@@ -199,7 +189,6 @@
            grp.includes("disco") || grp.includes("broca") || grp.includes("consum");
   }
 
-  // ITEMS vivo desde stock real cache
   let ITEMS = [];
   function refreshItemsFromStock(){
     const db = loadStockDB();
@@ -208,24 +197,18 @@
       return {ok:false, reason:"No existe la base de datos de stock. Abre stock.html una vez para inicializarla."};
     }
     const mats = (db.materials||[]).filter(isFerreteria);
-    ITEMS = mats.map(m=>{
-      const stock = getStockFromDB(db, m.id);
-      return {
-        id: m.id,
-        name: m.name,
-        unit: m.unit || "ud",
-        stock,
-        usageCount: 0,
-        family: m.grp || m.cat || "Ferretería"
-      };
-    });
+    ITEMS = mats.map(m=>({
+      id: m.id,
+      name: m.name,
+      unit: m.unit || "ud",
+      stock: getStockFromDB(db, m.id),
+      usageCount: 0,
+      family: m.grp || m.cat || "Ferretería"
+    }));
     return {ok:true};
   }
 
-  // -------- Firestore stock sync
-  function stockDocRef(){
-    return fbDb.collection(FIRESTORE_STOCK_DOC.col).doc(FIRESTORE_STOCK_DOC.doc);
-  }
+  function stockDocRef(){ return fbDb.collection(FIRESTORE_STOCK_DOC.col).doc(FIRESTORE_STOCK_DOC.doc); }
 
   async function fsLoadStockOnceToLocal(){
     const snap = await stockDocRef().get();
@@ -248,31 +231,24 @@
       if(!snap.exists) return;
       const data = snap.data() || {};
       if(!Array.isArray(data.materials) || !Array.isArray(data.movements)) return;
-
       localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
         materials: data.materials || [],
         movements: data.movements || [],
         categoryOrder: data.categoryOrder || []
       }));
-
       refreshItemsFromStock();
       setBadge();
-
       if(state.view==="main"){
         if(state.operator && !state.activeItemId) screenItems();
         if(state.operator && state.activeItemId) screenConsume();
       }
-    }, (err)=>{
-      console.warn("Firestore stock onSnapshot error:", err);
-    });
+    }, (err)=> console.warn("Firestore stock onSnapshot error:", err));
   }
 
   function genId(){ return Math.random().toString(36).slice(2,11); }
 
-  async function applyConsumeToStockFirestore(matId, qty){
-    if(!USE_FIRESTORE_STOCK || !fsReady){
-      return {ok:false, msg:"Firestore no listo (stock)."};
-    }
+  async function applyMovementToStockFirestore(matId, qty, type){
+    if(!USE_FIRESTORE_STOCK || !fsReady) return {ok:false, msg:"Firestore no listo (stock)."};
     const ref = stockDocRef();
     const movementId = genId();
 
@@ -286,23 +262,24 @@
         const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
         const current = movements.filter(m=>m.matId===matId).reduce((a,m)=> (m.type==="in"? a + Number(m.qty||0) : a - Number(m.qty||0)), 0);
-        if(current < qty){
+        if(type === 'out' && current < qty){
           return {ok:false, msg:"SIN STOCK: no se puede consumir.", current};
         }
 
         const mv = {
           id: movementId,
           matId,
-          type: "out",
+          type,
           qty,
           date: new Date().toISOString(),
-          source: "TABLET_FERRETERIA",
+          source: type === 'in' ? 'TABLET_FERRETERIA_IN' : 'TABLET_FERRETERIA',
           device: (navigator.userAgent||""),
           sessionId: state.sessionId || "SIN_SESION",
           operator: state.operator || ""
         };
 
         movements.push(mv);
+        const stockAfter = type === 'in' ? current + qty : current - qty;
 
         tx.set(ref, {
           materials,
@@ -311,19 +288,16 @@
           updatedAt: new Date().toISOString()
         }, { merge:true });
 
-        return {ok:true, stockAfter: current-qty, materials, movements, categoryOrder};
+        return {ok:true, stockAfter, materials, movements, categoryOrder};
       });
 
       if(!res.ok) return res;
-
       localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
         materials: res.materials || [],
         movements: res.movements || [],
         categoryOrder: res.categoryOrder || []
       }));
-
       return {ok:true, stockAfter: res.stockAfter, movementId};
-
     }catch(e){
       console.warn("No se pudo guardar movimiento en Firestore (stock):", e);
       return {ok:false, msg:"No se pudo guardar en Firestore. Revisa conexión/reglas."};
@@ -341,23 +315,17 @@
         const materials = Array.isArray(data.materials) ? data.materials : [];
         const movements = Array.isArray(data.movements) ? data.movements : [];
         const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
-
         const idx = movements.findIndex(m=>m && m.id===movementId);
-        if(idx === -1){
-          return {ok:false, msg:"No se encontró el movimiento para deshacer."};
-        }
+        if(idx === -1) return {ok:false, msg:"No se encontró el movimiento para deshacer."};
         movements.splice(idx,1);
-
         tx.set(ref, {
           materials,
           movements,
           categoryOrder,
           updatedAt: new Date().toISOString()
         }, { merge:true });
-
         return {ok:true, materials, movements, categoryOrder};
       });
-
       if(out.ok){
         localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
           materials: out.materials || [],
@@ -372,59 +340,43 @@
     }
   }
 
-  // -------- Firestore OPS sync
   function opsDocRef(){ return fbDb.collection(OPS_DOC_PATH.col).doc(OPS_DOC_PATH.doc); }
-
   async function opsLoadOnceToLocal(){
     const snap = await opsDocRef().get();
     if(!snap.exists) return false;
     const data = snap.data() || {};
     if(!Array.isArray(data.ops)) return false;
-
     ignoreLocalOpsSave = true;
     localStorage.setItem(OPS_KEY, JSON.stringify(data.ops || []));
     ignoreLocalOpsSave = false;
     return true;
   }
-
   function opsStartRealtimeListener(){
     if(opsUnsub) opsUnsub();
     opsUnsub = opsDocRef().onSnapshot((snap)=>{
       if(!snap.exists) return;
       const data = snap.data() || {};
       if(!Array.isArray(data.ops)) return;
-
       ignoreLocalOpsSave = true;
       localStorage.setItem(OPS_KEY, JSON.stringify(data.ops || []));
       ignoreLocalOpsSave = false;
-
       if(state.view==="ops") screenOps();
       if(!state.operator && state.view==="main") screenOperator();
-    }, (err)=>{
-      console.warn("Firestore OPS onSnapshot error:", err);
-    });
+    }, (err)=> console.warn("Firestore OPS onSnapshot error:", err));
   }
-
   function scheduleOpsSaveToFirestore(list){
-    if(!USE_FIRESTORE_OPS || !opsReady) return;
-    if(ignoreLocalOpsSave) return;
-
+    if(!USE_FIRESTORE_OPS || !opsReady || ignoreLocalOpsSave) return;
     clearTimeout(opsSaveTimer);
     opsSaveTimer = setTimeout(async ()=>{
-      try{
-        await opsDocRef().set({ ops:list, updatedAt:new Date().toISOString() }, {merge:true});
-      }catch(e){
-        console.warn("No se pudo guardar OPS en Firestore:", e);
-      }
+      try{ await opsDocRef().set({ ops:list, updatedAt:new Date().toISOString() }, {merge:true}); }
+      catch(e){ console.warn("No se pudo guardar OPS en Firestore:", e); }
     }, 450);
   }
 
-  // -------- State + UI
   const state = { operator:null, sessionId:null, activeItemId:null, lastAction:null, view:"main" };
   const $wrap = document.getElementById('stepWrap');
   const $badge = document.getElementById('hdrBadge');
   const byId = id => document.getElementById(id);
-
   const nowISO = () => new Date().toISOString();
   const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
   function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
@@ -438,12 +390,8 @@
       return arr.map(o=>({name:String(o.name||"").trim(), active:o.active!==false})).filter(o=>o.name);
     }catch(e){ return []; }
   }
-  function saveOps(list){
-    localStorage.setItem(OPS_KEY, JSON.stringify(list));
-    scheduleOpsSaveToFirestore(list);
-  }
+  function saveOps(list){ localStorage.setItem(OPS_KEY, JSON.stringify(list)); scheduleOpsSaveToFirestore(list); }
   function getActiveOps(){ return loadOps().filter(o=>o.active); }
-
   function loadHist(){
     try{
       const raw = localStorage.getItem(HIST_KEY);
@@ -453,12 +401,7 @@
     }catch(e){ return []; }
   }
   function saveHist(arr){ localStorage.setItem(HIST_KEY, JSON.stringify(arr)); }
-  function addHist(entry){
-    const arr = loadHist();
-    arr.unshift(entry);
-    if(arr.length>HIST_LIMIT) arr.length=HIST_LIMIT;
-    saveHist(arr);
-  }
+  function addHist(entry){ const arr = loadHist(); arr.unshift(entry); if(arr.length>HIST_LIMIT) arr.length=HIST_LIMIT; saveHist(arr); }
 
   function setBadge(){
     const parts=[];
@@ -479,28 +422,11 @@
     toast._tmr=setTimeout(()=>t.classList.remove('show'),8000);
   }
 
-  function detectLowTag(stock){
-    if(stock<=0) return ['zero','SIN STOCK'];
-    if(stock<=2) return ['low','BAJO'];
-    return [null,null];
-  }
-  function sortItems(arr){
-    return [...arr].sort((a,b)=>{
-      if(b.usageCount!==a.usageCount) return b.usageCount-a.usageCount;
-      return a.name.localeCompare(b.name,'es');
-    });
-  }
-  function escapeHtml(s){
-    return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  }
+  function detectLowTag(stock){ if(stock<=0) return ['zero','SIN STOCK']; if(stock<=2) return ['low','BAJO']; return [null,null]; }
+  function sortItems(arr){ return [...arr].sort((a,b)=>{ if(b.usageCount!==a.usageCount) return b.usageCount-a.usageCount; return a.name.localeCompare(b.name,'es'); }); }
+  function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+  function goBackMain(){ if(!state.operator) screenOperator(); else if(!state.activeItemId) screenItems(); else screenConsume(); }
 
-  function goBackMain(){
-    if(!state.operator) screenOperator();
-    else if(!state.activeItemId) screenItems();
-    else screenConsume();
-  }
-
-  // -------- Screens
   function screenOperator(){
     refreshItemsFromStock();
     state.view="main"; setBadge();
@@ -509,7 +435,7 @@
       <div class="row">
         <div>
           <div class="pill">Paso 1 · Operario</div>
-          <div style="margin-top:10px;font-size:26px;font-weight:900">¿Quién va a coger material?</div>
+          <div style="margin-top:10px;font-size:26px;font-weight:900">¿Quién va a mover material?</div>
           <div class="hint">Pulsa tu nombre. Si es una ayuda puntual, usa "Ocasional".</div>
         </div>
       </div>
@@ -526,9 +452,7 @@
         </div>
       </div>
     `;
-    [...$wrap.querySelectorAll('[data-op]')].forEach(b=> b.onclick = ()=>{
-      state.operator=b.getAttribute('data-op'); state.sessionId=newSessionId(); screenItems();
-    });
+    [...$wrap.querySelectorAll('[data-op]')].forEach(b=> b.onclick = ()=>{ state.operator=b.getAttribute('data-op'); state.sessionId=newSessionId(); screenItems(); });
     byId('btnOcc').onclick = ()=>{ byId('occBox').style.display='block'; byId('occName').focus(); };
     byId('occOk').onclick = ()=>{
       const v=(byId('occName').value||'').trim();
@@ -565,7 +489,7 @@
         <div>
           <div class="pill">Paso 2 · Artículo</div>
           <div style="margin-top:10px;font-size:26px;font-weight:900">Selecciona el consumible</div>
-          <div class="hint">Pulsa en una familia para ver sus artículos.</div>
+          <div class="hint">Puedes descontar o agregar stock desde el mismo artículo.</div>
         </div>
         <button class="btn small danger" id="logout">Cerrar sesión</button>
       </div>
@@ -582,9 +506,9 @@
         <div>
           <div class="hint" style="margin:0 0 8px">Modo rápido</div>
           <select id="fStep">
-            <option value="1">Consumir 1</option>
-            <option value="5">Consumir 5</option>
-            <option value="10">Consumir 10</option>
+            <option value="1">Paso 1</option>
+            <option value="5">Paso 5</option>
+            <option value="10">Paso 10</option>
           </select>
         </div>
       </div>
@@ -598,35 +522,24 @@
       const famFilter = byId('fFam').value;
       const txt = (byId('fTxt').value||"").trim().toLowerCase();
       const step = parseInt(byId('fStep').value,10) || 1;
-
       const filtered = sortItems(ITEMS).filter(it=>{
         if(famFilter && it.family!==famFilter) return false;
         if(txt && !it.name.toLowerCase().includes(txt)) return false;
         return true;
       });
-
       const groups = {};
       filtered.forEach(it => { (groups[it.family] ||= []).push(it); });
       const famKeys = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'es'));
       const autoExpand = txt.length>0;
-
-      if(filtered.length === 0) {
-        byId('itemsList').innerHTML = `<div class="muted">No hay resultados.</div>`;
-        return;
-      }
-
+      if(filtered.length === 0) { byId('itemsList').innerHTML = `<div class="muted">No hay resultados.</div>`; return; }
       byId('itemsList').innerHTML = famKeys.map(famName => {
         const list = groups[famName];
         const isOpenClass = autoExpand ? 'open' : '';
         const isShowClass = autoExpand ? 'show' : '';
-
         const itemsHtml = list.map(it => {
           const [cls,lbl]=detectLowTag(it.stock);
           const warnTag = cls ? `<span class="tag ${cls}">${lbl}</span>`:'';
-          const disabled = it.stock<=0 ? 'disabled':'';
-          const canStep = it.stock>=step;
-          const stepDisabled = (!canStep) ? 'disabled' : '';
-
+          const outDisabled = it.stock < step ? 'disabled' : '';
           return `
             <div class="item">
               <div class="left">
@@ -641,13 +554,13 @@
                   <div class="lbl">Stock</div>
                   <div class="val" style="font-size:18px">${it.stock} ${escapeHtml(it.unit)}</div>
                 </div>
-                <button class="miniBtn sel ${disabled}" data-sel="${it.id}">Ver</button>
-                <button class="miniBtn ${stepDisabled}" data-quick="${it.id}">- ${step}</button>
+                <button class="miniBtn sel" data-sel="${it.id}">Abrir</button>
+                <button class="miniBtn ${outDisabled}" data-quick-out="${it.id}">- ${step}</button>
+                <button class="miniBtn in" data-quick-in="${it.id}">+ ${step}</button>
               </div>
             </div>
           `;
         }).join("");
-
         return `
           <div class="groupWrap">
             <div class="groupHdr ${isOpenClass}" data-tog="${escapeHtml(famName)}">
@@ -667,48 +580,48 @@
           body.classList.toggle('show');
         };
       });
-
       $wrap.querySelectorAll("[data-sel]").forEach(b=>{
         b.onclick = ()=>{
           const id=b.getAttribute("data-sel");
           const it=ITEMS.find(x=>x.id===id);
-          if(!it || it.stock<=0){ toast("Sin stock.", false); return; }
+          if(!it){ toast("Artículo no encontrado.", false); return; }
           state.activeItemId=id; screenConsume();
         };
       });
-
-      $wrap.querySelectorAll("[data-quick]").forEach(b=>{
+      $wrap.querySelectorAll("[data-quick-out]").forEach(b=>{
         b.onclick = async ()=>{
-          const id=b.getAttribute("data-quick");
+          const id=b.getAttribute("data-quick-out");
           const it=ITEMS.find(x=>x.id===id);
           if(!it) return;
           if(it.stock<step){ toast("No hay suficiente stock.", false); return; }
-          await consume(it, step);
+          await doMovement(it, step, 'out');
+          render();
+        };
+      });
+      $wrap.querySelectorAll("[data-quick-in]").forEach(b=>{
+        b.onclick = async ()=>{
+          const id=b.getAttribute("data-quick-in");
+          const it=ITEMS.find(x=>x.id===id);
+          if(!it) return;
+          await doMovement(it, step, 'in');
           render();
         };
       });
     };
 
-    ["fFam","fTxt","fStep"].forEach(id=>{
-      byId(id).addEventListener("input", render);
-      byId(id).addEventListener("change", render);
-    });
+    ["fFam","fTxt","fStep"].forEach(id=>{ byId(id).addEventListener("input", render); byId(id).addEventListener("change", render); });
     render();
   }
 
-  async function consume(it, qty){
+  async function doMovement(it, qty, type){
     const beforeStock = it.stock;
-    state.lastAction = { itemId: it.id, stockBefore: beforeStock, qty, movementId:null };
-
-    const res = await applyConsumeToStockFirestore(it.id, qty);
-    if(!res.ok){ toast(res.msg||"SIN STOCK", false); return; }
-
+    state.lastAction = { itemId: it.id, stockBefore: beforeStock, qty, movementId:null, type };
+    const res = await applyMovementToStockFirestore(it.id, qty, type);
+    if(!res.ok){ toast(res.msg || (type==='in' ? 'No se pudo agregar.' : 'SIN STOCK'), false); return; }
     refreshItemsFromStock();
     const it2 = ITEMS.find(x=>x.id===it.id);
     if(it2) it.stock = it2.stock;
-
     state.lastAction.movementId = res.movementId;
-
     addHist({
       ts: nowISO(),
       operator: state.operator,
@@ -716,15 +629,17 @@
       itemId: it.id,
       itemName: it.name,
       family: it.family,
-      delta: -qty,
+      delta: type === 'in' ? qty : -qty,
       unit: it.unit,
       stockBefore: beforeStock,
       stockAfter: res.stockAfter,
-      device: "TERMINAL_FERRETERIA",
-      movementId: res.movementId
+      device: type === 'in' ? "TERMINAL_FERRETERIA_ENTRADA" : "TERMINAL_FERRETERIA",
+      movementId: res.movementId,
+      moveType: type
     });
-
-    toast(`Descontado ${qty} ${it.unit} (${res.stockAfter} restantes).`, true);
+    toast(type === 'in'
+      ? `Añadido ${qty} ${it.unit} (${res.stockAfter} en stock).`
+      : `Descontado ${qty} ${it.unit} (${res.stockAfter} restantes).`, true);
   }
 
   function screenConsume(){
@@ -732,7 +647,6 @@
     const it=ITEMS.find(x=>x.id===state.activeItemId);
     if(!it){ screenItems(); return; }
     const canUse = it.stock>0;
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
@@ -755,32 +669,53 @@
       <div class="grid2">
         <div>
           <div class="hint" style="margin:0 0 8px">Cantidad a consumir (${escapeHtml(it.unit)})</div>
-          <input id="qtyIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
+          <input id="qtyOutIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
         </div>
         <button class="btn ${canUse ? 'accent':'disabled'}" id="useCustom">CONSUMIR</button>
       </div>
-      <div class="sep"></div>
-      <div class="grid3">
+      <div class="grid3" style="margin-top:14px">
         <button class="btn ${canUse ? 'accent':'disabled'}" id="use1">CONSUMIR 1</button>
         <button class="btn ${it.stock>=5 ? 'accent':'disabled'}" id="use5">CONSUMIR 5</button>
         <button class="btn ${it.stock>=10 ? 'accent':'disabled'}" id="use10">CONSUMIR 10</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grid2">
+        <div>
+          <div class="hint" style="margin:0 0 8px">Cantidad a agregar (${escapeHtml(it.unit)})</div>
+          <input id="qtyAddIn" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 12"/>
+        </div>
+        <button class="btn good" id="addCustom">AGREGAR</button>
+      </div>
+      <div class="grid3" style="margin-top:14px">
+        <button class="btn good" id="add1">AGREGAR 1</button>
+        <button class="btn good" id="add5">AGREGAR 5</button>
+        <button class="btn good" id="add10">AGREGAR 10</button>
       </div>
     `;
 
     byId('chgItem').onclick = ()=>{ state.activeItemId=null; screenItems(); };
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
-
-    byId('use1').onclick = async ()=>{ if(it.stock<1) return; await consume(it,1); screenConsume(); };
-    byId('use5').onclick = async ()=>{ if(it.stock<5) return; await consume(it,5); screenConsume(); };
-    byId('use10').onclick = async ()=>{ if(it.stock<10) return; await consume(it,10); screenConsume(); };
-
+    byId('use1').onclick = async ()=>{ if(it.stock<1) return; await doMovement(it,1,'out'); screenConsume(); };
+    byId('use5').onclick = async ()=>{ if(it.stock<5) return; await doMovement(it,5,'out'); screenConsume(); };
+    byId('use10').onclick = async ()=>{ if(it.stock<10) return; await doMovement(it,10,'out'); screenConsume(); };
+    byId('add1').onclick = async ()=>{ await doMovement(it,1,'in'); screenConsume(); };
+    byId('add5').onclick = async ()=>{ await doMovement(it,5,'in'); screenConsume(); };
+    byId('add10').onclick = async ()=>{ await doMovement(it,10,'in'); screenConsume(); };
     byId('useCustom').onclick = async ()=>{
-      const raw = (byId('qtyIn').value||'').trim();
+      const raw = (byId('qtyOutIn').value||'').trim();
       const qty = parseInt(raw,10);
       if(!raw || isNaN(qty) || qty<=0){ toast('Introduce una cantidad válida.', false); return; }
       if(it.stock<qty){ toast('No hay suficiente stock para esa cantidad.', false); return; }
-      await consume(it, qty);
-      byId('qtyIn').value='';
+      await doMovement(it, qty, 'out');
+      byId('qtyOutIn').value='';
+      screenConsume();
+    };
+    byId('addCustom').onclick = async ()=>{
+      const raw = (byId('qtyAddIn').value||'').trim();
+      const qty = parseInt(raw,10);
+      if(!raw || isNaN(qty) || qty<=0){ toast('Introduce una cantidad válida.', false); return; }
+      await doMovement(it, qty, 'in');
+      byId('qtyAddIn').value='';
       screenConsume();
     };
   }
@@ -800,7 +735,6 @@
         </div>
       </div>
     `).join("");
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
@@ -819,50 +753,28 @@
       <div class="sep"></div>
       <button class="btn small danger" id="resetOps">Vaciar lista</button>
     `;
-
     byId('backMain').onclick = ()=>goBackMain();
     byId('addOp').onclick = ()=>{
       const v=(byId('newOp').value||"").trim();
       if(!v){ toast("Escribe un nombre.",false); return; }
       const cur=loadOps();
       if(cur.some(x=>x.name.toLowerCase()===v.toLowerCase())){ toast("Ya existe.",false); return; }
-      cur.push({name:v, active:true}); saveOps(cur);
-      toast("Operario añadido.",false); screenOps();
+      cur.push({name:v, active:true}); saveOps(cur); toast("Operario añadido.",false); screenOps();
     };
-    $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{
-      btn.onclick=()=>{
-        const idx=parseInt(btn.getAttribute("data-tgl"),10);
-        const cur=loadOps(); if(!cur[idx]) return;
-        cur[idx].active=!cur[idx].active; saveOps(cur);
-        toast(cur[idx].active ? "Operario activado." : "Operario desactivado.",false);
-        screenOps();
-      };
-    });
-    $wrap.querySelectorAll("[data-del]").forEach(btn=>{
-      btn.onclick=()=>{
-        const idx=parseInt(btn.getAttribute("data-del"),10);
-        const cur=loadOps(); if(!cur[idx]) return;
-        if(!confirm(`Eliminar operario "${cur[idx].name}"?`)) return;
-        cur.splice(idx,1); saveOps(cur);
-        toast("Operario eliminado.",false); screenOps();
-      };
-    });
-    byId('resetOps').onclick=()=>{
-      if(!confirm("Vaciar lista de operarios?")) return;
-      saveOps([]); toast("Operarios limpiados.",false); screenOps();
-    };
+    $wrap.querySelectorAll("[data-tgl]").forEach(btn=>{ btn.onclick=()=>{ const idx=parseInt(btn.getAttribute("data-tgl"),10); const cur=loadOps(); if(!cur[idx]) return; cur[idx].active=!cur[idx].active; saveOps(cur); toast(cur[idx].active ? "Operario activado." : "Operario desactivado.",false); screenOps(); }; });
+    $wrap.querySelectorAll("[data-del]").forEach(btn=>{ btn.onclick=()=>{ const idx=parseInt(btn.getAttribute("data-del"),10); const cur=loadOps(); if(!cur[idx]) return; if(!confirm(`Eliminar operario "${cur[idx].name}"?`)) return; cur.splice(idx,1); saveOps(cur); toast("Operario eliminado.",false); screenOps(); }; });
+    byId('resetOps').onclick=()=>{ if(!confirm("Vaciar lista de operarios?")) return; saveOps([]); toast("Operarios limpiados.",false); screenOps(); };
   }
 
   function screenHist(){
     state.view="hist"; setBadge();
     const hist=loadHist();
-
     $wrap.innerHTML = `
       <div class="row">
         <div>
           <div class="pill">📋 Historial (local)</div>
-          <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de consumos</div>
-          <div class="hint">Stock real se descuenta en Firestore, historial queda en este dispositivo.</div>
+          <div style="margin-top:10px;font-size:24px;font-weight:900">Registro de movimientos</div>
+          <div class="hint">Stock real se actualiza en Firestore, historial queda en este dispositivo.</div>
         </div>
         <button class="btn small ghost" id="backMain">⬅ Volver</button>
       </div>
@@ -881,26 +793,23 @@
               <div class="name">${escapeHtml(h.itemName||"")}</div>
               <div class="meta">
                 <span class="chip">${escapeHtml(h.operator||"")}</span>
+                <span class="chip">${h.moveType === 'in' ? 'ENTRADA' : 'SALIDA'}</span>
                 <span class="muted">${fmt(h.ts)}</span>
               </div>
             </div>
             <div class="right">
               <div class="kpi" style="min-width:170px">
                 <div class="lbl">Delta</div>
-                <div class="val">${h.delta} ${escapeHtml(h.unit||"")}</div>
+                <div class="val">${h.delta > 0 ? '+' : ''}${h.delta} ${escapeHtml(h.unit||"")}</div>
               </div>
             </div>
           </div>
         `).join('') || `<div class="muted">Sin historial.</div>`}
       </div>
     `;
-
     byId('backMain').onclick=()=>goBackMain();
     byId('btnExport').onclick=()=>exportHist();
-    byId('btnClear').onclick=()=>{
-      if(!confirm("Borrar historial local?")) return;
-      saveHist([]); toast("Historial borrado.",false); screenHist();
-    };
+    byId('btnClear').onclick=()=>{ if(!confirm("Borrar historial local?")) return; saveHist([]); toast("Historial borrado.",false); screenHist(); };
   }
 
   function exportHist(){
@@ -914,19 +823,13 @@
     toast("Exportación iniciada.",false);
   }
 
-  // Undo REAL Firestore
   byId('undoBtn').onclick = async ()=>{
     const la=state.lastAction; if(!la || !la.movementId){ toast("No hay movimiento para deshacer.",false); return; }
-
     const res = await undoConsumeByMovementId(la.movementId);
     if(!res.ok){ toast(res.msg||"No se pudo deshacer en Firestore.",false); return; }
-
     const hist = loadHist();
-    if(hist[0] && hist[0].movementId === la.movementId){
-      hist.shift(); saveHist(hist);
-    }
+    if(hist[0] && hist[0].movementId === la.movementId){ hist.shift(); saveHist(hist); }
     state.lastAction=null;
-
     refreshItemsFromStock();
     toast("Acción deshecha (stock restaurado).",false);
     goBackMain();
@@ -939,16 +842,12 @@
     try{
       fbEnsure();
       await fsLoginHidden();
-
-      // Stock Firestore -> cache local + realtime
       if(USE_FIRESTORE_STOCK){
         const r = await fsLoadStockOnceToLocal();
         if(!r.ok) console.warn("Carga stock Firestore inicial falló:", r.msg);
         fsReady=true;
         fsStartStockRealtime();
       }
-
-      // Operarios Firestore
       if(USE_FIRESTORE_OPS){
         const existed = await opsLoadOnceToLocal();
         opsReady=true;
@@ -963,10 +862,8 @@
       console.warn("Init Firestore falló:", e);
       fsReady=false; opsReady=false;
     }
-
     screenOperator();
   })();
-
 })();
 </script>
 </body>
