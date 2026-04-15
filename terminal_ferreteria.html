@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>Terminal Ferretería</title>
-  <!-- PATCH_VERSION: 2026-01-08 OPS+STOCK FIRESTORE_SYNC + ADD_MATERIAL -->
+  <!-- PATCH_VERSION: 2026-01-08 OPS+STOCK FIRESTORE_SYNC + ADD_MATERIAL + NEW_GROUP_SELECTOR -->
   <style>
     :root{
       --bg0:#070a12; --bg1:#0b1430; --card:#0d1b38cc; --card2:#0a162fdd;
@@ -94,6 +94,12 @@
     .toast .undo{margin-left:auto;height:44px;border-radius:12px;border:1px solid #2bd67155;background:#062a1a;color:#d9ffe8;font-weight:900;cursor:pointer;padding:0 14px}
     .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid #ffffff22;background:#061a2b88;font-weight:900}
     .muted{color:var(--muted)}
+    .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:120}
+    .backdrop.show{display:flex}
+    .modal{width:min(520px, 92vw);background:#0f172a;border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+    .modalActions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -117,6 +123,48 @@
 <div id="toast" class="toast" role="status" aria-live="polite">
   <div class="msg" id="toastMsg">Acción realizada</div>
   <button class="undo" id="undoBtn">Deshacer</button>
+</div>
+
+<div class="backdrop" id="modalNewMat">
+  <div class="modal">
+    <div class="pill">Nuevo material desde tablet</div>
+    <div style="margin-top:10px;font-size:24px;font-weight:900">Crear ficha de Ferretería</div>
+    <div class="hint">Se guardará en el mismo stock central y aparecerá en el programa madre del ordenador.</div>
+    <div class="sep"></div>
+    <div class="form-group">
+      <label>Grupo / Familia</label>
+      <select id="nmGrpSelect">
+        <option value="">Selecciona grupo...</option>
+      </select>
+      <div class="hint">Puedes elegir un grupo existente o crear uno nuevo.</div>
+    </div>
+    <div class="form-group" id="nmNewGrpWrap" style="display:none">
+      <label>Nuevo grupo</label>
+      <input id="nmGrpNew" placeholder="Ej: Tornillos, Brocas, Discos..."/>
+    </div>
+    <div class="form-group">
+      <label>Nombre del material</label>
+      <input id="nmName" placeholder="Ej: Tornillo autotaladrante 6,3x25"/>
+    </div>
+    <div class="grid2">
+      <div class="form-group">
+        <label>Unidad</label>
+        <input id="nmUnit" placeholder="ud"/>
+      </div>
+      <div class="form-group">
+        <label>Stock inicial</label>
+        <input id="nmQty" inputmode="numeric" pattern="[0-9]*" placeholder="0"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Mínimo</label>
+      <input id="nmMin" inputmode="numeric" pattern="[0-9]*" placeholder="0"/>
+    </div>
+    <div class="modalActions">
+      <button class="btn ghost" id="nmCancel">Cancelar</button>
+      <button class="btn good" id="nmSave">Crear material</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -304,6 +352,180 @@
     }
   }
 
+
+  async function createMaterialInFirestore(payload){
+    if(!USE_FIRESTORE_STOCK || !fsReady) return {ok:false, msg:"Firestore no listo (stock)."};
+
+    const ref = stockDocRef();
+    const materialId = genId();
+    const initialQty = Number(payload.initialQty || 0);
+    const min = Number(payload.min || 0);
+
+    try{
+      const res = await fbDb.runTransaction(async (tx)=>{
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw new Error("Firestore stock doc no existe.");
+        const data = snap.data() || {};
+        const materials = Array.isArray(data.materials) ? data.materials : [];
+        const movements = Array.isArray(data.movements) ? data.movements : [];
+        const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
+
+        const dup = materials.find(m =>
+          String(m.cat||"").toLowerCase() === "ferretería".toLowerCase() &&
+          String(m.grp||"").trim().toLowerCase() === String(payload.grp||"").trim().toLowerCase() &&
+          String(m.name||"").trim().toLowerCase() === String(payload.name||"").trim().toLowerCase()
+        );
+        if(dup){
+          return {ok:false, msg:"Ya existe un material con ese nombre en ese grupo."};
+        }
+
+        const mat = {
+          id: materialId,
+          cat: "Ferretería",
+          grp: String(payload.grp || "Ferretería").trim(),
+          name: String(payload.name || "").trim(),
+          unit: String(payload.unit || "ud").trim() || "ud",
+          min
+        };
+        materials.push(mat);
+
+        let movementId = null;
+        if(initialQty > 0){
+          movementId = genId();
+          movements.push({
+            id: movementId,
+            matId: materialId,
+            type: "in",
+            qty: initialQty,
+            date: new Date().toISOString(),
+            source: "TABLET_FERRETERIA_NEW_MATERIAL",
+            device: (navigator.userAgent||""),
+            sessionId: state.sessionId || "SIN_SESION",
+            operator: state.operator || ""
+          });
+        }
+
+        tx.set(ref, {
+          materials,
+          movements,
+          categoryOrder,
+          updatedAt: new Date().toISOString()
+        }, { merge:true });
+
+        return {ok:true, material:mat, movementId, materials, movements, categoryOrder, stockAfter:initialQty};
+      });
+
+      if(!res.ok) return res;
+
+      localStorage.setItem(STOCK_DB_KEY, JSON.stringify({
+        materials: res.materials || [],
+        movements: res.movements || [],
+        categoryOrder: res.categoryOrder || []
+      }));
+
+      return res;
+    }catch(e){
+      console.warn("No se pudo crear material en Firestore:", e);
+      return {ok:false, msg:"No se pudo crear el material en Firestore."};
+    }
+  }
+
+  function getFerreteriaGroups(){
+    const db = loadStockDB();
+    if(!db || !Array.isArray(db.materials)) return [];
+    return Array.from(new Set(
+      db.materials
+        .filter(isFerreteria)
+        .map(m => String(m.grp || m.cat || "").trim())
+        .filter(Boolean)
+    )).sort((a,b)=>a.localeCompare(b,'es'));
+  }
+
+  function fillNewMaterialGroups(){
+    const sel = byId('nmGrpSelect');
+    const groups = getFerreteriaGroups();
+    sel.innerHTML =
+      '<option value="">Selecciona grupo...</option>' +
+      groups.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('') +
+      '<option value="__new__">＋ Nuevo grupo...</option>';
+  }
+
+  function toggleNewGroupField(){
+    const isNew = byId('nmGrpSelect').value === '__new__';
+    byId('nmNewGrpWrap').style.display = isNew ? 'block' : 'none';
+    if(isNew){
+      setTimeout(()=>byId('nmGrpNew').focus(), 60);
+    }else{
+      byId('nmGrpNew').value = '';
+    }
+  }
+
+  function openNewMaterialModal(){
+    const modal = byId('modalNewMat');
+    fillNewMaterialGroups();
+    byId('nmGrpSelect').value = '';
+    byId('nmGrpNew').value = '';
+    byId('nmNewGrpWrap').style.display = 'none';
+    byId('nmName').value = '';
+    byId('nmUnit').value = 'ud';
+    byId('nmQty').value = '';
+    byId('nmMin').value = '';
+    modal.classList.add('show');
+    setTimeout(()=>byId('nmGrpSelect').focus(), 60);
+  }
+
+  function closeNewMaterialModal(){
+    byId('modalNewMat').classList.remove('show');
+  }
+
+  async function submitNewMaterial(){
+    const grpSelect = byId('nmGrpSelect').value;
+    const grp = (grpSelect === '__new__' ? byId('nmGrpNew').value : grpSelect || '').trim();
+    const name = (byId('nmName').value||'').trim();
+    const unit = (byId('nmUnit').value||'').trim() || 'ud';
+    const initialQty = parseInt((byId('nmQty').value||'0').trim(),10) || 0;
+    const min = parseInt((byId('nmMin').value||'0').trim(),10) || 0;
+
+    if(!grp || !name){
+      toast("Debes indicar grupo y nombre.", false);
+      return;
+    }
+    if(initialQty < 0 || min < 0){
+      toast("Stock inicial y mínimo deben ser 0 o más.", false);
+      return;
+    }
+
+    const res = await createMaterialInFirestore({ grp, name, unit, initialQty, min });
+    if(!res.ok){
+      toast(res.msg || "No se pudo crear el material.", false);
+      return;
+    }
+
+    refreshItemsFromStock();
+    addHist({
+      ts: nowISO(),
+      operator: state.operator,
+      sessionId: state.sessionId || "SIN_SESION",
+      itemId: res.material.id,
+      itemName: res.material.name,
+      family: res.material.grp,
+      delta: initialQty,
+      unit: res.material.unit,
+      stockBefore: 0,
+      stockAfter: initialQty,
+      device: "TERMINAL_FERRETERIA_NEW_MATERIAL",
+      movementId: res.movementId || null,
+      moveType: "new_material"
+    });
+
+    closeNewMaterialModal();
+    toast(initialQty > 0
+      ? `Material creado y cargado con ${initialQty} ${res.material.unit}.`
+      : "Material creado.", false);
+
+    screenItems();
+  }
+
   async function undoConsumeByMovementId(movementId){
     if(!USE_FIRESTORE_STOCK || !fsReady) return {ok:false, msg:"Firestore no listo."};
     const ref = stockDocRef();
@@ -378,6 +600,9 @@
   const $badge = document.getElementById('hdrBadge');
   const byId = id => document.getElementById(id);
   const nowISO = () => new Date().toISOString();
+  byId('nmCancel').onclick = ()=>closeNewMaterialModal();
+  byId('nmSave').onclick = ()=>submitNewMaterial();
+  byId('nmGrpSelect').onchange = ()=>toggleNewGroupField();
   const fmt = (iso) => new Date(iso).toLocaleString('es-ES', {hour12:false});
   function newSessionId(){ return 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -491,7 +716,7 @@
           <div style="margin-top:10px;font-size:26px;font-weight:900">Selecciona el consumible</div>
           <div class="hint">Puedes descontar o agregar stock desde el mismo artículo.</div>
         </div>
-        <button class="btn small danger" id="logout">Cerrar sesión</button>
+        <div class="row" style="gap:10px"><button class="btn small good" id="btnNewMat">＋ Nuevo material</button><button class="btn small danger" id="logout">Cerrar sesión</button></div>
       </div>
       <div class="sep"></div>
       <div class="grid3">
@@ -517,6 +742,7 @@
     `;
 
     byId('logout').onclick = ()=>{ state.operator=null; state.sessionId=null; state.activeItemId=null; screenOperator(); };
+    byId('btnNewMat').onclick = ()=>openNewMaterialModal();
 
     const render = () => {
       const famFilter = byId('fFam').value;
@@ -793,14 +1019,14 @@
               <div class="name">${escapeHtml(h.itemName||"")}</div>
               <div class="meta">
                 <span class="chip">${escapeHtml(h.operator||"")}</span>
-                <span class="chip">${h.moveType === 'in' ? 'ENTRADA' : 'SALIDA'}</span>
+                <span class="chip">${h.moveType === 'in' ? 'ENTRADA' : (h.moveType === 'new_material' ? 'ALTA' : 'SALIDA')}</span>
                 <span class="muted">${fmt(h.ts)}</span>
               </div>
             </div>
             <div class="right">
               <div class="kpi" style="min-width:170px">
                 <div class="lbl">Delta</div>
-                <div class="val">${h.delta > 0 ? '+' : ''}${h.delta} ${escapeHtml(h.unit||"")}</div>
+                <div class="val">${h.moveType === 'new_material' ? '+' : (h.delta > 0 ? '+' : '')}${h.delta} ${escapeHtml(h.unit||"")}</div>
               </div>
             </div>
           </div>
@@ -835,6 +1061,7 @@
     goBackMain();
   };
 
+  byId('modalNewMat').addEventListener('click', (e)=>{ if(e.target.id==='modalNewMat') closeNewMaterialModal(); });
   document.getElementById("btnOps").onclick=()=>screenOps();
   document.getElementById("btnHist").onclick=()=>screenHist();
 
