@@ -370,8 +370,12 @@
         const movements = Array.isArray(data.movements) ? data.movements : [];
         const categoryOrder = Array.isArray(data.categoryOrder) ? data.categoryOrder : [];
 
+        const existingFerreteriaCat = (
+          materials.find(m => String(m.cat||"").toLowerCase().includes("ferreter"))?.cat
+        ) || "Ferretería";
+
         const dup = materials.find(m =>
-          String(m.cat||"").toLowerCase() === "ferretería".toLowerCase() &&
+          String(m.cat||"").toLowerCase().includes("ferreter") &&
           String(m.grp||"").trim().toLowerCase() === String(payload.grp||"").trim().toLowerCase() &&
           String(m.name||"").trim().toLowerCase() === String(payload.name||"").trim().toLowerCase()
         );
@@ -381,8 +385,8 @@
 
         const mat = {
           id: materialId,
-          cat: "Ferretería",
-          grp: String(payload.grp || "Ferretería").trim(),
+          cat: existingFerreteriaCat,
+          grp: String(payload.grp || existingFerreteriaCat).trim(),
           name: String(payload.name || "").trim(),
           unit: String(payload.unit || "ud").trim() || "ud",
           min
