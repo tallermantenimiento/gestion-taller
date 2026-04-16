@@ -83,6 +83,10 @@
   .bar.crit > div, .bar.crit > i{background:linear-gradient(90deg,#ef4444,#b91c1c)}
   .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .small{font-size:12px;color:var(--mut)}
+  .desktop-only-menu-btn{display:block}
+  @media (hover: none) and (pointer: coarse){
+    .desktop-only-menu-btn{display:none !important}
+  }
 
   .loan{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#101a32,#0b1220);padding:10px;margin-bottom:10px}
   .loan .top{display:flex;gap:10px;align-items:flex-start}
@@ -231,7 +235,7 @@
 <script type="module" src="cloud_sync.js"></script>
 </head>
 <body>
-<div style="position:sticky;top:0;z-index:50;padding:10px;background:#111;color:#fff;"><button class="btn" onclick="window.location.href='index.html'">Volver al menú</button></div>
+<div class="desktop-only-menu-btn" style="position:sticky;top:0;z-index:50;padding:10px;background:#111;color:#fff;"><button class="btn" onclick="window.location.href='index.html'">Volver al menú</button></div>
 
 <header>
   <div class="wrap">
