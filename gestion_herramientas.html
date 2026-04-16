@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -15,7 +15,7 @@
   /* === CSS GENERAL === */
   .icon-img {width: 48px; height: 48px; object-fit: contain; vertical-align: middle;}
   .emojiBtn .icon-img {width: 32px; height: 32px;}
-  
+
   /* Upload & Slider Styles */
   .drop-zone {border: 2px dashed var(--line); background: rgba(15,23,42,0.5); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; color: var(--mut); margin-bottom: 10px;}
   .drop-zone:hover, .drop-zone.dragover {border-color: var(--pri); background: rgba(34,197,94,0.1); color: var(--txt);}
@@ -23,13 +23,11 @@
   input[type=range] {width: 100%; cursor: pointer; accent-color: var(--pri);}
 
   /* === DRAG AND DROP STYLES === */
-  /* Tools */
   .tool[draggable="true"] {cursor: grab;}
   .tool[draggable="true"]:active {cursor: grabbing;}
   .tool.dragging {opacity: 0.4; border: 2px dashed var(--mut); background: rgba(0,0,0,0.2);}
   .tool.drag-over {border: 2px solid var(--pri); transform: scale(1.02); box-shadow: 0 0 15px rgba(34,197,94,0.2); z-index: 10;}
 
-  /* Families */
   .fam-wrap[draggable="true"] .fam-head { cursor: grab; }
   .fam-wrap[draggable="true"] .fam-head:active { cursor: grabbing; }
   .fam-wrap.dragging { opacity: 0.3; }
@@ -43,19 +41,16 @@
     border: 1px solid transparent; transition: 0.2s;
   }
   .cat-header.drag-target { border-color: var(--pri); background: rgba(34,197,94,0.15); }
-  
+
   .cat-actions { display:flex; gap:5px; opacity:0.6; transition:0.2s; }
   .cat-header:hover .cat-actions { opacity:1; }
   .icon-btn { padding:4px; background:transparent; border:none; color:var(--mut); cursor:pointer; border-radius:4px; }
   .icon-btn:hover { background:rgba(255,255,255,0.1); color:var(--txt); }
   .icon-btn.del:hover { background:rgba(239,68,68,0.2); color:#fca5a5; }
 
-  /* Drag styles for Icons inside Catalog */
   .emojiBtn[draggable="true"] { cursor: grab; }
   .emojiBtn.dragging-icon { opacity: 0.3; transform: scale(0.8); }
   .emojiBtn.drag-over-icon { transform: scale(1.1); border-color: var(--pri); background: rgba(34,197,94,0.2); }
-
-  /* =============================== */
 
   h1{font-size:16px;margin:0;color:#f1f5f9;letter-spacing:.2px; display: flex; align-items: center; gap: 8px;}
   .btn{border:1px solid var(--line);background:linear-gradient(180deg,#16233f,#0f172a);color:var(--txt);padding:9px 11px;border-radius:10px;cursor:pointer}
@@ -71,25 +66,24 @@
   .card{background:linear-gradient(180deg,rgba(17,27,46,.95),rgba(15,23,42,.95));border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
   .card h2{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);color:#f8fafc;letter-spacing:.2px}
   .card .content{padding:12px 14px}
-  .tools{display:block;} /* Override grid for vertical blocks */
-  
+  .tools{display:block;}
+
   .tool{position:relative;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#101a32,#0b1220);padding:10px;cursor:pointer; transition: transform 0.2s, border-color 0.2s; margin-bottom: 8px;}
   .tool.selected{outline:2px solid rgba(34,197,94,.55);box-shadow:0 0 0 2px rgba(34,197,94,.15)}
   .tool .name{font-weight:650;margin:0 0 6px 0;font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
   .tool .name svg{display:block;}
   .tool .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--mut);font-size:12px}
-  
+
   .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;background:rgba(2,6,23,.35)}
   .badge.ok{border-color:rgba(34,197,94,.35)}
   .badge.maint{border-color:rgba(245,158,11,.45); color:#fbbf24; background:rgba(245,158,11,.1)}
   .bar{height:7px;border-radius:999px;background:#0b1326;border:1px solid var(--line);overflow:hidden;margin-top:8px}
-  .bar > div{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
-  .bar.low > div{background:linear-gradient(90deg,#f59e0b,#d97706)}
-  .bar.crit > div{background:linear-gradient(90deg,#ef4444,#b91c1c)}
+  .bar > div, .bar > i{height:100%;display:block;background:linear-gradient(90deg,#22c55e,#16a34a)}
+  .bar.low > div, .bar.low > i{background:linear-gradient(90deg,#f59e0b,#d97706)}
+  .bar.crit > div, .bar.crit > i{background:linear-gradient(90deg,#ef4444,#b91c1c)}
   .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .small{font-size:12px;color:var(--mut)}
-  
-  /* En uso */
+
   .loan{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#101a32,#0b1220);padding:10px;margin-bottom:10px}
   .loan .top{display:flex;gap:10px;align-items:flex-start}
   .loan .top .sp{flex:1}
@@ -97,19 +91,16 @@
   .loan .sub{margin:2px 0 0 0;color:var(--mut);font-size:12px}
   .loan.warn{border-color:rgba(245,158,11,.55)}
   .loan.dang{border-color:rgba(239,68,68,.6)}
-  
-  /* Floating bar */
+
   #floating{position:fixed;left:16px;top:auto;right:auto;bottom:16px;z-index:30;display:none}
   #floating .inner{max-width:1180px;margin:0 auto;border:1px solid var(--line);border-radius:16px;background:rgba(15,23,42,.92);backdrop-filter:blur(10px);box-shadow:0 18px 40px rgba(0,0,0,.4);padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   #floating input{background:#0b1326;border:1px solid var(--line);border-radius:10px;padding:9px 10px;color:var(--txt);min-width:220px}
 
-  /* Floating draggable */
   #floating.dragging { user-select:none; }
   #fbDragHandle{display:inline-flex;align-items:center;gap:6px;cursor:move;user-select:none}
   #fbDragHandle:hover{filter:brightness(1.08)}
   #fbDragHandle .grip{font-size:14px;color:var(--mut)}
-  
-  /* Modal System */
+
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50;background:rgba(0,0,0,.6);backdrop-filter:blur(2px)}
   .modal.aux{z-index:60;} 
   .modal.show{display:flex}
@@ -123,7 +114,7 @@
   input,select,textarea{width:100%;background:#0b1326;border:1px solid var(--line);border-radius:10px;padding:9px 10px;color:var(--txt);outline:none}
   textarea{min-height:80px;resize:vertical}
   .modal .foot{display:flex;gap:10px;justify-content:flex-end;padding:12px 14px;border-top:1px solid var(--line)}
-  
+
   table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:14px}
   th,td{padding:9px 10px;border-bottom:1px solid var(--line);font-size:12px}
   th{color:#e2e8f0;text-align:left;background:rgba(2,6,23,.35)}
@@ -134,11 +125,107 @@
   .emojiBtn{font-size:26px;padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);cursor:pointer; transition: transform 0.1s; display:flex; align-items:center; justify-content:center; overflow:hidden;}
   .emojiBtn:active{transform:scale(0.9)}
   .emojiBtn:hover{background:rgba(255,255,255,.12)}
-  
+
   .check{display:flex; align-items:center; gap:8px; padding:6px; border-radius:6px; cursor:pointer;}
   .check:hover{background:rgba(255,255,255,0.05)}
   .check input{width:auto;}
   .maint-stat{display:flex; gap:12px; margin-bottom:12px; padding:10px; background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); border-radius:10px; color:#fbbf24; font-size:13px;}
+
+  /* ===== MODO TABLET / TACTIL (NO AFECTA A PC) ===== */
+  @media (hover: none) and (pointer: coarse) {
+    body { -webkit-tap-highlight-color: transparent; }
+    header .wrap, main, .wrap { padding-left: 12px; padding-right: 12px; }
+    .btn,
+    input,
+    select,
+    textarea {
+      min-height: 46px;
+      font-size: 16px;
+    }
+    .icon-btn {
+      min-width: 38px;
+      min-height: 38px;
+    }
+    .pill {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .row {
+      gap: 12px;
+    }
+    header .row {
+      align-items: stretch;
+    }
+    header .btn {
+      flex: 0 0 auto;
+    }
+    .tool {
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .tool .row:last-child,
+    .loan .top {
+      flex-wrap: wrap;
+    }
+    .tool .row:last-child .btn,
+    .loan .top .btn {
+      flex: 1 1 140px;
+      min-height: 44px;
+    }
+    .tool .ico,
+    .loan .title img,
+    .loan .title svg {
+      pointer-events: none;
+    }
+    #floating .inner {
+      width: min(96vw, 760px);
+      padding: 12px;
+    }
+    #floating input {
+      min-width: 100%;
+      flex: 1 1 100%;
+    }
+    #floating .btn {
+      flex: 1 1 160px;
+    }
+    #fbDragHandle {
+      cursor: default;
+    }
+    .modal .panel {
+      width: min(96vw, 860px);
+      max-height: 90vh;
+    }
+    .modal .foot {
+      flex-wrap: wrap;
+    }
+    .modal .foot .btn {
+      flex: 1 1 140px;
+    }
+    th, td {
+      font-size: 13px;
+    }
+    .cat-actions {
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 900px) and (hover: none) and (pointer: coarse) {
+    .tool .row:first-child {
+      align-items: flex-start;
+    }
+    .tool .row:first-child > div:last-child {
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+    .loan .top > div:last-child {
+      width: 100%;
+    }
+    .emojiGrid {
+      grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    }
+  }
 </style>
 
 <script type="module" src="cloud_sync.js"></script>
@@ -172,7 +259,7 @@
       <div class="content">
         <div class="row" style="margin-bottom:10px; gap:10px">
           <input id="invSearch" placeholder="🔍 Buscar herramienta..." style="flex:1; min-width:150px; background:rgba(0,0,0,0.2);">
-          
+
           <select id="sortInv" style="max-width:200px">
             <option value="manual">Orden: Personalizado</option>
             <option value="crit">Prioridad: Críticos</option>
@@ -237,10 +324,14 @@
 </div>
 
 <script>
+const IS_TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 /* ========= Persistencia ========= */
-// RESTAURAMOS LA CLAVE ORIGINAL PARA RECUPERAR DATOS
 const DB_KEY = "tool_loans_db_v14_lib"; 
 const CFG_KEY = "tool_loans_cfg_v14_lib";
+
+window.DB_KEY = DB_KEY;
+window.CFG_KEY = CFG_KEY;
 
 const nowIso = () => new Date().toISOString();
 const uid = () => Math.random().toString(36).slice(2,10)+Math.random().toString(36).slice(2,8);
@@ -257,7 +348,6 @@ const normOp = (s) => {
 };
 const esc = (s) => String(s||"").replace(/[&<>"']/g, (c)=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 
-/* ========= Render Icon Update ========= */
 const renderIcon = (s) => {
   if(!s) return "🧰";
   if(String(s).startsWith("data:image")) return `<img src="${s}" class="icon-img" alt="icon"/>`;
@@ -265,7 +355,6 @@ const renderIcon = (s) => {
   return esc(s);
 };
 
-/* ========= Resize Utility ========= */
 function processImage(file, callback) {
   if(!file.type.startsWith("image/")) return alert("No es una imagen");
   const reader = new FileReader();
@@ -290,13 +379,11 @@ function processImage(file, callback) {
 let db = { tools: [], history: [], library: null, familyOrder: [], operators: [] }; 
 let cfg = { warnDays: 7, dangerDays: 30, familyOpen: {}, floatingPos: null };
 let selected = new Set();
-// Variables globales Drag & Drop
 let dragSrcIndex = null; 
 let draggedIcon = null;  
-let dragType = null; // 'tool' or 'family'
-let dragSrcId = null; // ID for tools, Family Name for families
+let dragType = null;
+let dragSrcId = null;
 
-/* ========= DOM ========= */
 const $ = (id)=>document.getElementById(id);
 const invTools = $("invTools");
 const useList = $("useList");
@@ -306,11 +393,10 @@ const fbRecoge = $("fbRecoge");
 const dlOps = $("dlOps");
 const statusPill = $("statusPill");
 
-/* ========= Floating bar draggable ========= */
 function applyFloatingPos(){
   const el = $("floating");
   if(!el) return;
-  if(cfg && cfg.floatingPos && typeof cfg.floatingPos.x==="number" && typeof cfg.floatingPos.y==="number"){
+  if(cfg && cfg.floatingPos && typeof cfg.floatingPos.x==="number" && typeof cfg.floatingPos.y==="number" && !IS_TOUCH){
     el.style.left = cfg.floatingPos.x + "px";
     el.style.top = cfg.floatingPos.y + "px";
     el.style.right = "auto";
@@ -329,6 +415,7 @@ function setupFloatingDrag(){
   if(!el || !handle) return;
 
   applyFloatingPos();
+  if(IS_TOUCH) return;
 
   let dragging = false;
   let sx=0, sy=0, ox=0, oy=0;
@@ -340,27 +427,23 @@ function setupFloatingDrag(){
     const dy = e.clientY - sy;
     let nx = ox + dx;
     let ny = oy + dy;
-
-    // Clamp inside viewport
     const rect = el.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     nx = Math.max(6, Math.min(vw - rect.width - 6, nx));
     ny = Math.max(6, Math.min(vh - rect.height - 6, ny));
-
     el.style.left = nx + "px";
     el.style.top = ny + "px";
     el.style.right = "auto";
     el.style.bottom = "auto";
   };
 
-  const onUp = (e) => {
+  const onUp = () => {
     if(!dragging) return;
     dragging = false;
     el.classList.remove("dragging");
     document.removeEventListener("pointermove", onMove, true);
     document.removeEventListener("pointerup", onUp, true);
-    // Persist
     const left = parseFloat(el.style.left);
     const top = parseFloat(el.style.top);
     if(!Number.isNaN(left) && !Number.isNaN(top)){
@@ -370,7 +453,6 @@ function setupFloatingDrag(){
   };
 
   handle.addEventListener("pointerdown", (e)=>{
-    // Only start drag if selection bar is visible
     if(el.style.display === "none") return;
     dragging = true;
     el.classList.add("dragging");
@@ -396,8 +478,6 @@ function setupFloatingDrag(){
   window.addEventListener("resize", ()=>{ applyFloatingPos(); });
 }
 
-
-/* ========= Modal System ========= */
 function showModal(title, bodyHtml, footButtons){
   $("mTitle").textContent = title;
   $("mBody").innerHTML = bodyHtml;
@@ -434,8 +514,6 @@ function closeAuxModal(){ $("auxModal").classList.remove("show"); }
 $("aClose").addEventListener("click", closeAuxModal);
 $("auxModal").addEventListener("click", (e)=>{ if(e.target.id==="auxModal") closeAuxModal(); });
 
-
-/* ========= Logic Core ========= */
 const DEFAULT_LIB = {
   "Maquinaria PRO": [],
   "Básicos": ["🧰","🛠️","⚙️","🔩","🔧","🔨","🪛","🪚","⚒️","🪓","⛏️","🗜️","⛓️","🧲","📏","📐","✂️"],
@@ -451,13 +529,10 @@ const DEFAULT_LIB = {
 };
 
 function loadAll(){
-  // Cargamos la base de datos ANTIGUA para recuperar lo que tenías
   try{ const raw = localStorage.getItem(DB_KEY); if(raw) db = JSON.parse(raw); }catch(_){ db = {tools:[],history:[], library:null}; }
 
   if(!db || !Array.isArray(db.tools)) db = {tools:[],history:[], library:null};
   if(!db.library) db.library = JSON.parse(JSON.stringify(DEFAULT_LIB));
-  
-  // Clean empty defaults if messy
   if(!db.library["Mis Iconos"]) db.library["Mis Iconos"] = [];
 
   for(const t of db.tools){
@@ -466,28 +541,21 @@ function loadAll(){
     if(!Array.isArray(t.maintSerials)) t.maintSerials = [];
     if(typeof t.maintQty !== 'number') t.maintQty = 0;
     if(typeof t.stock !== 'number') t.stock = 0;
-
-    // Backward-compat: loans antiguos solo tenían operator (destino).
     for(const l of (t.loans||[])){
       if(!l.operator) l.operator = "";
-      if(!l.pickupBy) l.pickupBy = l.operator; // quién la recoge
+      if(!l.pickupBy) l.pickupBy = l.operator;
     }
   }
-  
-  // Ensure familyOrder exists and is synced
+
   if(!Array.isArray(db.familyOrder)) db.familyOrder = [];
   syncFamilyOrder();
-  
-  // === AUTO-ACTUALIZAR CON OPERARIOS ===
-  // Si tu base de datos vieja no tenía tabla de operarios, la creamos ahora y metemos los nombres del historial
+
   if(!Array.isArray(db.operators)){
       db.operators = [];
       const tempSet = new Set();
-      // Recopilar nombres de historial y préstamos activos
       [...db.history, ...db.tools.flatMap(t=>t.loans)].forEach(item => {
           if(item.operator) tempSet.add(item.operator.trim());
       });
-      // Crear fichas básicas
       tempSet.forEach(name => {
          if(name) db.operators.push({ id: uid(), name: name, phone: "", dept: "" });
       });
@@ -500,11 +568,9 @@ function loadAll(){
 
 function syncFamilyOrder(){
     const currentKeys = Object.keys(db.library);
-    // Add new ones
     currentKeys.forEach(k => {
         if(!db.familyOrder.includes(k)) db.familyOrder.push(k);
     });
-    // Remove deleted ones (and keep "Sin familia" out of this explicit list if preferred, but we handle it in render)
     db.familyOrder = db.familyOrder.filter(k => currentKeys.includes(k) || k === "Sin familia");
 }
 
@@ -537,13 +603,10 @@ function daysSince(iso){
 
 function hydrateOperators(){
   dlOps.innerHTML = "";
-  // Ordenar alfabéticamente
   const sorted = [...db.operators].sort((a,b) => a.name.localeCompare(b.name));
-  
   sorted.forEach(op => {
       const opt = document.createElement("option");
       opt.value = op.name;
-      // Mostrar info extra si existe en la etiqueta (algunos navegadores lo muestran)
       if(op.dept || op.phone) {
           opt.label = `${op.dept ? op.dept : ''} ${op.phone ? '📞'+op.phone : ''}`;
       }
@@ -551,7 +614,6 @@ function hydrateOperators(){
   });
 }
 
-/* ========= Render ========= */
 function updateStatus(){
   const total = db.tools.length;
   const activeLoans = db.tools.reduce((a,t)=>a + ((t.loans||[]).length), 0);
@@ -559,8 +621,6 @@ function updateStatus(){
   statusPill.textContent = `Items: ${total} · Activos: ${activeLoans} · Reparación: ${inMaint}`;
 }
 
-
-/* === Familias desde Catálogo (db.library) === */
 function familyOfTool(t){
   const icon=(t.icon||"").trim();
   if(!icon) return "Sin familia";
@@ -571,18 +631,14 @@ function familyOfTool(t){
 }
 
 function render(){
-  try{ var b=document.getElementById('debugBanner'); if(b){b.textContent='DEBUG: render()';}}catch(e){}
-
   updateStatus();
   hydrateOperators();
-  syncFamilyOrder(); // Ensure order array is healthy
+  syncFamilyOrder();
 
-  /* ================== INVENTARIO (CON BUSQUEDA) ================== */
   $("invEmpty").style.display = db.tools.length ? "none" : "block";
   const sort = $("sortInv").value;
-  // MEJORA: Obtener valor de busqueda
   const search = normName($("invSearch").value).toLowerCase();
-  
+
   let list = [];
   if (sort === "manual") {
       list = db.tools.map((t, idx) => ({ ...t, originalIndex: idx }));
@@ -597,12 +653,10 @@ function render(){
       });
   }
 
-  // MEJORA: Filtrado por busqueda
   if(search) {
       list = list.filter(t => t.name.toLowerCase().includes(search));
   }
-  
-  // === Agrupar Inventario por familia ===
+
   invTools.innerHTML = "";
   const famBuckets = {};
   for(const t of list){
@@ -610,11 +664,8 @@ function render(){
     (famBuckets[fam] = famBuckets[fam] || []).push(t);
   }
 
-  // Ordenar familias
   let fams = [...db.familyOrder];
   if(famBuckets["Sin familia"] && !fams.includes("Sin familia")) fams.push("Sin familia");
-  
-  // Filtrar solo las que tienen herramientas visibles
   fams = fams.filter(f => famBuckets[f] && famBuckets[f].length > 0);
 
   for(const fam of fams){
@@ -626,9 +677,8 @@ function render(){
     wrap.style.marginBottom="10px";
     wrap.style.overflow="hidden";
     wrap.style.background="rgba(255,255,255,0.03)";
-    
-    // Solo permitir drag si no hay busqueda (para no romper orden)
-    if(!search) {
+
+    if(!IS_TOUCH && !search) {
         wrap.draggable = true;
         wrap.ondragstart = (e) => handleFamDragStart(e, fam);
         wrap.ondragover = (e) => handleFamDragOver(e);
@@ -644,12 +694,11 @@ function render(){
     head.style.padding="10px 12px";
     head.style.background="rgba(0,0,0,0.18)";
     head.style.cursor="pointer"; 
-    head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${famBuckets[fam].length})</span> <span style="font-size:10px;color:var(--mut)">::</span></div><div style="color:var(--mut);font-size:12px">▼</div>`;
+    head.innerHTML = `<div><b>${esc(fam)}</b> <span style="color:var(--mut);font-size:12px">(${famBuckets[fam].length})</span> ${!IS_TOUCH && !search ? '<span style="font-size:10px;color:var(--mut)">::</span>' : ''}</div><div style="color:var(--mut);font-size:12px">▼</div>`;
 
     const body=document.createElement("div");
     body.style.padding="10px";
-    
-    // Lógica de colapsado (abierto por defecto si hay búsqueda)
+
     const isOpen = search ? true : (cfg.familyOpen && cfg.familyOpen[fam] === true);
     body.style.display = isOpen ? "block" : "none";
 
@@ -670,9 +719,8 @@ function render(){
 
       const tool = document.createElement("div");
       tool.className = `tool ${selClass}`;
-      
-      // Solo drag herramientas si no hay busqueda
-      if(!search){
+
+      if(!IS_TOUCH && !search){
           tool.draggable = true;
           tool.ondragstart = (e) => handleToolDragStart(e, t.id);
           tool.ondragover = (e) => handleToolDragOver(e);
@@ -684,23 +732,23 @@ function render(){
         if(e.target.closest(".btn") || e.target.closest("input") || e.target.closest("select")) return;
         toggleSelect(t.id);
       };
-      
+
       tool.innerHTML = `
         <div class="row">
-          <div class="ico" style="cursor:grab">${renderIcon(t.icon)}</div>
+          <div class="ico">${renderIcon(t.icon)}</div>
           <div style="flex:1;min-width:140px">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div class="name">${esc(t.name)}</div>
               <div class="kpis">${used?`<span class="pill warn">En uso ${used}</span>`:""}${maint?`<span class="pill danger">Reparación ${maint}</span>`:""}</div>
             </div>
             <div class="meta">Stock: <b>${t.stock}</b> · Libres: <b>${free}</b></div>
-            <div class="bar"><i class="${barClass}" style="width:${pct}%;"></i></div>
+            <div class="bar ${barClass}"><i style="width:${pct}%;"></i></div>
           </div>
           <div class="row" style="gap:6px">
             <button class="btn" type="button" onclick="openEdit('${t.id}')">Editar</button>
             <button class="btn" type="button" onclick="openLoanAction('${t.id}')">Prestar</button>
             <button class="btn" type="button" onclick="openMaintManager('${t.id}')">Reparación</button>
-            <button class="btn dang" type="button" onclick="deleteTool('${t.id}')">Eliminar</button>
+            <button class="btn danger" type="button" onclick="deleteTool('${t.id}')">Eliminar</button>
           </div>
         </div>
       `;
@@ -712,7 +760,6 @@ function render(){
     invTools.appendChild(wrap);
   }
 
-  /* ================== EN USO (AGRUPADO POR OPERARIO) ================== */
   const opBuckets = {};
   let totalLoans = 0;
 
@@ -725,7 +772,6 @@ function render(){
     });
   });
 
-  // Ordenar cada operario por fecha de salida
   for(const op in opBuckets){
     opBuckets[op].sort((a,b)=> new Date(a.loan.outAt)-new Date(b.loan.outAt));
   }
@@ -802,7 +848,6 @@ function render(){
     useList.appendChild(wrap);
   }
 
-  /* ================== EN REPARACIÓN (RESUMEN) ================== */
   const repListEl = document.getElementById("repList");
   const repEmptyEl = document.getElementById("repEmpty");
   if(repListEl && repEmptyEl){
@@ -877,7 +922,6 @@ function render(){
     }
   }
 
-
   $("selCount").textContent = String(selected.size);
   $("selHint").textContent = selected.size ? "Listo para prestar." : "";
   applyFloatingPos();
@@ -886,43 +930,37 @@ function render(){
 
 function toggleSelect(id){
   if(selected.has(id)) selected.delete(id); else selected.add(id);
-  render(); var b=document.getElementById('debugBanner'); if(b){b.textContent='DEBUG: OK';}
+  render();
 }
 
-/* === MAIN PAGE DRAG AND DROP LOGIC === */
-
-// 1. Family Dragging
 function handleFamDragStart(e, famName){
-    if(e.target.closest('.tool')) {
-        // Prevent family drag if actually dragging a tool inside
-        return;
-    }
+    if(IS_TOUCH) return;
+    if(e.target.closest('.tool')) return;
     dragType = 'family';
     dragSrcId = famName;
     e.dataTransfer.effectAllowed = 'move';
-    e.target.classList.add('dragging');
+    e.currentTarget.classList.add('dragging');
 }
 function handleFamDragOver(e){
-    if(dragType !== 'family') return;
+    if(IS_TOUCH || dragType !== 'family') return;
     e.preventDefault();
-    e.target.closest('.fam-wrap').classList.add('drag-over');
+    e.currentTarget.classList.add('drag-over');
 }
 function handleFamDragLeave(e){
-    e.target.closest('.fam-wrap')?.classList.remove('drag-over');
+    e.currentTarget.classList.remove('drag-over');
 }
 function handleFamDrop(e, targetFam){
-    if(dragType !== 'family') return;
+    if(IS_TOUCH || dragType !== 'family') return;
     e.preventDefault();
     e.stopPropagation();
-    const wrap = e.target.closest('.fam-wrap');
+    const wrap = e.currentTarget;
     if(wrap) wrap.classList.remove('drag-over');
-    
+
     const srcFam = dragSrcId;
     if(srcFam !== targetFam){
         const srcIdx = db.familyOrder.indexOf(srcFam);
         const tgtIdx = db.familyOrder.indexOf(targetFam);
         if(srcIdx > -1 && tgtIdx > -1){
-             // Remove source and insert at target
              db.familyOrder.splice(srcIdx, 1);
              db.familyOrder.splice(tgtIdx, 0, srcFam);
              saveAll();
@@ -931,43 +969,40 @@ function handleFamDrop(e, targetFam){
     }
 }
 
-// 2. Tool Dragging
 function handleToolDragStart(e, toolId){
+    if(IS_TOUCH) return;
     dragType = 'tool';
     dragSrcId = toolId;
     e.dataTransfer.effectAllowed = 'move';
-    e.target.classList.add('dragging');
-    e.stopPropagation(); // Stop bubbling to family
+    e.currentTarget.classList.add('dragging');
+    e.stopPropagation();
 }
 function handleToolDragOver(e){
-    if(dragType !== 'tool') return;
+    if(IS_TOUCH || dragType !== 'tool') return;
     e.preventDefault();
-    const t = e.target.closest('.tool');
+    const t = e.currentTarget.closest('.tool') || e.currentTarget;
     if(t) t.classList.add('drag-over');
 }
 function handleToolDragLeave(e){
-    const t = e.target.closest('.tool');
+    const t = e.currentTarget.closest('.tool') || e.currentTarget;
     if(t) t.classList.remove('drag-over');
 }
 function handleToolDrop(e, targetId){
-    if(dragType !== 'tool') return;
+    if(IS_TOUCH || dragType !== 'tool') return;
     e.preventDefault();
     e.stopPropagation();
-    
-    // Switch to manual sort automatically if dropped
+
     const sortSelect = $("sortInv");
     if(sortSelect.value !== "manual"){
         sortSelect.value = "manual";
-        // We need to ensure logic handles this switch gracefully
     }
-    
+
     const srcId = dragSrcId;
     if(srcId !== targetId){
         const srcIdx = db.tools.findIndex(t => t.id === srcId);
         const tgtIdx = db.tools.findIndex(t => t.id === targetId);
-        
+
         if(srcIdx > -1 && tgtIdx > -1){
-            // Move item in array
             const [item] = db.tools.splice(srcIdx, 1);
             db.tools.splice(tgtIdx, 0, item);
             saveAll();
@@ -976,8 +1011,6 @@ function handleToolDrop(e, targetId){
     }
 }
 
-
-/* ========= Tool CRUD ========= */
 function openNew(){
   showModal("Nueva herramienta", `
     <div class="form">
@@ -1034,7 +1067,6 @@ function openEdit(id){
       let stock = t.stock;
       if(t.mode!=="serial") stock = clampInt($("eStock").value, toolsInUseCount(t)+toolsInMaintCount(t), 9999);
       if(stock===null) return alert("Stock inválido");
-      
       t.name = name; t.icon = $("eIcon").value; t.stock = stock;
       saveAll(); closeModal(); render();
     }}
@@ -1058,7 +1090,6 @@ function deleteTool(id){
   }
 }
 
-/* ========= Maintenance Manager ========= */
 function openMaintManager(id){
   const t = db.tools.find(x=>x.id===id); if(!t) return;
   const inMaint = toolsInMaintCount(t);
@@ -1129,11 +1160,10 @@ function doReturnMaint(t){
   }
 }
 
-/* ========= Loans ========= */
 function openBatchLoan(){
-  const para = normOp(fbOperario.value); // destinatario
+  const para = normOp(fbOperario.value);
   const recoge0 = normOp((fbRecoge && fbRecoge.value) || "");
-  const recoge = recoge0 || para; // quien recoge (si no se indica, mismo)
+  const recoge = recoge0 || para;
   if(!para) {
       if(selected.size > 0) alert("Escribe 'Para' (operario destino) en la barra flotante");
       return;
@@ -1223,7 +1253,6 @@ function openReturn(tid, lid){
   ]);
 }
 
-
 function openTransfer(tid, lid){
   const t = db.tools.find(x=>x.id===tid);
   if(!t) return;
@@ -1276,20 +1305,15 @@ function openTransfer(tid, lid){
   ]);
 }
 
-
 function openHistory(){
   showModal("Historial", `<div style="margin-bottom:10px;display:flex;gap:10px"><input id="hSearch" placeholder="Filtrar..." style="flex:1"/><button class="btn danger" id="hClear">Limpiar</button></div><div style="max-height:60vh;overflow:auto"><table id="hTable"><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Nota</th></tr></thead><tbody id="hBody"></tbody></table></div>`, [{text:"Cerrar", className:"btn", onClick:closeModal}]);
   const renderH = (filter) => {
-    const list = db.history.slice().reverse().filter(h => !filter || (h.operator+h.toolName+(h.variant||"")).toLowerCase().includes(filter.toLowerCase()));
-    $("hBody").innerHTML = list.map(h => `<tr><td class="mono small">${new Date(h.type==="OUT"?h.outAt:h.inAt).toLocaleDateString()}</td><td><span class="badge ${h.type==='OUT'?'':'ok'}">${h.type}</span></td><td class="small"><b>${esc(h.toolName)}</b> ${h.variant?`<br>(${esc(h.variant)})`:''}<br>${esc(h.operator)} (x${h.qty})</td><td class="small">${esc(h.notes||"")} ${h.status==='inc'?'🚨':''}</td></tr>`).join("");
+    const list = db.history.slice().reverse().filter(h => !filter || (String(h.operator||"")+String(h.toolName||"")+String(h.variant||"")).toLowerCase().includes(filter.toLowerCase()));
+    $("hBody").innerHTML = list.map(h => `<tr><td class="mono small">${new Date(h.type==="OUT"?h.outAt:(h.inAt||h.at||Date.now())).toLocaleDateString()}</td><td><span class="badge ${h.type==='OUT'?'':'ok'}">${h.type}</span></td><td class="small"><b>${esc(h.toolName)}</b> ${h.variant?`<br>(${esc(h.variant)})`:''}<br>${esc(h.operator || h.toOperator || "—")} (x${h.qty||0})</td><td class="small">${esc(h.notes||"")} ${h.status==='inc'?'🚨':''}</td></tr>`).join("");
   };
   renderH(""); $("hSearch").oninput = (e) => renderH(e.target.value); $("hClear").onclick = () => { if(confirm("¿Borrar todo?")) { db.history=[]; saveAll(); closeModal(); } };
 }
 
-
-/* ================================================== */
-/* === GESTOR DE OPERARIOS (NUEVO) ================= */
-/* ================================================== */
 function openOperatorManager() {
     const renderOps = (searchVal = "") => {
         let rows = "";
@@ -1297,7 +1321,6 @@ function openOperatorManager() {
             op.name.toLowerCase().includes(searchVal) || 
             (op.dept||"").toLowerCase().includes(searchVal)
         );
-        // Orden alfabético
         filtered.sort((a,b)=>a.name.localeCompare(b.name));
 
         filtered.forEach(op => {
@@ -1313,7 +1336,7 @@ function openOperatorManager() {
               </tr>
             `;
         });
-        
+
         return `
           <div style="margin-bottom:10px; display:flex; gap:10px;">
             <input id="opSearch" placeholder="Buscar operario..." value="${esc(searchVal)}" style="flex:1">
@@ -1330,13 +1353,11 @@ function openOperatorManager() {
 
     showModal("Gestión de Operarios", renderOps(), [{text:"Cerrar", className:"btn", onClick:closeModal}]);
 
-    // Re-bind events after render
     const bindEvents = () => {
         const inp = $("opSearch");
         if(inp) inp.oninput = (e) => {
             $("mBody").innerHTML = renderOps(e.target.value.toLowerCase());
-            bindEvents(); // Re-bind dynamic buttons
-            // Focus back to input
+            bindEvents();
             const newInp = $("opSearch");
             newInp.value = e.target.value;
             newInp.focus();
@@ -1347,20 +1368,19 @@ function openOperatorManager() {
     bindEvents();
 }
 
-// Global functions for inline HTML access
 window.editOp = (id) => openOpForm(id);
 window.deleteOp = (id) => {
     if(confirm("¿Eliminar operario? (No afecta al historial pasado)")){
         db.operators = db.operators.filter(o => o.id !== id);
         saveAll();
-        openOperatorManager(); // Refresh
-        render(); // Refresh autocomplete
+        openOperatorManager();
+        render();
     }
 };
 
 function openOpForm(id = null){
     const op = id ? db.operators.find(o => o.id === id) : {name:"", phone:"", dept:""};
-    
+
     showAuxModal(id ? "Editar Operario" : "Nuevo Operario", `
         <div class="form">
             <div style="grid-column:1/-1"><label>Nombre Completo</label><input id="fOpName" value="${esc(op.name)}" placeholder="Ej. Juan Pérez"></div>
@@ -1372,9 +1392,8 @@ function openOpForm(id = null){
         {text:"Guardar", className:"btn primary", onClick:()=>{
             const name = normName($("fOpName").value);
             if(!name) return alert("Nombre obligatorio");
-            
+
             if(id){
-                // Edit
                 const target = db.operators.find(o => o.id === id);
                 if(target) {
                     target.name = name;
@@ -1382,7 +1401,6 @@ function openOpForm(id = null){
                     target.dept = $("fOpDept").value.trim();
                 }
             } else {
-                // Create
                 db.operators.push({
                     id: uid(),
                     name: name,
@@ -1392,8 +1410,8 @@ function openOpForm(id = null){
             }
             saveAll();
             closeAuxModal();
-            openOperatorManager(); // Back to list
-            render(); // Refresh autocomplete
+            openOperatorManager();
+            render();
         }}
     ]);
 }
@@ -1417,37 +1435,27 @@ $("btnImport").onclick = () => {
 };
 
 $("btnNuevo").onclick = openNew;
-$("btnOps").onclick = openOperatorManager; // NUEVO BOTON
+$("btnOps").onclick = openOperatorManager;
 $("btnHistorial").onclick = openHistory;
 $("sortInv").onchange = render;
-$("invSearch").oninput = render; // BUSCADOR ACTIVADO
+$("invSearch").oninput = render;
 $("btnPrestarSel").onclick = openBatchLoan;
 $("btnCancelSel").onclick = ()=>{ selected.clear(); render(); };
 
-
-/* ================================================== */
-/* === GESTOR DE CATÁLOGO TOTAL (RENOVADO) ========= */
-/* ================================================== */
-
-// Ahora es una única función que maneja tanto "Ver/Gestionar" como "Seleccionar para herramienta"
-// isPickerMode: true (si vienes de "Nueva Herramienta") / false (si vienes del botón menú principal)
-// onSelect: callback solo usado si isPickerMode=true
 function openCatalogManager(isPickerMode = false, onSelect = null) {
-  
   const renderManager = () => {
       let html = `
-        <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--line); padding-bottom:10px;">
+        <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid var(--line); padding-bottom:10px; flex-wrap:wrap;">
           <button class="btn primary" id="btnAddNewFamily">+ Familia</button>
           <button class="btn" id="btnUploadIcon">+ Icono/Imagen</button>
           <div class="spacer"></div>
-          ${!isPickerMode ? `<span class="small" style="color:var(--mut)">Arrastra iconos para ordenar o mover entre familias.</span>` : ''}
+          ${!isPickerMode && !IS_TOUCH ? `<span class="small" style="color:var(--mut)">Arrastra iconos para ordenar o mover entre familias.</span>` : ''}
+          ${!isPickerMode && IS_TOUCH ? `<span class="small" style="color:var(--mut)">Modo tablet: gestión sin arrastre.</span>` : ''}
         </div>
         <div style="max-height:60vh; overflow-y:auto; padding-right:5px;">
       `;
 
-      // Iterar familias
       for(const [cat, list] of Object.entries(db.library)){
-        // Header de Familia (Drop Target)
         html += `
           <div class="cat-header" data-cat="${cat}">
              <span>${cat} <span class="badge" style="margin-left:8px">${list.length}</span></span>
@@ -1458,10 +1466,9 @@ function openCatalogManager(isPickerMode = false, onSelect = null) {
           </div>
           <div class="emojiGrid" data-cat="${cat}">
         `;
-        // Iconos
         html += list.map((e, idx) => `
             <button class="emojiBtn" 
-              draggable="true" 
+              ${!IS_TOUCH ? `draggable="true"` : ''}
               data-cat="${cat}" 
               data-idx="${idx}"
               onclick="selectIcon('${cat}', ${idx})"
@@ -1473,7 +1480,6 @@ function openCatalogManager(isPickerMode = false, onSelect = null) {
       }
       html += `</div>`;
 
-      // Renderizar en el modal adecuado
       if(isPickerMode) {
           $("aBody").innerHTML = html;
       } else {
@@ -1488,35 +1494,28 @@ function openCatalogManager(isPickerMode = false, onSelect = null) {
   } else {
       showModal("Gestión de Catálogo", "", [{text:"Cerrar", className:"btn", onClick:closeModal}]);
   }
-  
+
   renderManager();
 }
 
-// Eventos y Lógica del Catálogo
 window.renameFamily = (oldName) => {
     const newName = prompt("Nuevo nombre para la familia:", oldName);
     if(newName && newName !== oldName){
         if(db.library[newName]) return alert("Ese nombre ya existe");
         const entries = Object.entries(db.library);
         const newLib = {};
-        // Mantener orden de keys
         for(const [k,v] of entries){
             if(k === oldName) newLib[newName] = v;
             else newLib[k] = v;
         }
         db.library = newLib;
-        
-        // Also update familyOrder
         const idx = db.familyOrder.indexOf(oldName);
         if(idx > -1) db.familyOrder[idx] = newName;
         else db.familyOrder.push(newName);
-        
         saveAll();
-        // Refrescar vista re-llamando al openCatalogManager en el modo correcto
-        // Truco: detectamos cual modal está abierto
         const isAux = $("auxModal").classList.contains("show");
         openCatalogManager(isAux, isAux ? window.currentSelectCb : null);
-        render(); // update main view too
+        render();
     }
 };
 
@@ -1527,17 +1526,15 @@ window.deleteFamily = (name) => {
         saveAll();
         const isAux = $("auxModal").classList.contains("show");
         openCatalogManager(isAux, isAux ? window.currentSelectCb : null);
-        render(); // update main view
+        render();
     }
 };
 
 window.selectIcon = (cat, idx) => {
-    // Si estamos en modo picker, ejecutamos el callback
     if(window.isPickerActive && window.currentSelectCb) {
         window.currentSelectCb(db.library[cat][idx]);
         closeAuxModal();
     } else {
-        // En modo gestión, click podría ser para borrar individualmente?
         if(confirm("¿Eliminar este icono?")){
             db.library[cat].splice(idx, 1);
             saveAll();
@@ -1547,14 +1544,12 @@ window.selectIcon = (cat, idx) => {
 }
 
 function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
-    // Guardar estado global para los oncliks inline
     window.isPickerActive = isPickerMode;
     window.currentSelectCb = onSelect;
 
-    // Botones Top
     const btnAddFam = document.getElementById("btnAddNewFamily");
     const btnUpload = document.getElementById("btnUploadIcon");
-    
+
     if(btnAddFam) btnAddFam.onclick = () => {
         const name = prompt("Nombre de la nueva familia:");
         if(name){
@@ -1569,7 +1564,8 @@ function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
 
     if(btnUpload) btnUpload.onclick = () => openUploadModal(refreshCb);
 
-    // DRAG AND DROP LOGIC
+    if(IS_TOUCH) return;
+
     const icons = document.querySelectorAll('.emojiBtn');
     const headers = document.querySelectorAll('.cat-header');
 
@@ -1589,7 +1585,6 @@ function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
             document.querySelectorAll('.cat-header').forEach(h => h.classList.remove('drag-target'));
         });
 
-        // Drop sobre otro icono (Reordenar)
         icon.addEventListener('dragover', (e) => { e.preventDefault(); icon.classList.add('drag-over-icon'); });
         icon.addEventListener('dragleave', () => icon.classList.remove('drag-over-icon'));
         icon.addEventListener('drop', (e) => {
@@ -1599,13 +1594,8 @@ function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
             const targetIdx = parseInt(icon.dataset.idx);
 
             if(draggedIcon && (draggedIcon.cat !== targetCat || draggedIcon.idx !== targetIdx)){
-                // Mover
                 const item = db.library[draggedIcon.cat].splice(draggedIcon.idx, 1)[0];
-                // Si es la misma categoria pero hemos borrado uno antes, ajustar indice
                 let finalIdx = targetIdx;
-                /* La logica simple de splice y insert funciona bien si recargamos todo */
-                
-                // Insertar en nuevo lugar
                 db.library[targetCat].splice(finalIdx, 0, item);
                 saveAll();
                 refreshCb();
@@ -1613,7 +1603,6 @@ function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
         });
     });
 
-    // Drop sobre cabecera (Mover a carpeta)
     headers.forEach(header => {
         header.addEventListener('dragover', (e) => { e.preventDefault(); header.classList.add('drag-target'); });
         header.addEventListener('dragleave', () => header.classList.remove('drag-target'));
@@ -1631,21 +1620,10 @@ function attachCatalogEvents(isPickerMode, onSelect, refreshCb) {
     });
 }
 
-// Sub-Modal para Subir Imagen
 function openUploadModal(parentRefreshCb) {
   let tempImgData = null; 
   let baseImg = null; 
-
-  // Guardamos referencia al modal padre para volver a él
   const isAux = $("auxModal").classList.contains("show");
-  const parentModalId = isAux ? "auxModal" : "modal";
-  
-  // Ocultamos temporalmente el padre (no cerramos para no perder estado si fuera complejo)
-  // Pero aquí, como recargamos todo, podemos cerrarlo visualmente y reabrirlo.
-  // Estrategia: Usamos el OTRO modal disponible para el upload.
-  // Si estamos en modal principal (Gestión), usamos auxModal para upload.
-  // Si estamos en auxModal (Picker), usamos modal para upload (invertido).
-  
   const uploadModalId = isAux ? "modal" : "auxModal";
   const uploadModalTitle = isAux ? "mTitle" : "aTitle";
   const uploadModalBody = isAux ? "mBody" : "aBody";
@@ -1664,21 +1642,18 @@ function openUploadModal(parentRefreshCb) {
     </div>
   `;
 
-  // Configurar el modal de upload
   $(uploadModalTitle).textContent = "Subir Nuevo Icono";
   $(uploadModalBody).innerHTML = body;
   const foot = $(uploadModalFoot);
   foot.innerHTML = "";
-  
-  // Botones
+
   const btnCancel = document.createElement("button");
   btnCancel.className = "btn";
   btnCancel.textContent = "Volver";
   btnCancel.onclick = () => {
       uploadModalEl.classList.remove("show");
-      // El padre sigue abierto detras
   };
-  
+
   const btnSave = document.createElement("button");
   btnSave.className = "btn primary";
   btnSave.textContent = "Guardar";
@@ -1688,20 +1663,17 @@ function openUploadModal(parentRefreshCb) {
        db.library[cat].push(tempImgData);
        saveAll();
        uploadModalEl.classList.remove("show");
-       parentRefreshCb(); // Recargar el manager
+       parentRefreshCb();
   };
 
   foot.appendChild(btnCancel);
   foot.appendChild(btnSave);
   uploadModalEl.classList.add("show");
 
-  // Lógica Upload
   const dz = $("dz_upload");
   const fi = $("fi_upload");
   const pv = $("pv_upload");
   const slider = $("sl_hue");
-
-  dz.onclick = () => fi.click();
 
   const updatePreview = () => {
       if(!baseImg) return;
@@ -1723,50 +1695,40 @@ function openUploadModal(parentRefreshCb) {
     });
   };
 
+  dz.onclick = () => fi.click();
   slider.oninput = updatePreview;
   fi.onchange = (e) => { if(e.target.files[0]) handleFile(e.target.files[0]); };
   dz.ondragover = (e) => { e.preventDefault(); dz.classList.add("dragover"); };
   dz.ondragleave = () => dz.classList.remove("dragover");
   dz.ondrop = (e) => { e.preventDefault(); dz.classList.remove("dragover"); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
   document.onpaste = (e) => {
-    // Solo capturar paste si este modal está visible (top z-index)
     if(!uploadModalEl.classList.contains("show")) return; 
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
     for (const item of items) { if (item.kind === 'file' && item.type.startsWith('image/')) handleFile(item.getAsFile()); }
   };
 }
 
-// === FUNCIONES AUXILIARES PARA LOS BOTONES ===
-
-// Acción del botón "Prestar" en la tarjeta
 function openLoanAction(id){
-  // Si la herramienta no estaba seleccionada, la seleccionamos
   if(!selected.has(id)) {
       selected.add(id);
       render();
   }
-  // Abrimos el modal con TODO lo que haya seleccionado (incluyendo la actual)
-  // Usamos timeout para dar tiempo al renderizado visual
   setTimeout(() => openBatchLoan(), 10);
 }
 
-// Boton del menu principal: Abre el modo Gestión (isPicker=false)
 $("btnCatalogo").onclick = () => openCatalogManager(false);
 
-boot();
 function boot(){
   loadAll();
-  // Al iniciar, ninguna familia debe quedar desplegada por defecto
   if(!cfg.familyOpen) cfg.familyOpen = {};
   cfg.familyOpen = {};
   saveAll();
   render();
   setupFloatingDrag();
 }
-
+boot();
 </script>
 
-<!-- ================= FIREBASE (Auth + Firestore) - Cloud Save Herramientas ================= -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
@@ -1788,7 +1750,6 @@ function boot(){
   window.__FIREBASE_TOOLS__ = { app, auth, db, onAuthStateChanged, doc, getDoc, setDoc, serverTimestamp };
 
   async function ensureLoggedIn() {
-    // Firebase Auth persistence should carry over between pages in same origin if user signed in once.
     const u = auth.currentUser;
     if (u) return u;
     return await new Promise((resolve) => {
@@ -1807,7 +1768,6 @@ function boot(){
       return;
     }
 
-    // Guardamos solo las 2 claves del módulo (mínimo, sin tocar tu lógica)
     const DB_KEY = window.DB_KEY || "tool_loans_db_v14_lib";
     const CFG_KEY = window.CFG_KEY || "tool_loans_cfg_v14_lib";
 
@@ -1844,7 +1804,6 @@ function boot(){
     const payload = data.payload || {};
     const keys = Object.keys(payload);
 
-    // Guardado seguro (no romper por cuota): si falla, avisamos y no machacamos a medias.
     try {
       for (const k of keys) {
         if (typeof payload[k] === "string") localStorage.setItem(k, payload[k]);
@@ -1858,7 +1817,6 @@ function boot(){
     alert("✅ Cargado desde nube OK. Recarga la página para ver los datos.");
   }
 
-  // Wire UI
   window.addEventListener("DOMContentLoaded", () => {
     const btnSave = document.getElementById("btnCloudSave");
     const btnLoad = document.getElementById("btnCloudLoad");
